@@ -3633,6 +3633,69 @@
     margin: 0;
     padding: 10px 14px;
   }
+  /* Google Sign-In profile */
+  .mset-google-signin-wrap { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; }
+  .mset-google-desc { color: var(--text-dim); font-size: 13px; line-height: 1.5; margin: 0; }
+  .mset-google-btn-wrap { display: flex; justify-content: center; min-height: 44px; }
+  .mset-google-no-config {
+    align-items: flex-start;
+    background: color-mix(in oklab, #f59e0b 8%, transparent);
+    border: 1px solid color-mix(in oklab, #f59e0b 25%, transparent);
+    border-radius: 12px;
+    color: #f59e0b;
+    display: flex;
+    font-size: 12px;
+    gap: 8px;
+    line-height: 1.5;
+    margin: 14px 16px;
+    padding: 10px 12px;
+  }
+  .mset-google-no-config code { background: rgba(255,255,255,.1); border-radius: 4px; padding: 1px 4px; }
+  .mset-google-profile { align-items: center; display: flex; gap: 14px; padding: 14px 16px; }
+  .mset-google-avatar {
+    border-radius: 50%;
+    flex-shrink: 0;
+    height: 48px;
+    object-fit: cover;
+    width: 48px;
+  }
+  .mset-google-avatar.initials {
+    align-items: center;
+    background: var(--accent);
+    color: #000;
+    display: flex;
+    font-size: 22px;
+    font-weight: 800;
+    justify-content: center;
+  }
+  .mset-google-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .mset-google-info strong { color: var(--text); font-size: 15px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mset-google-info small { color: var(--text-dim); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mset-uid { font-size: 10px !important; opacity: .5; }
+  /* Search hint in command palette */
+  .cmd-hint { align-items: center; display: flex; flex-direction: column; gap: 8px; padding: 36px 24px; text-align: center; }
+  .cmd-hint p { color: var(--text-dim); font-size: 14px; margin: 0; }
+  .cmd-type-badge {
+    background: color-mix(in oklab, var(--text) 6%, transparent);
+    border-radius: 6px;
+    color: var(--text-dim);
+    flex-shrink: 0;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    margin-left: auto;
+    padding: 2px 6px;
+    text-transform: uppercase;
+  }
+  /* Account pill in create flow — unset state */
+  .mobile-create-account-pill.unset {
+    background: color-mix(in oklab, var(--m-primary) 8%, var(--m-surface-2));
+    border-color: color-mix(in oklab, var(--m-primary) 30%, transparent);
+  }
+  .mobile-create-account-pill.unset .mobile-create-account-name {
+    color: var(--m-primary);
+    font-weight: 700;
+  }
   /* Version row */
   .mset-info-row {
     align-items: center;

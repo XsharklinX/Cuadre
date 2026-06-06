@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Icon } from '@/components/ui/Icon'
 import { toast } from '@/components/ui/Toast'
-import { createBackup } from '@/data/backup'
 import { fmtCompact } from '@/data/helpers'
 import { useFinance } from '@/store/finance'
 import { useSettings } from '@/store/settings'
@@ -21,13 +20,6 @@ const TYPE_META: Record<AccountType, { label: string; icon: Parameters<typeof Ic
   credit:  { label: 'Credit', icon: 'cards'  },
 }
 
-function downloadJson(data: object, filename: string) {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-  const url  = URL.createObjectURL(blob)
-  const a    = document.createElement('a')
-  a.href = url; a.download = filename; a.click()
-  URL.revokeObjectURL(url)
-}
 
 export function MobileProfile({
   userName,
@@ -41,8 +33,7 @@ export function MobileProfile({
   createRequest?: ViewProps['createRequest']
 }) {
   const { displayName, setDisplayName } = useSettings()
-  const financeState = useFinance()
-  const { accounts, currency, addAccount, updateAccount, deleteAccount } = financeState
+  const { accounts, currency, addAccount, updateAccount, deleteAccount } = useFinance()
 
   const [editingName,    setEditingName]    = useState(false)
   const [nameInput,      setNameInput]      = useState(displayName || userName || '')
@@ -83,16 +74,6 @@ export function MobileProfile({
       setEditingAccount(null)
     } catch (error) {
       toast(error instanceof Error ? error.message : 'Could not delete account.', { icon: 'alert' })
-    }
-  }
-
-  const handleBackup = () => {
-    try {
-      const date = new Date().toISOString().slice(0, 10)
-      downloadJson(createBackup(financeState), `sharky-backup-${date}.json`)
-      toast('Backup downloaded', { icon: 'download', type: 'ok' })
-    } catch {
-      toast('Could not generate backup.', { icon: 'alert' })
     }
   }
 
@@ -173,23 +154,14 @@ export function MobileProfile({
         )}
       </div>
 
-      {/* ── Tools ── */}
+      {/* ── Quick links ── */}
       <div className="mpr-section">
-        <div className="mpr-section-header"><span>Tools</span></div>
+        <div className="mpr-section-header"><span>Quick links</span></div>
         <div className="mpr-link-list">
-          <button onClick={onSettings}><Icon name="settings" size={20} />Settings<Icon name="arrowUp" size={13} style={{ transform: 'rotate(90deg)', marginLeft: 'auto', color: 'var(--m-muted)' }} /></button>
+          <button onClick={onSettings}><Icon name="settings" size={20} />Settings &amp; backup<Icon name="arrowUp" size={13} style={{ transform: 'rotate(90deg)', marginLeft: 'auto', color: 'var(--m-muted)' }} /></button>
           <button onClick={() => goto('annual')}><Icon name="chart" size={20} />Annual report<Icon name="arrowUp" size={13} style={{ transform: 'rotate(90deg)', marginLeft: 'auto', color: 'var(--m-muted)' }} /></button>
           <button onClick={() => goto('goals')}><Icon name="target" size={20} />Goals<Icon name="arrowUp" size={13} style={{ transform: 'rotate(90deg)', marginLeft: 'auto', color: 'var(--m-muted)' }} /></button>
           <button onClick={() => goto('calendar')}><Icon name="calendar" size={20} />Calendar<Icon name="arrowUp" size={13} style={{ transform: 'rotate(90deg)', marginLeft: 'auto', color: 'var(--m-muted)' }} /></button>
-        </div>
-      </div>
-
-      {/* ── Data ── */}
-      <div className="mpr-section">
-        <div className="mpr-section-header"><span>Data</span></div>
-        <div className="mpr-link-list">
-          <button onClick={handleBackup}><Icon name="download" size={20} />Export backup (JSON)<Icon name="arrowUp" size={13} style={{ transform: 'rotate(90deg)', marginLeft: 'auto', color: 'var(--m-muted)' }} /></button>
-          <button onClick={onSettings}><Icon name="upload" size={20} />Restore backup<Icon name="arrowUp" size={13} style={{ transform: 'rotate(90deg)', marginLeft: 'auto', color: 'var(--m-muted)' }} /></button>
         </div>
       </div>
 
