@@ -1,0 +1,394 @@
+﻿  /* ─── Settings screen — new design ─── */
+  .mobile-settings-screen {
+    background: var(--bg);
+    bottom: 0;
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    left: 0;
+    overflow-y: auto;
+    position: fixed;
+    right: 0;
+    top: 0;
+    z-index: 220;
+  }
+  .mset-header {
+    align-items: center;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    display: grid;
+    grid-template-columns: 52px 1fr 52px;
+    padding: calc(12px + env(safe-area-inset-top)) 16px 12px;
+    position: sticky;
+    text-align: center;
+    top: 0;
+    z-index: 2;
+  }
+  .mset-header strong { font-size: 16px; font-weight: 900; }
+  .mset-back {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    color: var(--text);
+    display: flex;
+    min-height: 44px;
+    padding: 0;
+  }
+  .mset-body {
+    display: grid;
+    gap: 8px;
+    padding: 16px 16px calc(28px + env(safe-area-inset-bottom));
+  }
+  .mset-section { display: grid; gap: 6px; }
+  .mset-section-title {
+    color: var(--text-dim);
+    font-size: 11px;
+    font-weight: 850;
+    letter-spacing: .07em;
+    padding: 0 6px;
+    text-transform: uppercase;
+  }
+  .mset-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    overflow: hidden;
+  }
+  .mset-card > .mset-row:not(:last-child) {
+    border-bottom: 1px solid var(--border);
+  }
+  .mset-row {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    color: var(--text);
+    display: flex;
+    gap: 12px;
+    min-height: 54px;
+    padding: 0 14px;
+    text-align: left;
+    width: 100%;
+  }
+  .mset-row:active { background: color-mix(in oklab, var(--text) 4%, transparent); }
+  .mset-row.danger { color: #ff6b8a; }
+  .mset-icon {
+    border-radius: 10px;
+    display: grid;
+    flex-shrink: 0;
+    height: 34px;
+    place-items: center;
+    width: 34px;
+  }
+  .mset-label {
+    flex: 1;
+    font-size: 15px;
+    font-weight: 750;
+  }
+  .mset-value {
+    color: var(--text-dim);
+    font-size: 14px;
+    font-weight: 750;
+    margin-right: 4px;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mset-color-dot {
+    border-radius: 50%;
+    flex-shrink: 0;
+    height: 18px;
+    margin-right: 4px;
+    width: 18px;
+  }
+  /* Toggle switch */
+  .mset-toggle {
+    display: inline-block;
+    flex-shrink: 0;
+    height: 30px;
+    position: relative;
+    width: 52px;
+  }
+  .mset-toggle input { left: 0; opacity: 0; position: absolute; top: 0; }
+  .mset-toggle span {
+    background: color-mix(in oklab, var(--text) 20%, transparent);
+    border-radius: 999px;
+    bottom: 0;
+    cursor: pointer;
+    left: 0;
+    position: absolute;
+    right: 0;
+    top: 0;
+    transition: background .2s;
+  }
+  .mset-toggle span::after {
+    background: var(--text);
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0,0,0,.4);
+    content: '';
+    height: 22px;
+    left: 4px;
+    position: absolute;
+    top: 4px;
+    transition: transform .2s;
+    width: 22px;
+  }
+  .mset-toggle input:checked + span { background: var(--accent); }
+  .mset-toggle input:checked + span::after { transform: translateX(22px); }
+  /* Stats strip */
+  .mset-stats {
+    display: grid;
+    gap: 0;
+    grid-template-columns: repeat(3, 1fr);
+    padding: 16px 14px;
+  }
+  .mset-stats > div {
+    display: grid;
+    gap: 4px;
+    text-align: center;
+  }
+  .mset-stats > div:not(:last-child) {
+    border-right: 1px solid var(--border);
+  }
+  .mset-stats strong { font-size: 22px; font-weight: 900; }
+  .mset-stats small { color: var(--text-dim); font-size: 11px; font-weight: 750; }
+  /* Warning */
+  .mset-warning {
+    align-items: center;
+    background: color-mix(in oklab, var(--accent) 10%, transparent);
+    border-top: 1px solid color-mix(in oklab, var(--accent) 22%, transparent);
+    color: var(--accent);
+    display: flex;
+    font-size: 12px;
+    font-weight: 800;
+    gap: 7px;
+    margin: 0;
+    padding: 10px 14px;
+  }
+  /* Google Sign-In profile */
+  .mset-google-signin-wrap { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; }
+  .mset-google-desc { color: var(--text-dim); font-size: 13px; line-height: 1.5; margin: 0; }
+  .mset-google-btn-wrap { display: flex; justify-content: center; min-height: 44px; }
+  .mset-google-no-config {
+    align-items: flex-start;
+    background: color-mix(in oklab, #f59e0b 8%, transparent);
+    border: 1px solid color-mix(in oklab, #f59e0b 25%, transparent);
+    border-radius: 12px;
+    color: #f59e0b;
+    display: flex;
+    font-size: 12px;
+    gap: 8px;
+    line-height: 1.5;
+    margin: 14px 16px;
+    padding: 10px 12px;
+  }
+  .mset-google-no-config code { background: rgba(255,255,255,.1); border-radius: 4px; padding: 1px 4px; }
+  .mset-google-profile { align-items: center; display: flex; gap: 14px; padding: 14px 16px; }
+  .mset-google-avatar {
+    border-radius: 50%;
+    flex-shrink: 0;
+    height: 48px;
+    object-fit: cover;
+    width: 48px;
+  }
+  .mset-google-avatar.initials {
+    align-items: center;
+    background: var(--accent);
+    color: #000;
+    display: flex;
+    font-size: 22px;
+    font-weight: 800;
+    justify-content: center;
+  }
+  .mset-google-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .mset-google-info strong { color: var(--text); font-size: 15px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mset-google-info small { color: var(--text-dim); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mset-uid { font-size: 10px !important; opacity: .5; }
+  /* Search hint in command palette */
+  .cmd-hint { align-items: center; display: flex; flex-direction: column; gap: 8px; padding: 36px 24px; text-align: center; }
+  .cmd-hint p { color: var(--text-dim); font-size: 14px; margin: 0; }
+  .cmd-type-badge {
+    background: color-mix(in oklab, var(--text) 6%, transparent);
+    border-radius: 6px;
+    color: var(--text-dim);
+    flex-shrink: 0;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    margin-left: auto;
+    padding: 2px 6px;
+    text-transform: uppercase;
+  }
+  /* Account pill in create flow — unset state */
+  .mobile-create-account-pill.unset {
+    background: color-mix(in oklab, var(--m-primary) 8%, var(--m-surface-2));
+    border-color: color-mix(in oklab, var(--m-primary) 30%, transparent);
+  }
+  .mobile-create-account-pill.unset .mobile-create-account-name {
+    color: var(--m-primary);
+    font-weight: 700;
+  }
+  /* Version row */
+  .mset-info-row {
+    align-items: center;
+    color: var(--text-dim);
+    display: flex;
+    font-size: 13px;
+    font-weight: 750;
+    justify-content: space-between;
+    padding: 14px 16px;
+  }
+  /* Sheets */
+  .mset-sheet-body {
+    display: grid;
+    gap: 10px;
+    padding: 14px 0 4px;
+  }
+  .mset-sheet-options {
+    display: grid;
+    gap: 6px;
+    padding: 12px 0 4px;
+  }
+  .mset-option-row {
+    align-items: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    color: var(--text);
+    display: flex;
+    gap: 10px;
+    min-height: 58px;
+    padding: 0 16px;
+    text-align: left;
+  }
+  .mset-option-row:active { background: var(--surface-2); }
+  .mset-option-row.on { border-color: color-mix(in oklab, var(--accent) 40%, transparent); background: color-mix(in oklab, var(--accent) 6%, var(--surface)); }
+  .mset-option-row strong { display: block; font-size: 15px; font-weight: 850; }
+  .mset-option-row small { color: var(--text-dim); display: block; font-size: 12px; margin-top: 2px; }
+  /* Theme options */
+  .mset-theme-opt {
+    align-items: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    color: var(--text);
+    display: flex;
+    gap: 12px;
+    min-height: 62px;
+    padding: 0 16px;
+    text-align: left;
+  }
+  .mset-theme-opt:active { background: var(--surface-2); }
+  .mset-theme-opt.on { border-color: color-mix(in oklab, var(--accent) 40%, transparent); background: color-mix(in oklab, var(--accent) 6%, var(--surface)); }
+  .mset-theme-opt strong { flex: 1; font-size: 15px; font-weight: 850; }
+  .mset-theme-preview {
+    border-radius: 10px;
+    display: grid;
+    flex-shrink: 0;
+    height: 38px;
+    place-items: center;
+    width: 38px;
+  }
+  .mset-theme-preview span {
+    background: currentColor;
+    border-radius: 3px;
+    display: block;
+    height: 12px;
+    opacity: .7;
+    width: 20px;
+  }
+  /* Accent grid */
+  .mset-accent-grid {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .mset-accent-opt {
+    align-items: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 70px;
+    justify-content: center;
+  }
+  .mset-accent-opt:active { background: var(--surface-2); }
+  .mset-accent-opt.on { border-color: color-mix(in oklab, var(--text) 30%, transparent); }
+  .mset-accent-opt span {
+    border-radius: 50%;
+    height: 28px;
+    width: 28px;
+    box-shadow: 0 0 0 3px transparent;
+    transition: box-shadow .15s;
+  }
+  .mset-accent-opt.on span { box-shadow: 0 0 0 2px var(--text); }
+  .mset-accent-opt small { color: var(--text-dim); font-size: 11px; font-weight: 750; }
+  /* Name input */
+  .mset-text-input {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    color: var(--text);
+    font-size: 15px;
+    font-weight: 750;
+    min-height: 52px;
+    outline: none;
+    padding: 0 14px;
+    width: 100%;
+  }
+  .mset-text-input:focus { border-color: color-mix(in oklab, var(--accent) 50%, transparent); }
+  .mset-sheet-confirm {
+    align-items: center;
+    background: var(--accent);
+    border: 0;
+    border-radius: 14px;
+    color: #151515;
+    display: flex;
+    font-size: 15px;
+    font-weight: 900;
+    justify-content: center;
+    min-height: 52px;
+    width: 100%;
+  }
+  .mset-sheet-danger {
+    align-items: center;
+    background: rgba(255,107,138,.15);
+    border: 1px solid rgba(255,107,138,.3);
+    border-radius: 14px;
+    color: #ff6b8a;
+    display: flex;
+    font-size: 15px;
+    font-weight: 900;
+    gap: 8px;
+    justify-content: center;
+    min-height: 52px;
+    width: 100%;
+  }
+  .mset-sheet-cancel {
+    align-items: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    color: var(--text-dim);
+    display: flex;
+    font-size: 14px;
+    font-weight: 850;
+    justify-content: center;
+    min-height: 48px;
+    width: 100%;
+  }
+  .mset-reset-warning {
+    background: rgba(255,107,138,.08);
+    border: 1px solid rgba(255,107,138,.2);
+    border-radius: 14px;
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.55;
+    margin: 0;
+    padding: 14px 16px;
+  }
+  .mset-reset-warning strong { color: #ff6b8a; }
+

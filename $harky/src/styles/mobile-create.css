@@ -1,0 +1,487 @@
+﻿  /* ─── Create flow: new flex layout with fixed numpad ─── */
+  .mobile-create-flow {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+  }
+  .mobile-create-scroll {
+    align-content: start;
+    display: grid;
+    flex: 1;
+    gap: 12px;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+    padding: 12px 16px 8px;
+  }
+  .mobile-create-section-header {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+  }
+  .mobile-create-section-header > span {
+    color: var(--m-muted);
+    font-size: 11px;
+    font-weight: 850;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+  }
+  .mobile-create-new-btn {
+    align-items: center;
+    background: rgba(255,221,61,.1);
+    border: 1px solid rgba(255,221,61,.2);
+    border-radius: 999px;
+    color: #ffdd3d;
+    display: inline-flex;
+    font-size: 11px;
+    font-weight: 850;
+    gap: 4px;
+    padding: 5px 10px;
+  }
+  .mobile-create-meta-row {
+    display: flex;
+    gap: 8px;
+  }
+  .mobile-create-account-pill {
+    align-items: center;
+    background: var(--m-surface);
+    border: 1px solid var(--m-border);
+    border-radius: 14px;
+    color: var(--m-text);
+    cursor: pointer;
+    display: flex;
+    flex: 1;
+    gap: 8px;
+    min-height: 44px;
+    padding: 0 12px;
+    transition: background .08s;
+  }
+  .mobile-create-account-pill:active { background: var(--m-surface-2); }
+  .mobile-create-date-pill {
+    align-items: center;
+    background: var(--m-surface);
+    border: 1px solid var(--m-border);
+    border-radius: 14px;
+    color: var(--m-muted);
+    display: flex;
+    gap: 6px;
+    min-height: 44px;
+    padding: 0 12px;
+    position: relative;
+    white-space: nowrap;
+  }
+  .mobile-create-date-pill span {
+    color: var(--m-text);
+    font-size: 12px;
+    font-weight: 850;
+  }
+  .mobile-date-hidden {
+    height: 100%;
+    left: 0;
+    opacity: 0;
+    pointer-events: none;
+    position: absolute;
+    top: 0;
+    width: 100%;
+  }
+  .mobile-transfer-cards {
+    align-items: stretch;
+    display: grid;
+    gap: 8px;
+    grid-template-columns: 1fr auto 1fr;
+  }
+  .mobile-transfer-card {
+    align-items: center;
+    background: var(--m-surface);
+    border: 1px solid var(--m-border);
+    border-radius: 22px;
+    color: var(--m-text);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 20px 10px 16px;
+    text-align: center;
+  }
+  .mobile-transfer-card:active { background: var(--m-surface-2); }
+  .mobile-transfer-card > span {
+    border-radius: 16px;
+    display: grid;
+    height: 54px;
+    place-items: center;
+    width: 54px;
+  }
+  .mobile-transfer-card b {
+    font-size: 14px;
+    font-weight: 850;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    width: 100%;
+  }
+  .mobile-transfer-card small {
+    color: var(--m-muted);
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .mobile-transfer-card em {
+    color: #555;
+    font-size: 10px;
+    font-style: normal;
+    font-weight: 750;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+  }
+  .mobile-transfer-arrow {
+    align-items: center;
+    color: var(--m-muted);
+    display: flex;
+    font-size: 22px;
+    font-weight: 300;
+  }
+  /* ─── Fixed bottom section ─── */
+  .mobile-create-bottom {
+    background: var(--m-bg);
+    border-top: 1px solid rgba(255,255,255,.06);
+    display: grid;
+    gap: 7px;
+    padding: 10px 12px calc(12px + env(safe-area-inset-bottom));
+  }
+  .mobile-create-amount-row {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+    padding: 0 4px;
+  }
+  .mobile-create-amount-label {
+    color: #555;
+    font-size: 11px;
+    font-weight: 850;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+  }
+  .mobile-create-amount-value {
+    font-size: clamp(24px, 7vw, 36px);
+    font-variant-numeric: tabular-nums;
+    font-weight: 900;
+    letter-spacing: -.04em;
+    max-width: 76%;
+    overflow: hidden;
+    text-align: right;
+    text-overflow: ellipsis;
+    transition: color .15s;
+    white-space: nowrap;
+  }
+  .mobile-create-note-input {
+    align-items: center;
+    background: var(--m-surface);
+    border: 1px solid var(--m-border);
+    border-radius: 13px;
+    color: #666;
+    display: flex;
+    gap: 9px;
+    padding: 0 12px;
+  }
+  .mobile-create-note-input input {
+    background: transparent;
+    border: 0;
+    color: var(--m-text);
+    flex: 1;
+    font-size: 14px;
+    font-weight: 750;
+    min-height: 42px;
+    outline: none;
+  }
+  .mobile-create-note-input input::placeholder { color: #444; }
+  .mobile-keypad-compact {
+    display: grid;
+    gap: 5px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .mobile-keypad-compact button {
+    background: #222;
+    border: 1px solid rgba(255,255,255,.05);
+    border-radius: 12px;
+    color: var(--m-text);
+    display: grid;
+    font-size: 22px;
+    font-weight: 780;
+    min-height: 48px;
+    place-items: center;
+    transition: background .07s;
+  }
+  .mobile-keypad-compact button:active {
+    background: var(--m-surface-2);
+    transform: scale(.96);
+  }
+  /* Account picker sheet */
+  .mobile-picker-list {
+    display: grid;
+    gap: 6px;
+    padding: 10px 0 4px;
+  }
+  .mobile-picker-row {
+    align-items: center;
+    background: var(--m-surface);
+    border: 1px solid var(--m-border);
+    border-radius: 16px;
+    color: var(--m-text);
+    display: flex;
+    gap: 12px;
+    min-height: 58px;
+    padding: 0 16px;
+    text-align: left;
+  }
+  .mobile-picker-row:active { background: var(--m-surface-2); }
+  .mobile-picker-row.active { border-color: rgba(255,221,61,.25); background: rgba(255,221,61,.04); }
+  .mobile-picker-row b { flex: 1; font-size: 15px; font-weight: 800; }
+  .mobile-picker-row small { color: var(--m-muted); font-size: 13px; font-weight: 750; }
+  .mobile-create-account-name {
+    flex: 1;
+    font-size: 13px;
+    font-weight: 800;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+  }
+
+  .mobile-segment {
+    background: var(--m-surface);
+    border: 1px solid rgba(255,255,255,.18);
+    border-radius: 12px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    overflow: hidden;
+  }
+  .mobile-segment button {
+    background: transparent;
+    border: 0;
+    color: var(--m-text);
+    font-size: 15px;
+    font-weight: 750;
+    min-height: 52px;
+    padding: 12px 8px;
+  }
+  .mobile-segment button.on {
+    background: #f4f4f4;
+    color: #151515;
+  }
+  .mobile-amount-panel {
+    background: var(--m-surface);
+    border: 1px solid var(--m-border);
+    border-radius: 22px;
+    display: grid;
+    gap: 7px;
+    padding: 18px 18px 20px;
+  }
+  .mobile-amount-panel small,
+  .mobile-quick-fields label > span {
+    color: var(--m-muted);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: .02em;
+  }
+  .mobile-amount-panel strong {
+    color: var(--m-text);
+    font-size: clamp(34px, 12vw, 54px);
+    font-variant-numeric: tabular-nums;
+    font-weight: 850;
+    letter-spacing: -.05em;
+    line-height: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mobile-create-section {
+    background: var(--m-surface);
+    border: 1px solid var(--m-border);
+    border-radius: 22px;
+    padding: 16px;
+  }
+  .mobile-section-title {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .mobile-section-title h2 {
+    font-size: 15px;
+    margin: 0;
+  }
+  .mobile-section-title button,
+  .mobile-empty-action {
+    background: rgba(255,221,61,.12);
+    border: 1px solid rgba(255,221,61,.2);
+    border-radius: 999px;
+    color: #ffdd3d;
+    font-size: 12px;
+    font-weight: 850;
+    padding: 8px 12px;
+  }
+  .mobile-category-grid {
+    display: grid;
+    gap: 10px 8px;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+  .mobile-category-grid button {
+    align-items: center;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 14px;
+    color: var(--m-text);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+    padding: 6px 2px 8px;
+  }
+  .mobile-category-grid button.on {
+    background: rgba(255,255,255,.045);
+    border-color: rgba(255,255,255,.11);
+  }
+  .mobile-category-grid span {
+    border-radius: 999px;
+    display: grid;
+    height: 46px;
+    place-items: center;
+    width: 46px;
+  }
+  .mobile-category-grid small {
+    font-size: 10px;
+    font-weight: 700;
+    max-width: 62px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mobile-empty-action {
+    border-radius: 16px;
+    min-height: 52px;
+    width: 100%;
+  }
+  .mobile-quick-fields {
+    display: grid;
+    gap: 12px;
+  }
+  .mobile-quick-fields label {
+    display: grid;
+    gap: 7px;
+  }
+  .mobile-field-grid {
+    display: grid;
+    gap: 10px;
+  }
+  .mobile-field-grid.two {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .mobile-quick-fields select,
+  .mobile-quick-fields input {
+    appearance: none;
+    background: var(--m-surface-2);
+    border: 1px solid var(--m-border);
+    border-radius: 15px;
+    color: var(--m-text);
+    font-size: 14px;
+    font-weight: 750;
+    min-height: 48px;
+    min-width: 0;
+    padding: 0 13px;
+    width: 100%;
+  }
+  .mobile-quick-fields input::placeholder { color: #777; }
+  .mobile-keypad {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .mobile-keypad button {
+    background: #252525;
+    border: 1px solid rgba(255,255,255,.05);
+    border-radius: 14px;
+    color: var(--m-text);
+    display: grid;
+    font-size: 25px;
+    font-weight: 780;
+    min-height: 58px;
+    place-items: center;
+  }
+  .mobile-keypad button:active,
+  .mobile-save-button:active {
+    transform: translateY(1px) scale(.99);
+  }
+  .mobile-save-button {
+    align-items: center;
+    background: #ffdd3d;
+    border: 0;
+    border-radius: 18px;
+    color: #151515;
+    display: flex;
+    font-size: 17px;
+    font-weight: 900;
+    gap: 9px;
+    justify-content: center;
+    min-height: 58px;
+    width: 100%;
+  }
+  .mobile-save-button:disabled {
+    background: #333;
+    color: #777;
+  }
+  .mobile-secondary-actions {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .mobile-secondary-actions button {
+    align-items: center;
+    background: transparent;
+    border: 1px solid var(--m-border);
+    border-radius: 16px;
+    color: #d8d8d8;
+    display: flex;
+    font-weight: 800;
+    gap: 8px;
+    justify-content: center;
+    min-height: 48px;
+  }
+
+  /* ── Route entrance animation ── */
+  @keyframes mobile-enter {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .mobile-home,
+  .mobile-analytics,
+  .mobile-create-flow,
+  .mobile-reports,
+  .mobile-profile,
+  .mobile-route,
+  .mobile-welcome-hub {
+    animation: mobile-enter 0.22s ease both;
+  }
+
+  /* ── Skeleton loading ── */
+  @keyframes skel-shimmer {
+    from { background-position: 200% 0; }
+    to   { background-position: -200% 0; }
+  }
+  .skel {
+    background: linear-gradient(90deg, #1e1e1e 25%, #2a2a2a 50%, #1e1e1e 75%);
+    background-size: 200% 100%;
+    animation: skel-shimmer 1.5s ease infinite;
+    border-radius: 10px;
+  }
+  .skel-text { height: 14px; border-radius: 6px; }
+  .skel-hero { height: 48px; border-radius: 12px; width: 60%; }
+
+  /* ── Active state feedback ── */
+  .mobile-tx-row:active { background: var(--m-bg); }
+  .mobile-account-row:active { background: rgba(255,255,255,.03); }
+  .mobile-bottom-nav > button:active { opacity: .7; }
+  .mobile-category-grid button:active { background: rgba(255,255,255,.06); }
+  .mobile-section-card header button:active,
+  .mobile-hero-card button:active { filter: brightness(.92); }
+
