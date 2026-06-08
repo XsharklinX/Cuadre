@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Accesos directos al mantener presionado el ícono de $harky.
+     NOTA: este directorio se regenera con `tauri android init` — si eso
+     ocurre, hay que volver a copiar este archivo y su referencia en
+     AndroidManifest.xml (meta-data android.app.shortcuts). -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="add-expense"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_add_expense_short"
+        android:shortcutLongLabel="@string/shortcut_add_expense_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.sharky.finanzas"
+            android:targetClass="com.sharky.finanzas.MainActivity"
+            android:data="sharky://shortcut/add-expense" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="add-income"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_add_income_short"
+        android:shortcutLongLabel="@string/shortcut_add_income_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.sharky.finanzas"
+            android:targetClass="com.sharky.finanzas.MainActivity"
+            android:data="sharky://shortcut/add-income" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="reports"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_reports_short"
+        android:shortcutLongLabel="@string/shortcut_reports_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.sharky.finanzas"
+            android:targetClass="com.sharky.finanzas.MainActivity"
+            android:data="sharky://shortcut/reports" />
+    </shortcut>
+</shortcuts>

@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react'
-import { Empty, MiniStat } from '@/views/shared'
-import { totals, txForMonth } from '@/data/helpers'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { ViewErrorBoundary } from '@/components/ui/ErrorBoundary'
+import type { AppShortcut } from '@/hooks/useAppShortcut'
+import type { SharedReceipt } from '@/hooks/useTauri'
 import type { Transaction, ViewId, ViewProps } from '@/types'
-import { MobileBottomNav, type MobileRoute } from './MobileBottomNav'
+import { MobileBottomNav, type MobileRoute, type QuickAddMode } from './MobileBottomNav'
 import { MobileAnalytics } from './MobileAnalytics'
 import { MobileAnnual } from './MobileAnnual'
 import { MobileCreateFlow } from './MobileCreateFlow'
@@ -11,32 +11,34 @@ import { MobileCurrencySheet } from './MobileCurrencySheet'
 import { MobileHome } from './MobileHome'
 import { MobileProfile } from './MobileProfile'
 import { MobileReports } from './MobileReports'
+import { MobileDebt } from './MobileDebt'
+import { MobileSubscriptions } from './MobileSubscriptions'
+const MobileCSVImport = lazy(() => import('./MobileCSVImport').then(m => ({ default: m.MobileCSVImport })))
 import { MobileTopBar } from './MobileTopBar'
-import { MobileTransactionList } from './MobileTransactionList'
 import { useMobileBackDismiss } from './useMobileBackDismiss'
 
 type MobileViewRenderer = (props: ViewProps) => React.ReactNode
 
 function routeFromView(view: ViewId): MobileRoute {
-  if (view === 'transactions') return 'movements'
   if (view === 'stats') return 'analytics'
-  if (view === 'annual' || view === 'budgets' || view === 'goals' || view === 'calendar' || view === 'reports') return 'reports'
+  if (view === 'annual' || view === 'budgets' || view === 'goals' || view === 'calendar' || view === 'reports' || view === 'subscriptions' || view === 'debt') return 'reports'
   return 'home'
 }
 
 function viewFromRoute(route: Exclude<MobileRoute, 'add'>): ViewId {
-  if (route === 'movements') return 'transactions'
   if (route === 'analytics') return 'stats'
   if (route === 'reports') return 'reports'
   return 'dashboard'
 }
 
 const INTERNAL_TITLES: Partial<Record<ViewId, string>> = {
-  annual:   'Annual report',
-  calendar: 'Calendar',
-  budgets:  'Budgets',
-  goals:    'Goals',
-  reports:  'Reports',
+  annual:        'Informe anual',
+  calendar:      'Calendario',
+  budgets:       'Presupuestos',
+  goals:         'Metas',
+  reports:       'Reportes',
+  subscriptions: 'Suscripciones',
+  debt:          'Calculadora de deudas',
 }
 
 export function MobileShell({
@@ -47,10 +49,13 @@ export function MobileShell({
   mkey,
   keys,
   onMonth,
-  onSearch,
   onSettings,
   onEditTx,
   userName,
+  sharedReceipt,
+  onConsumeSharedReceipt,
+  appShortcut,
+  onConsumeAppShortcut,
 }: {
   view: ViewId
   setView: (view: ViewId) => void
@@ -59,32 +64,53 @@ export function MobileShell({
   mkey: string
   keys: string[]
   onMonth: (mkey: string) => void
-  onSearch: () => void
   onSettings: () => void
   onEditTx: (transaction: Transaction) => void
   userName?: string
+  sharedReceipt?: SharedReceipt | null
+  onConsumeSharedReceipt?: () => void
+  appShortcut?: AppShortcut | null
+  onConsumeAppShortcut?: () => void
 }) {
   const [route, setRoute] = useState<MobileRoute>(routeFromView(view))
+  const [quickAddMode, setQuickAddMode] = useState<QuickAddMode | null>(null)
   const [currencyOpen, setCurrencyOpen] = useState(false)
-  const monthTx = useMemo(() => txForMonth(viewProps.txns, mkey), [viewProps.txns, mkey])
-  const monthTotals = totals(monthTx)
+  const [csvOpen, setCsvOpen] = useState(false)
   const mIdx = keys.indexOf(mkey)
 
   // Back navigation: add-flow → home
   useMobileBackDismiss(route === 'add', () => {
     setRoute('home')
     setView('dashboard')
+    onConsumeSharedReceipt?.()
   })
   // Back navigation: sub-views inside reports → main reports
   const isInSubView = route === 'reports' && view !== 'reports'
   useMobileBackDismiss(isInSubView, () => setView('reports'))
-  // Back navigation: movements → home
-  useMobileBackDismiss(route === 'movements', () => {
-    setRoute('home')
-    setView('dashboard')
-  })
+  // Recibo compartido desde otra app (Galería, WhatsApp, etc.) → abrir "agregar gasto" con vista previa
+  useEffect(() => {
+    if (!sharedReceipt) return
+    setQuickAddMode('expense')
+    setRoute('add')
+  }, [sharedReceipt])
+  // Accesos directos del ícono (mantener presionado — ver res/xml/shortcuts.xml)
+  useEffect(() => {
+    if (!appShortcut) return
+    if (appShortcut === 'add-expense' || appShortcut === 'add-income') {
+      setQuickAddMode(appShortcut === 'add-expense' ? 'expense' : 'income')
+      setRoute('add')
+    } else if (appShortcut === 'reports') {
+      setRoute('reports')
+      setView('reports')
+    }
+    onConsumeAppShortcut?.()
+  }, [appShortcut])
 
   const goRoute = (next: MobileRoute) => {
+    if (next !== 'add') {
+      setQuickAddMode(null)
+      onConsumeSharedReceipt?.()
+    }
     setRoute(next)
     if (next !== 'add') setView(viewFromRoute(next))
   }
@@ -94,7 +120,12 @@ export function MobileShell({
       return (
         <MobileCreateFlow
           mkey={mkey}
-          onSaved={() => { setRoute('home'); setView('dashboard') }}
+          initialMode={quickAddMode ?? undefined}
+          receiptPreview={sharedReceipt ?? undefined}
+          onSaved={() => {
+            setQuickAddMode(null); setRoute('home'); setView('dashboard')
+            onConsumeSharedReceipt?.()
+          }}
         />
       )
     }
@@ -104,33 +135,25 @@ export function MobileShell({
         <MobileHome
           mkey={mkey}
           onAdd={() => setRoute('add')}
-          onMovements={() => { setRoute('movements'); setView('transactions') }}
-          onBudgets={() => { setRoute('reports'); setView('budgets') }}
           onEditTx={onEditTx}
           onDeleteTx={viewProps.onDeleteTx}
         />
       )
     }
 
-    if (view === 'transactions') {
+    if (route === 'analytics') {
       return (
-        <div className="mobile-route">
-          <div className="mobile-summary-strip">
-            <MiniStat label="Gastos" amount={monthTotals.expense} color="var(--expense)" />
-            <MiniStat label="Ingresos" amount={monthTotals.income} color="var(--income)" />
-            <MiniStat label="Balance" amount={monthTotals.net} color="var(--accent)" />
-          </div>
-          {monthTx.length
-            ? <MobileTransactionList transactions={monthTx} onEdit={onEditTx} onDelete={viewProps.onDeleteTx} />
-            : <Empty icon="list" title="Sin movimientos" text="Agrega tu primer movimiento del mes." />}
-        </div>
+        <MobileAnalytics
+          mkey={mkey}
+          onBudgets={() => { setRoute('reports'); setView('budgets') }}
+        />
       )
     }
 
-    if (route === 'analytics') return <MobileAnalytics mkey={mkey} />
-
     if (route === 'reports') {
       if (view === 'annual') return <MobileAnnual mkey={mkey} />
+      if (view === 'subscriptions') return <MobileSubscriptions />
+      if (view === 'debt') return <MobileDebt />
       const renderer = mobileViews[view]
       if (renderer) {
         return (
@@ -139,7 +162,7 @@ export function MobileShell({
           </ViewErrorBoundary>
         )
       }
-      return <MobileReports />
+      return <MobileReports goto={v => setView(v)} onImport={() => setCsvOpen(true)} mkey={mkey} />
     }
 
     if (route === 'profile') {
@@ -158,6 +181,11 @@ export function MobileShell({
 
   return (
     <main className="mobile-shell">
+      {csvOpen && (
+        <Suspense fallback={null}>
+          <MobileCSVImport onClose={() => setCsvOpen(false)} />
+        </Suspense>
+      )}
       {currencyOpen && <MobileCurrencySheet onClose={() => setCurrencyOpen(false)} />}
       <MobileTopBar
         route={route}
@@ -167,7 +195,6 @@ export function MobileShell({
         canGoForward={mIdx >= 0 && mIdx < keys.length - 1}
         onPrevMonth={() => mIdx > 0 && onMonth(keys[mIdx - 1])}
         onNextMonth={() => mIdx >= 0 && mIdx < keys.length - 1 && onMonth(keys[mIdx + 1])}
-        onSearch={onSearch}
         onSettings={onSettings}
         onCurrency={() => setCurrencyOpen(true)}
       />
@@ -178,7 +205,8 @@ export function MobileShell({
           <div className="mobile-content">
             {renderMain()}
           </div>
-          <MobileBottomNav route={route} onRoute={goRoute} />
+          <MobileBottomNav route={route} onRoute={goRoute}
+            onQuickAdd={mode => { setQuickAddMode(mode); setRoute('add') }} />
         </>
       )}
     </main>
