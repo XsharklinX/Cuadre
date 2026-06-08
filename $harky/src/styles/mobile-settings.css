@@ -101,27 +101,93 @@
     margin-right: 4px;
     width: 18px;
   }
-  /* Toggle switch */
-  .mset-toggle {
+  /* Settings row with icon + text + control (sounds, biometría…) */
+  .mset-row-icon {
+    border-radius: 10px;
+    display: grid;
+    flex-shrink: 0;
+    height: 34px;
+    place-items: center;
+    width: 34px;
+  }
+  .mset-row-text {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .mset-row-text b { font-size: 15px; font-weight: 750; }
+  .mset-row-text small { color: var(--text-dim); font-size: 12px; font-weight: 700; }
+  .mset-row-volume { min-height: 60px; }
+  .mset-row-volume .mset-row-text b { margin-bottom: 4px; }
+  .mset-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+    height: 22px;
+    width: 100%;
+  }
+  .mset-slider::-webkit-slider-runnable-track {
+    background: color-mix(in oklab, var(--text) 18%, transparent);
+    border-radius: 999px;
+    height: 4px;
+  }
+  .mset-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--accent);
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0,0,0,.4);
+    height: 18px;
+    margin-top: -7px;
+    width: 18px;
+  }
+  .mset-slider::-moz-range-track {
+    background: color-mix(in oklab, var(--text) 18%, transparent);
+    border-radius: 999px;
+    height: 4px;
+  }
+  .mset-slider::-moz-range-thumb {
+    background: var(--accent);
+    border: 0;
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0,0,0,.4);
+    height: 18px;
+    width: 18px;
+  }
+
+  /* Toggle switch — label.mset-toggle-wrap > input.mset-toggle-input + span.mset-toggle */
+  .mset-toggle-wrap {
+    cursor: pointer;
     display: inline-block;
     flex-shrink: 0;
     height: 30px;
     position: relative;
     width: 52px;
   }
-  .mset-toggle input { left: 0; opacity: 0; position: absolute; top: 0; }
-  .mset-toggle span {
+  .mset-toggle-input {
+    height: 100%;
+    left: 0;
+    margin: 0;
+    opacity: 0;
+    position: absolute;
+    top: 0;
+    width: 100%;
+    z-index: 1;
+  }
+  .mset-toggle {
     background: color-mix(in oklab, var(--text) 20%, transparent);
     border-radius: 999px;
     bottom: 0;
-    cursor: pointer;
     left: 0;
+    pointer-events: none;
     position: absolute;
     right: 0;
     top: 0;
     transition: background .2s;
   }
-  .mset-toggle span::after {
+  .mset-toggle::after {
     background: var(--text);
     border-radius: 50%;
     box-shadow: 0 1px 3px rgba(0,0,0,.4);
@@ -133,8 +199,9 @@
     transition: transform .2s;
     width: 22px;
   }
-  .mset-toggle input:checked + span { background: var(--accent); }
-  .mset-toggle input:checked + span::after { transform: translateX(22px); }
+  .mset-toggle-input:checked + .mset-toggle { background: var(--accent); }
+  .mset-toggle-input:checked + .mset-toggle::after { transform: translateX(22px); }
+  .mset-toggle-input:disabled + .mset-toggle { opacity: .5; }
   /* Stats strip */
   .mset-stats {
     display: grid;
@@ -166,23 +233,24 @@
     padding: 10px 14px;
   }
   /* Google Sign-In profile */
-  .mset-google-signin-wrap { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; }
+  .mset-google-signin-wrap { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; }
   .mset-google-desc { color: var(--text-dim); font-size: 13px; line-height: 1.5; margin: 0; }
-  .mset-google-btn-wrap { display: flex; justify-content: center; min-height: 44px; }
-  .mset-google-no-config {
-    align-items: flex-start;
-    background: color-mix(in oklab, #f59e0b 8%, transparent);
-    border: 1px solid color-mix(in oklab, #f59e0b 25%, transparent);
-    border-radius: 12px;
-    color: #f59e0b;
+  .mset-google-btn-wrap {
+    align-items: center;
+    background: #fff;
+    border: none;
+    border-radius: 24px;
+    color: #1f1f1f;
+    cursor: pointer;
     display: flex;
-    font-size: 12px;
-    gap: 8px;
-    line-height: 1.5;
-    margin: 14px 16px;
-    padding: 10px 12px;
+    font-size: 14px;
+    font-weight: 600;
+    gap: 10px;
+    justify-content: center;
+    padding: 12px 20px;
+    width: 100%;
   }
-  .mset-google-no-config code { background: rgba(255,255,255,.1); border-radius: 4px; padding: 1px 4px; }
+  .mset-google-btn-wrap:disabled { cursor: default; opacity: .6; }
   .mset-google-profile { align-items: center; display: flex; gap: 14px; padding: 14px 16px; }
   .mset-google-avatar {
     border-radius: 50%;
@@ -218,15 +286,6 @@
     margin-left: auto;
     padding: 2px 6px;
     text-transform: uppercase;
-  }
-  /* Account pill in create flow — unset state */
-  .mobile-create-account-pill.unset {
-    background: color-mix(in oklab, var(--m-primary) 8%, var(--m-surface-2));
-    border-color: color-mix(in oklab, var(--m-primary) 30%, transparent);
-  }
-  .mobile-create-account-pill.unset .mobile-create-account-name {
-    color: var(--m-primary);
-    font-weight: 700;
   }
   /* Version row */
   .mset-info-row {
@@ -391,4 +450,111 @@
     padding: 14px 16px;
   }
   .mset-reset-warning strong { color: #ff6b8a; }
+  /* Category settings */
+  .mset-cat-group { display: flex; flex-direction: column; gap: 10px; }
+  .mset-cat-group + .mset-cat-group { margin-top: 22px; }
+  .mset-cat-group-head {
+    align-items: center; display: flex; justify-content: space-between;
+  }
+  .mset-cat-group-head > span {
+    color: var(--text-dim); font-size: 13px; font-weight: 850;
+    letter-spacing: .03em; text-transform: uppercase;
+  }
+  .mset-cat-group-head button {
+    align-items: center; background: color-mix(in oklab, var(--accent) 16%, transparent);
+    border: 0; border-radius: 10px; color: var(--accent);
+    display: flex; font-size: 12.5px; font-weight: 800; gap: 6px; padding: 7px 12px;
+  }
+  .mset-cat-empty { color: var(--text-dim); font-size: 13px; margin: 0; padding: 4px 2px; }
+  .mset-cat-list { display: flex; flex-direction: column; gap: 6px; }
+  .mset-cat-row {
+    align-items: center; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 14px;
+    display: flex; gap: 12px; padding: 12px 14px; text-align: left; width: 100%;
+  }
+  .mset-cat-icon {
+    align-items: center; border-radius: 12px;
+    display: flex; height: 38px; justify-content: center; width: 38px; flex-shrink: 0;
+  }
+  .mset-cat-name { color: var(--text); flex: 1; font-size: 14.5px; font-weight: 700; }
+  /* Comments */
+  .mset-legal-intro {
+    color: var(--text-dim);
+    font-size: 13px;
+    line-height: 1.55;
+    margin: 0;
+  }
+  .mset-textarea {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    min-height: 140px;
+    outline: none;
+    padding: 12px 14px;
+    resize: vertical;
+    width: 100%;
+  }
+  .mset-textarea:focus { border-color: color-mix(in oklab, var(--accent) 50%, transparent); }
+  .mset-textarea::placeholder { color: var(--text-dim); }
+  .mset-sheet-confirm:disabled {
+    background: var(--surface-2);
+    color: var(--text-dim);
+  }
+  .mset-sheet-confirm:disabled :is(svg) { opacity: .5; }
+  /* About */
+  .mset-about {
+    align-items: center;
+    padding: 6px 0 10px;
+    text-align: center;
+  }
+  .mset-about-name {
+    font-size: 22px;
+    font-weight: 900;
+    letter-spacing: -.02em;
+    margin-top: 12px;
+  }
+  .mset-about-version {
+    color: var(--text-dim);
+    font-size: 13px;
+    font-weight: 750;
+  }
+  .mset-about-dev {
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 700;
+    margin: 14px 0 0;
+  }
+  .mset-about-dev strong { color: var(--accent); }
+  .mset-about-desc {
+    color: var(--text-dim);
+    font-size: 13px;
+    line-height: 1.6;
+    margin: 8px 0 0;
+  }
+  /* Legal documents */
+  .mset-legal-updated {
+    color: var(--text-dim);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: .04em;
+    margin: 0;
+    text-transform: uppercase;
+  }
+  .mset-legal h3 {
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 850;
+    margin: 14px 0 4px;
+  }
+  .mset-legal p {
+    color: var(--text-dim);
+    font-size: 13px;
+    line-height: 1.65;
+    margin: 0 0 8px;
+  }
+  .mset-legal strong { color: var(--text); }
 

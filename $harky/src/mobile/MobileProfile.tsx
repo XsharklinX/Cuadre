@@ -4,6 +4,7 @@ import { toast } from '@/components/ui/Toast'
 import { fmtCompact } from '@/data/helpers'
 import { useFinance } from '@/store/finance'
 import { useSettings } from '@/store/settings'
+import { playAccountsSound } from '@/lib/sound'
 import { useMobileBackDismiss } from './useMobileBackDismiss'
 import type { Account, AccountType, OverdraftPolicy, ViewId, ViewProps } from '@/types'
 
@@ -14,10 +15,10 @@ const EMPTY_ACCOUNT: Omit<Account, 'id'> = {
 }
 
 const TYPE_META: Record<AccountType, { label: string; icon: Parameters<typeof Icon>[0]['name'] }> = {
-  cash:    { label: 'Cash',    icon: 'wallet' },
-  debit:   { label: 'Debit',  icon: 'cards'  },
-  savings: { label: 'Savings',icon: 'piggy'  },
-  credit:  { label: 'Credit', icon: 'cards'  },
+  cash:    { label: 'Efectivo', icon: 'wallet' },
+  debit:   { label: 'Débito',  icon: 'cards'  },
+  savings: { label: 'Ahorros', icon: 'piggy'  },
+  credit:  { label: 'Crédito', icon: 'cards'  },
 }
 
 
@@ -41,6 +42,8 @@ export function MobileProfile({
 
   useMobileBackDismiss(!!editingAccount, () => setEditingAccount(null))
 
+  useEffect(() => { playAccountsSound() }, [])
+
   useEffect(() => {
     if (createRequest?.target === 'account') setEditingAccount('new')
   }, [createRequest])
@@ -52,28 +55,28 @@ export function MobileProfile({
     const trimmed = nameInput.trim()
     setDisplayName(trimmed)
     setEditingName(false)
-    if (trimmed) toast(`Name updated to "${trimmed}"`, { icon: 'check', type: 'ok' })
+    if (trimmed) toast(`Nombre actualizado a "${trimmed}"`, { icon: 'check', type: 'ok' })
   }
 
   const saveAccount = (fields: Omit<Account, 'id'>) => {
     if (!fields.name.trim() || !fields.short.trim()) {
-      toast('Fill in name and label.', { icon: 'alert' })
+      toast('Completa el nombre y la etiqueta.', { icon: 'alert' })
       return
     }
     const clean = { ...fields, name: fields.name.trim(), short: fields.short.trim(), last4: fields.last4?.trim() || null }
     if (editingAccount === 'new') addAccount(clean)
     else if (editingAccount) updateAccount(editingAccount.id, clean)
-    toast(editingAccount === 'new' ? 'Account created' : 'Account updated', { icon: 'cards', type: 'ok' })
+    toast(editingAccount === 'new' ? 'Cuenta creada' : 'Cuenta actualizada', { icon: 'cards', type: 'ok' })
     setEditingAccount(null)
   }
 
   const deleteAcc = (account: Account) => {
     try {
       deleteAccount(account.id)
-      toast('Account deleted', { icon: 'trash', type: 'ok' })
+      toast('Cuenta eliminada', { icon: 'trash', type: 'ok' })
       setEditingAccount(null)
     } catch (error) {
-      toast(error instanceof Error ? error.message : 'Could not delete account.', { icon: 'alert' })
+      toast(error instanceof Error ? error.message : 'No se pudo eliminar la cuenta.', { icon: 'alert' })
     }
   }
 
@@ -88,32 +91,31 @@ export function MobileProfile({
         {editingName ? (
           <div className="mpr-name-editor">
             <input
-              autoFocus
               type="text"
               value={nameInput}
-              placeholder="Your name"
+              placeholder="Tu nombre"
               autoCapitalize="words"
               enterKeyHint="done"
               onChange={e => setNameInput(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') saveName() }}
             />
             <div className="mpr-name-actions">
-              <button onClick={() => setEditingName(false)}>Cancel</button>
-              <button className="primary" onClick={saveName}>Save</button>
+              <button onClick={() => setEditingName(false)}>Cancelar</button>
+              <button className="primary" onClick={saveName}>Guardar</button>
             </div>
           </div>
         ) : (
           <>
-            <h2>{effectiveName || 'My account'}</h2>
+            <h2>{effectiveName || 'Mi cuenta'}</h2>
             <button className="mpr-edit-name-btn" onClick={() => { setNameInput(effectiveName); setEditingName(true) }}>
               <Icon name="edit" size={13} />
-              {effectiveName ? 'Edit name' : 'Add name'}
+              {effectiveName ? 'Editar nombre' : 'Agregar nombre'}
             </button>
           </>
         )}
 
         <div className="mpr-balance-badge">
-          <span>Total balance</span>
+          <span>Balance total</span>
           <strong>{fmtCompact(totalBalance, currency)}</strong>
         </div>
       </div>
@@ -121,17 +123,17 @@ export function MobileProfile({
       {/* ── Accounts ── */}
       <div className="mpr-section">
         <div className="mpr-section-header">
-          <span>Accounts</span>
+          <span>Cuentas</span>
           <button className="mpr-add-btn" onClick={() => setEditingAccount('new')}>
-            <Icon name="plus" size={15} /> Add
+            <Icon name="plus" size={15} /> Agregar
           </button>
         </div>
 
         {accounts.length === 0 ? (
           <div className="mpr-empty">
             <Icon name="cards" size={28} style={{ opacity: .25 }} />
-            <p>No accounts yet</p>
-            <button onClick={() => setEditingAccount('new')}>Create account</button>
+            <p>Sin cuentas aún</p>
+            <button onClick={() => setEditingAccount('new')}>Crear cuenta</button>
           </div>
         ) : (
           <div className="mpr-account-list">
@@ -156,12 +158,13 @@ export function MobileProfile({
 
       {/* ── Quick links ── */}
       <div className="mpr-section">
-        <div className="mpr-section-header"><span>Quick links</span></div>
+        <div className="mpr-section-header"><span>Accesos rápidos</span></div>
         <div className="mpr-link-list">
-          <button onClick={onSettings}><Icon name="settings" size={20} />Settings &amp; backup<Icon name="arrowUp" size={13} style={{ transform: 'rotate(90deg)', marginLeft: 'auto', color: 'var(--m-muted)' }} /></button>
-          <button onClick={() => goto('annual')}><Icon name="chart" size={20} />Annual report<Icon name="arrowUp" size={13} style={{ transform: 'rotate(90deg)', marginLeft: 'auto', color: 'var(--m-muted)' }} /></button>
-          <button onClick={() => goto('goals')}><Icon name="target" size={20} />Goals<Icon name="arrowUp" size={13} style={{ transform: 'rotate(90deg)', marginLeft: 'auto', color: 'var(--m-muted)' }} /></button>
-          <button onClick={() => goto('calendar')}><Icon name="calendar" size={20} />Calendar<Icon name="arrowUp" size={13} style={{ transform: 'rotate(90deg)', marginLeft: 'auto', color: 'var(--m-muted)' }} /></button>
+          <button onClick={onSettings}><Icon name="settings" size={20} />Configuración y backup<Icon name="arrowUp" size={13} style={{ transform: 'rotate(90deg)', marginLeft: 'auto', color: 'var(--m-muted)' }} /></button>
+          <button onClick={() => goto('subscriptions')}><Icon name="repeat" size={20} />Suscripciones<Icon name="arrowUp" size={13} style={{ transform: 'rotate(90deg)', marginLeft: 'auto', color: 'var(--m-muted)' }} /></button>
+          <button onClick={() => goto('annual')}><Icon name="chart" size={20} />Informe anual<Icon name="arrowUp" size={13} style={{ transform: 'rotate(90deg)', marginLeft: 'auto', color: 'var(--m-muted)' }} /></button>
+          <button onClick={() => goto('goals')}><Icon name="target" size={20} />Metas<Icon name="arrowUp" size={13} style={{ transform: 'rotate(90deg)', marginLeft: 'auto', color: 'var(--m-muted)' }} /></button>
+          <button onClick={() => goto('calendar')}><Icon name="calendar" size={20} />Calendario<Icon name="arrowUp" size={13} style={{ transform: 'rotate(90deg)', marginLeft: 'auto', color: 'var(--m-muted)' }} /></button>
         </div>
       </div>
 
@@ -200,28 +203,28 @@ function AccountEditorSheet({
     <div className="mobile-detail-sheet" role="dialog" aria-modal="true" onClick={onClose}>
       <section className="mpr-editor-sheet" onClick={e => e.stopPropagation()}>
         <header>
-          <span>{account ? 'Edit account' : 'New account'}</span>
+          <span>{account ? 'Editar cuenta' : 'Nueva cuenta'}</span>
           <button onClick={onClose}><Icon name="close" size={18} /></button>
         </header>
 
         <div className="mpr-editor-body">
           <label className="mpr-field">
-            <span>Name</span>
-            <input className="mpr-input" value={fields.name} placeholder="e.g. Main Bank" autoFocus onChange={e => patch('name', e.target.value)} />
+            <span>Nombre</span>
+            <input className="mpr-input" value={fields.name} placeholder="Ej. Banco Principal" onChange={e => patch('name', e.target.value)} />
           </label>
 
           <div className="mpr-field-row">
             <label className="mpr-field" style={{ flex: 1 }}>
-              <span>Label</span>
-              <input className="mpr-input" value={fields.short} placeholder="Debit" onChange={e => patch('short', e.target.value)} />
+              <span>Etiqueta</span>
+              <input className="mpr-input" value={fields.short} placeholder="Débito" onChange={e => patch('short', e.target.value)} />
             </label>
             <label className="mpr-field" style={{ flex: 1 }}>
-              <span>Type</span>
+              <span>Tipo</span>
               <select className="mpr-input" value={fields.type} onChange={e => patch('type', e.target.value as AccountType)}>
-                <option value="cash">Cash</option>
-                <option value="debit">Debit</option>
-                <option value="savings">Savings</option>
-                <option value="credit">Credit</option>
+                <option value="cash">Efectivo</option>
+                <option value="debit">Débito</option>
+                <option value="savings">Ahorros</option>
+                <option value="credit">Crédito</option>
               </select>
             </label>
           </div>
@@ -232,26 +235,26 @@ function AccountEditorSheet({
               <input className="mpr-input" type="number" value={fields.balance} onChange={e => patch('balance', Number(e.target.value))} />
             </label>
             <label className="mpr-field" style={{ flex: 1 }}>
-              <span>Last 4 digits</span>
-              <input className="mpr-input" maxLength={4} value={fields.last4 ?? ''} placeholder="Optional" onChange={e => patch('last4', e.target.value)} />
+              <span>Últimos 4 dígitos</span>
+              <input className="mpr-input" maxLength={4} value={fields.last4 ?? ''} placeholder="Opcional" onChange={e => patch('last4', e.target.value)} />
             </label>
           </div>
 
           {fields.type === 'credit' && (
             <label className="mpr-field">
-              <span>Credit limit</span>
+              <span>Límite de crédito</span>
               <input className="mpr-input" type="number" value={fields.limit ?? ''} onChange={e => patch('limit', Number(e.target.value) || undefined)} />
             </label>
           )}
 
           {fields.type !== 'credit' && (
             <label className="mpr-field">
-              <span>Overdraft</span>
+              <span>Sobregiro</span>
               <select className="mpr-input" value={fields.overdraftPolicy ?? ''} onChange={e => patch('overdraftPolicy', (e.target.value || undefined) as OverdraftPolicy | undefined)}>
-                <option value="">Use global setting</option>
-                <option value="block">Block when empty</option>
-                <option value="warn">Warn</option>
-                <option value="allow">Always allow</option>
+                <option value="">Usar configuración global</option>
+                <option value="block">Bloquear cuando vacío</option>
+                <option value="warn">Advertir</option>
+                <option value="allow">Siempre permitir</option>
               </select>
             </label>
           )}
@@ -263,6 +266,8 @@ function AccountEditorSheet({
                 <button
                   key={c}
                   className={`mpr-color-dot${fields.color === c ? ' on' : ''}`}
+                  aria-label={`Color ${c}`}
+                  aria-pressed={fields.color === c}
                   style={{ background: c }}
                   onClick={() => patch('color', c)}
                 />
@@ -273,15 +278,15 @@ function AccountEditorSheet({
           {account && onDelete && (
             !confirmDel ? (
               <button className="mpr-del-btn" onClick={() => setConfirmDel(true)}>
-                <Icon name="trash" size={16} /> Delete account
+                <Icon name="trash" size={16} /> Eliminar cuenta
               </button>
             ) : (
               <div className="mpr-confirm-del">
-                <p>Delete "{account.name}"? This cannot be undone.</p>
+                <p>¿Eliminar "{account.name}"? Esta acción no se puede deshacer.</p>
                 <div>
-                  <button onClick={() => setConfirmDel(false)}>Cancel</button>
+                  <button onClick={() => setConfirmDel(false)}>Cancelar</button>
                   <button className="danger" onClick={() => onDelete(account)}>
-                    <Icon name="trash" size={16} /> Delete
+                    <Icon name="trash" size={16} /> Eliminar
                   </button>
                 </div>
               </div>
@@ -290,9 +295,9 @@ function AccountEditorSheet({
         </div>
 
         <div className="mpr-editor-actions">
-          <button className="mpr-btn-cancel" onClick={onClose}>Cancel</button>
+          <button className="mpr-btn-cancel" onClick={onClose}>Cancelar</button>
           <button className="mpr-btn-save" style={{ background: fields.color }} onClick={() => onSave(fields)}>
-            {account ? 'Save' : 'Create'}
+            {account ? 'Guardar' : 'Crear'}
           </button>
         </div>
       </section>
