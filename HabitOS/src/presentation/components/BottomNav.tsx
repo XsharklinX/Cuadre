@@ -4,6 +4,7 @@ import { Pressable, Text, View } from "react-native";
 const TABS = [
   { path: "/", label: "Hoy", icon: "☀️" },
   { path: "/journal", label: "Diario", icon: "📅" },
+  { path: "/achievements", label: "Logros", icon: "🏆" },
 ] as const;
 
 export function BottomNav() {

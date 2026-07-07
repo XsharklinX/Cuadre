@@ -1,8 +1,10 @@
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, Pressable, Text, View } from "react-native";
+import Animated, { FadeInUp, FadeOut } from "react-native-reanimated";
 
+import { calculateGamification } from "@/domain/gamification";
 import { calculateCurrentStreak } from "@/domain/streaks";
 import { EmptyState } from "@/presentation/components/EmptyState";
 import { HabitCard } from "@/presentation/components/HabitCard";
@@ -12,6 +14,7 @@ import { useHabitStore } from "@/state/habitStore";
 
 export function DashboardScreen() {
   const timeZone = useDeviceTimeZone();
+  const habits = useHabitStore((state) => state.habits);
   const dailyHabits = useHabitStore((state) => state.dailyHabits);
   const completions = useHabitStore((state) => state.completions);
   const selectedDate = useHabitStore((state) => state.selectedDate);
@@ -19,6 +22,25 @@ export function DashboardScreen() {
   const errorMessage = useHabitStore((state) => state.errorMessage);
   const completeHabit = useHabitStore((state) => state.completeHabit);
   const undoCompletion = useHabitStore((state) => state.undoCompletion);
+
+  const gamification = useMemo(
+    () => calculateGamification(habits, completions, selectedDate),
+    [habits, completions, selectedDate],
+  );
+
+  const previousXp = useRef<number | undefined>(undefined);
+  const [xpFlash, setXpFlash] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    const before = previousXp.current;
+    previousXp.current = gamification.totalXp;
+    if (before === undefined || gamification.totalXp <= before) {
+      return;
+    }
+    setXpFlash(`+${gamification.totalXp - before} XP`);
+    const timer = setTimeout(() => setXpFlash(undefined), 1600);
+    return () => clearTimeout(timer);
+  }, [gamification.totalXp]);
 
   const streaksByHabit = useMemo(() => {
     const streaks = new Map<string, number>();
@@ -39,8 +61,31 @@ export function DashboardScreen() {
   return (
     <View className="flex-1">
       <View className="px-5 pb-4 pt-3">
-        <Text className="text-2xl font-bold text-base-text">HabitOS</Text>
-        <Text className="mt-0.5 text-sm text-base-muted">{formatLogicalDate(selectedDate)}</Text>
+        <View className="flex-row items-center justify-between">
+          <View>
+            <Text className="text-2xl font-bold text-base-text">HabitOS</Text>
+            <Text className="mt-0.5 text-sm text-base-muted">{formatLogicalDate(selectedDate)}</Text>
+          </View>
+          <Pressable
+            className="flex-row items-center gap-1.5 rounded-full border border-habit-violet/50 bg-base-card px-3 py-1.5 active:opacity-70"
+            onPress={() => router.push("/achievements")}
+            accessibilityRole="button"
+            accessibilityLabel={`Nivel ${gamification.level}, ver logros`}
+          >
+            <Text className="text-sm">⭐</Text>
+            <Text className="text-sm font-bold text-habit-violet">Nv {gamification.level}</Text>
+          </Pressable>
+        </View>
+
+        {xpFlash ? (
+          <Animated.Text
+            entering={FadeInUp}
+            exiting={FadeOut}
+            className="absolute right-5 top-14 text-base font-bold text-habit-violet"
+          >
+            {xpFlash}
+          </Animated.Text>
+        ) : null}
 
         {totalCount > 0 ? (
           <View className="mt-4">
