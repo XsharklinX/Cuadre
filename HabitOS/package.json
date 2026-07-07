@@ -1,0 +1,45 @@
+{
+  "name": "habitos",
+  "version": "0.1.0",
+  "main": "expo-router/entry",
+  "dependencies": {
+    "@expo/metro-runtime": "56.0.15",
+    "@js-temporal/polyfill": "0.5.1",
+    "babel-preset-expo": "56.0.15",
+    "expo": "~56.0.12",
+    "expo-crypto": "~56.0.4",
+    "expo-haptics": "~56.0.3",
+    "expo-linking": "~56.0.15",
+    "expo-notifications": "~56.0.18",
+    "expo-router": "~56.2.11",
+    "expo-splash-screen": "~56.0.10",
+    "expo-status-bar": "~56.0.4",
+    "nativewind": "4.2.6",
+    "react": "19.2.3",
+    "react-native": "0.85.3",
+    "react-native-gesture-handler": "2.31.1",
+    "react-native-mmkv": "4.3.2",
+    "react-native-nitro-modules": "0.36.1",
+    "react-native-reanimated": "4.3.1",
+    "react-native-safe-area-context": "5.7.0",
+    "react-native-worklets": "0.8.3",
+    "tailwindcss": "3.4.4",
+    "zod": "4.4.3",
+    "zustand": "5.0.14"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.2",
+    "typescript": "~6.0.3",
+    "vitest": "4.1.9"
+  },
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "android:release": "expo run:android --variant release",
+    "web": "expo start --web",
+    "test": "vitest run --pool=forks --fileParallelism=false --testTimeout=15000",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "private": true
+}
