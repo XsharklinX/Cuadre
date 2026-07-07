@@ -1,6 +1,7 @@
 import "../global.css";
 
 import { Stack } from "expo-router";
+import * as Notifications from "expo-notifications";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
@@ -11,6 +12,15 @@ import { UI } from "@/presentation/theme/colors";
 import { useHabitStore } from "@/state/habitStore";
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 
 export default function RootLayout() {
   const timeZone = useDeviceTimeZone();

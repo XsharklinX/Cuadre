@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
-import { Alert, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { Alert, Pressable, ScrollView, Switch, Text, TextInput, View } from "react-native";
 
 import type { HabitFormValues } from "@/domain/habitValidation";
 import { habitDraftFromForm, validateHabitForm } from "@/domain/habitValidation";
@@ -28,6 +28,7 @@ export function HabitFormScreen({ habitId }: HabitFormScreenProps) {
   const createHabit = useHabitStore((state) => state.createHabit);
   const updateHabit = useHabitStore((state) => state.updateHabit);
   const archiveHabit = useHabitStore((state) => state.archiveHabit);
+  const requestNotificationPermission = useHabitStore((state) => state.requestNotificationPermission);
 
   const existing: Habit | undefined = useMemo(
     () => habits.find((habit) => habit.id === habitId),
@@ -37,6 +38,7 @@ export function HabitFormScreen({ habitId }: HabitFormScreenProps) {
   const [values, setValues] = useState<HabitFormValues>(() => {
     if (existing) {
       const frequency = existing.goal.frequency;
+      const reminder = existing.reminders[0];
       return {
         name: existing.name,
         description: existing.description ?? "",
@@ -45,9 +47,9 @@ export function HabitFormScreen({ habitId }: HabitFormScreenProps) {
         frequencyType: frequency.type,
         weekdays: frequency.type === "specific_weekdays" ? frequency.weekdays : [],
         targetCount: frequency.type === "times_per_week" ? frequency.targetCount : 3,
-        reminderEnabled: false,
-        reminderHour: 8,
-        reminderMinute: 0,
+        reminderEnabled: reminder?.enabled ?? false,
+        reminderHour: reminder?.hour ?? 8,
+        reminderMinute: reminder?.minute ?? 0,
         referenceTimeZone: existing.referenceTimeZone,
         displayOrder: existing.displayOrder,
       };
@@ -72,6 +74,23 @@ export function HabitFormScreen({ habitId }: HabitFormScreenProps) {
 
   function patch(partial: Partial<HabitFormValues>) {
     setValues((current) => ({ ...current, ...partial }));
+  }
+
+  async function handleReminderToggle(next: boolean) {
+    if (!next) {
+      patch({ reminderEnabled: false });
+      return;
+    }
+
+    const granted = await requestNotificationPermission();
+    if (!granted) {
+      Alert.alert(
+        "Permiso necesario",
+        "Activa las notificaciones para HabitOS en los ajustes del sistema para recibir recordatorios.",
+      );
+      return;
+    }
+    patch({ reminderEnabled: true });
   }
 
   function toggleWeekday(weekday: Weekday) {
@@ -275,6 +294,39 @@ export function HabitFormScreen({ habitId }: HabitFormScreenProps) {
         </View>
       ) : null}
 
+      <View className="mb-1.5 mt-4 flex-row items-center justify-between">
+        <Text className="text-xs font-semibold uppercase text-base-muted">Recordatorio</Text>
+        <Switch
+          value={values.reminderEnabled}
+          onValueChange={(next) => void handleReminderToggle(next)}
+          trackColor={{ false: "#334155", true: "#22c55e" }}
+          thumbColor="#f1f5f9"
+        />
+      </View>
+
+      {values.reminderEnabled ? (
+        <View className="flex-row items-center justify-center gap-4 rounded-xl border border-base-border bg-base-card py-3">
+          <TimeStepper
+            label="Hora"
+            value={values.reminderHour}
+            max={23}
+            onChange={(reminderHour) => patch({ reminderHour })}
+          />
+          <Text className="text-lg font-bold text-base-text">:</Text>
+          <TimeStepper
+            label="Min"
+            value={values.reminderMinute}
+            max={59}
+            step={5}
+            onChange={(reminderMinute) => patch({ reminderMinute })}
+          />
+        </View>
+      ) : (
+        <Text className="text-xs text-base-muted">
+          Recibe un aviso {values.frequencyType === "specific_weekdays" ? "los días de este hábito" : "todos los días"}.
+        </Text>
+      )}
+
       {existing ? (
         <Pressable
           className="mt-8 items-center rounded-xl border border-habit-rose/50 py-3 active:opacity-70"
@@ -285,5 +337,52 @@ export function HabitFormScreen({ habitId }: HabitFormScreenProps) {
         </Pressable>
       ) : null}
     </ScrollView>
+  );
+}
+
+interface TimeStepperProps {
+  label: string;
+  value: number;
+  max: number;
+  step?: number;
+  onChange: (value: number) => void;
+}
+
+function TimeStepper({ label, value, max, step = 1, onChange }: TimeStepperProps) {
+  function clamp(next: number): number {
+    if (next < 0) {
+      return max - (step - 1);
+    }
+    if (next > max) {
+      return 0;
+    }
+    return next;
+  }
+
+  return (
+    <View className="items-center">
+      <Text className="mb-1 text-[10px] uppercase text-base-muted">{label}</Text>
+      <View className="flex-row items-center gap-2">
+        <Pressable
+          className="h-9 w-9 items-center justify-center rounded-full bg-base-bg"
+          onPress={() => onChange(clamp(value - step))}
+          accessibilityRole="button"
+          accessibilityLabel={`Reducir ${label}`}
+        >
+          <Text className="text-base text-base-text">−</Text>
+        </Pressable>
+        <Text className="w-9 text-center text-lg font-bold text-base-text">
+          {value.toString().padStart(2, "0")}
+        </Text>
+        <Pressable
+          className="h-9 w-9 items-center justify-center rounded-full bg-base-bg"
+          onPress={() => onChange(clamp(value + step))}
+          accessibilityRole="button"
+          accessibilityLabel={`Aumentar ${label}`}
+        >
+          <Text className="text-base text-base-text">+</Text>
+        </Pressable>
+      </View>
+    </View>
   );
 }

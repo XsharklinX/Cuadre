@@ -43,7 +43,7 @@ Ver `docs/business-rules.md` (fechas lógicas locales, nunca UTC directo; rachas
 - [x] Fase 2 — Rachas + calendario mensual + journal.
 - [x] Fase 3 — Gamificación (`src/domain/gamification.ts`): XP derivado del historial (nunca persistido — undo lo ajusta solo), niveles, 10 logros, pantalla Logros, flash +XP en Dashboard.
 - [x] Fase 4 — Analíticas (`src/domain/insights.ts`): heatmap anual, ranking de días de la semana, tendencia mensual (6 meses), comparativa de hábitos activos por tasa de cumplimiento a 30 días. Pantalla Analíticas + `HeatmapGrid`.
-- [ ] Fase 5 — Notificaciones/recordatorios (expo-notifications; el form ya modela reminders).
+- [x] Fase 5 — Notificaciones (`src/native/notificationScheduler.ts`): recordatorio opcional por hábito (hora/minuto, respeta días fijos), permiso solicitado al activar el switch en el formulario, canal Android dedicado. Se resincroniza al crear/editar/archivar; deliberadamente **no** se resincroniza en cada `hydrate` para no afectar el cold start (el SO ya persiste las notificaciones programadas).
 - [ ] Fase 6 — Widget Android nativo (ver `HabitTracker/docs/android-widget.md` como referencia).
 - [ ] Fase 7 — Sync Supabase offline-first.
 - [ ] Fase 8 — Onboarding, export/import, APK firmado.

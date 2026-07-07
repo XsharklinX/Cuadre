@@ -2,6 +2,7 @@ import { create } from "zustand";
 
 import { todayLogicalDate } from "@/dates/logicalDate";
 import type { Habit, HabitCompletion, HabitDraft, LogicalDate } from "@/domain/types";
+import { createExpoNotificationScheduler, type NotificationScheduler } from "@/native/notificationScheduler";
 import { createMmkvStorage } from "@/persistence/mmkvStorage";
 import type { HabitRepository } from "@/repositories/habitRepository";
 import { LocalHabitRepository } from "@/repositories/localHabitRepository";
@@ -13,6 +14,7 @@ import { logDevelopmentError } from "@/utils/logger";
 
 interface HabitStoreDependencies {
   repository: HabitRepository;
+  notificationScheduler: NotificationScheduler;
 }
 
 interface HabitStoreState {
@@ -29,6 +31,7 @@ interface HabitStoreState {
   archiveHabit: (habitId: string) => Promise<Habit | undefined>;
   completeHabit: (habitId: string, timeZone: string) => Promise<void>;
   undoCompletion: (habitId: string) => Promise<void>;
+  requestNotificationPermission: () => Promise<boolean>;
   clearError: () => void;
 }
 
@@ -38,11 +41,30 @@ export function configureHabitStore(nextDependencies: HabitStoreDependencies): v
   dependencies = nextDependencies;
 }
 
-function getRepository(): HabitRepository {
+function getDependencies(): HabitStoreDependencies {
   if (!dependencies) {
-    dependencies = { repository: new LocalHabitRepository(createMmkvStorage()) };
+    dependencies = {
+      repository: new LocalHabitRepository(createMmkvStorage()),
+      notificationScheduler: createExpoNotificationScheduler(),
+    };
   }
-  return dependencies.repository;
+  return dependencies;
+}
+
+function getRepository(): HabitRepository {
+  return getDependencies().repository;
+}
+
+function syncReminders(habit: Habit): void {
+  getDependencies()
+    .notificationScheduler.syncHabitReminders(habit)
+    .catch(logDevelopmentError);
+}
+
+function cancelReminders(habitId: string): void {
+  getDependencies()
+    .notificationScheduler.cancelHabitReminders(habitId)
+    .catch(logDevelopmentError);
 }
 
 export const useHabitStore = create<HabitStoreState>((set, get) => ({
@@ -73,6 +95,7 @@ export const useHabitStore = create<HabitStoreState>((set, get) => ({
   createHabit: async (draft) => {
     try {
       const habit = await createHabit(getRepository(), draft, new Date().toISOString());
+      syncReminders(habit);
       await refreshState(set, get().selectedDate);
       return habit;
     } catch (error) {
@@ -85,6 +108,7 @@ export const useHabitStore = create<HabitStoreState>((set, get) => ({
   updateHabit: async (habit) => {
     try {
       const updated = await updateHabit(getRepository(), habit);
+      syncReminders(updated);
       await refreshState(set, get().selectedDate);
       return updated;
     } catch (error) {
@@ -97,6 +121,7 @@ export const useHabitStore = create<HabitStoreState>((set, get) => ({
   archiveHabit: async (habitId) => {
     try {
       const archived = await archiveHabit(getRepository(), habitId, new Date().toISOString());
+      cancelReminders(habitId);
       await refreshState(set, get().selectedDate);
       return archived;
     } catch (error) {
@@ -129,6 +154,15 @@ export const useHabitStore = create<HabitStoreState>((set, get) => ({
     } catch (error) {
       logDevelopmentError(error);
       set({ errorMessage: "No se pudo deshacer el hábito." });
+    }
+  },
+
+  requestNotificationPermission: async () => {
+    try {
+      return await getDependencies().notificationScheduler.ensurePermission();
+    } catch (error) {
+      logDevelopmentError(error);
+      return false;
     }
   },
 
