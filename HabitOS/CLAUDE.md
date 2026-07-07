@@ -42,7 +42,7 @@ Ver `docs/business-rules.md` (fechas lógicas locales, nunca UTC directo; rachas
 - [x] Fase 1 — CRUD hábitos + Dashboard + persistencia MMKV.
 - [x] Fase 2 — Rachas + calendario mensual + journal.
 - [x] Fase 3 — Gamificación (`src/domain/gamification.ts`): XP derivado del historial (nunca persistido — undo lo ajusta solo), niveles, 10 logros, pantalla Logros, flash +XP en Dashboard.
-- [ ] Fase 4 — Analíticas (heatmap anual, tendencias).
+- [x] Fase 4 — Analíticas (`src/domain/insights.ts`): heatmap anual, ranking de días de la semana, tendencia mensual (6 meses), comparativa de hábitos activos por tasa de cumplimiento a 30 días. Pantalla Analíticas + `HeatmapGrid`.
 - [ ] Fase 5 — Notificaciones/recordatorios (expo-notifications; el form ya modela reminders).
 - [ ] Fase 6 — Widget Android nativo (ver `HabitTracker/docs/android-widget.md` como referencia).
 - [ ] Fase 7 — Sync Supabase offline-first.

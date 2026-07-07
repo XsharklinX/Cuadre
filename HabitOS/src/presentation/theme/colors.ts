@@ -18,6 +18,22 @@ export const HABIT_COLORS = [
   "#84cc16",
 ];
 
+export function heatmapCellColor(dueCount: number, rate: number): string {
+  if (dueCount === 0) {
+    return "#1e293b";
+  }
+  if (rate === 0) {
+    return "#33415588";
+  }
+  if (rate < 0.5) {
+    return "#f59e0b55";
+  }
+  if (rate < 1) {
+    return "#22c55e77";
+  }
+  return "#22c55e";
+}
+
 export const HABIT_ICONS = [
   "💧",
   "📖",
