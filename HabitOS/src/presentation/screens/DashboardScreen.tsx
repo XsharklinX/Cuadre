@@ -1,3 +1,4 @@
+import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -8,8 +9,11 @@ import { calculateGamification } from "@/domain/gamification";
 import { calculateCurrentStreak } from "@/domain/streaks";
 import { EmptyState } from "@/presentation/components/EmptyState";
 import { HabitCard } from "@/presentation/components/HabitCard";
+import { Icon } from "@/presentation/components/Icon";
+import { ProgressRing } from "@/presentation/components/ProgressRing";
 import { useDeviceTimeZone } from "@/presentation/hooks/useDeviceTimeZone";
 import { formatLogicalDate } from "@/presentation/labels";
+import { gradients, shadows, UI } from "@/presentation/theme/colors";
 import { useHabitStore } from "@/state/habitStore";
 
 export function DashboardScreen() {
@@ -72,7 +76,7 @@ export function DashboardScreen() {
             accessibilityRole="button"
             accessibilityLabel={`Nivel ${gamification.level}, ver logros`}
           >
-            <Text className="text-sm">⭐</Text>
+            <Icon name="star" size={14} weight="fill" color="#8b5cf6" />
             <Text className="text-sm font-bold text-habit-violet">Nv {gamification.level}</Text>
           </Pressable>
         </View>
@@ -88,24 +92,22 @@ export function DashboardScreen() {
         ) : null}
 
         {totalCount > 0 ? (
-          <View className="mt-4">
-            <View className="mb-1.5 flex-row justify-between">
+          <View className="mt-5 flex-row items-center gap-4">
+            <ProgressRing size={76} strokeWidth={8} progress={progress} gradientColors={gradients.dailyProgress}>
+              <Text className="text-base font-bold text-base-text">{Math.round(progress * 100)}%</Text>
+            </ProgressRing>
+            <View className="flex-1">
               <Text className="text-xs text-base-muted">Progreso de hoy</Text>
-              <Text className="text-xs font-semibold text-base-text">
-                {completedCount}/{totalCount}
+              <Text className="mt-0.5 text-lg font-bold text-base-text">
+                {completedCount}/{totalCount} hábitos
               </Text>
+              {progress === 1 ? (
+                <View className="mt-1.5 flex-row items-center gap-1.5">
+                  <Icon name="sparkle" size={16} weight="fill" color={UI.accent} />
+                  <Text className="text-sm font-semibold text-habit-green">¡Día completado!</Text>
+                </View>
+              ) : null}
             </View>
-            <View className="h-2.5 overflow-hidden rounded-full bg-base-card">
-              <View
-                className="h-full rounded-full bg-habit-green"
-                style={{ width: `${Math.round(progress * 100)}%` }}
-              />
-            </View>
-            {progress === 1 ? (
-              <Text className="mt-2 text-center text-sm font-semibold text-habit-green">
-                🎉 ¡Día completado!
-              </Text>
-            ) : null}
           </View>
         ) : null}
       </View>
@@ -120,6 +122,7 @@ export function DashboardScreen() {
         <EmptyState
           title="Sin hábitos todavía"
           subtitle="Crea tu primer hábito con el botón + y empieza a construir tu racha."
+          icon="target"
         />
       ) : (
         <FlatList
@@ -147,12 +150,20 @@ export function DashboardScreen() {
       )}
 
       <Pressable
-        className="absolute bottom-5 right-5 h-14 w-14 items-center justify-center rounded-full bg-habit-green shadow-lg active:opacity-80"
+        className="absolute bottom-5 right-5"
+        style={shadows.floating}
         onPress={() => router.push("/habits/new")}
         accessibilityRole="button"
         accessibilityLabel="Crear hábito"
       >
-        <Text className="text-3xl font-light text-white">+</Text>
+        <LinearGradient
+          colors={gradients.fab}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={{ height: 56, width: 56, borderRadius: 28, alignItems: "center", justifyContent: "center" }}
+        >
+          <Icon name="plus" size={26} weight="bold" color="#ffffff" />
+        </LinearGradient>
       </Pressable>
     </View>
   );

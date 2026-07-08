@@ -27,16 +27,26 @@ export interface AchievementDefinition {
 }
 
 export const ACHIEVEMENTS: AchievementDefinition[] = [
-  { id: "first_step", name: "Primer paso", description: "Completa tu primer hábito.", icon: "🌱" },
-  { id: "streak_3", name: "Calentando", description: "Alcanza una racha de 3.", icon: "✨" },
-  { id: "streak_7", name: "En llamas", description: "Alcanza una racha de 7.", icon: "🔥" },
-  { id: "streak_30", name: "Imparable", description: "Alcanza una racha de 30.", icon: "🚀" },
-  { id: "collector_5", name: "Coleccionista", description: "Crea 5 hábitos.", icon: "🗂️" },
-  { id: "century_100", name: "Centenario", description: "Acumula 100 completados.", icon: "💯" },
-  { id: "perfect_week", name: "Semana perfecta", description: "Completa todos tus hábitos cada día de una semana.", icon: "🏆" },
-  { id: "early_bird_10", name: "Madrugador", description: "Completa 10 hábitos antes de las 8 a. m.", icon: "🌅" },
-  { id: "level_5", name: "Veterano", description: "Alcanza el nivel 5.", icon: "⭐" },
-  { id: "level_10", name: "Leyenda", description: "Alcanza el nivel 10.", icon: "👑" },
+  { id: "first_step", name: "Primer paso", description: "Completa tu primer hábito.", icon: "leaf" },
+  { id: "streak_3", name: "Calentando", description: "Alcanza una racha de 3.", icon: "sparkle" },
+  { id: "streak_7", name: "En llamas", description: "Alcanza una racha de 7.", icon: "fire" },
+  { id: "streak_30", name: "Imparable", description: "Alcanza una racha de 30.", icon: "rocket" },
+  { id: "collector_5", name: "Coleccionista", description: "Crea 5 hábitos.", icon: "folder-open" },
+  { id: "century_100", name: "Centenario", description: "Acumula 100 completados.", icon: "medal" },
+  {
+    id: "perfect_week",
+    name: "Semana perfecta",
+    description: "Completa todos tus hábitos cada día de una semana.",
+    icon: "trophy",
+  },
+  {
+    id: "early_bird_10",
+    name: "Madrugador",
+    description: "Completa 10 hábitos antes de las 8 a. m.",
+    icon: "sun-horizon",
+  },
+  { id: "level_5", name: "Veterano", description: "Alcanza el nivel 5.", icon: "star" },
+  { id: "level_10", name: "Leyenda", description: "Alcanza el nivel 10.", icon: "crown" },
 ];
 
 export interface LevelProgress {

@@ -39,7 +39,7 @@ async function cancelScheduledForHabit(habitId: string): Promise<void> {
 async function scheduleReminder(habit: Habit, reminder: HabitReminder): Promise<void> {
   const weekdays = reminder.weekdays ?? habitFrequencyWeekdays(habit);
   const content = {
-    title: `${habit.icon} ${habit.name}`,
+    title: habit.name,
     body: "Es hora de tu hábito. ¡No rompas la racha!",
     data: { [HABIT_ID_DATA_KEY]: habit.id, reminderId: reminder.id },
   };

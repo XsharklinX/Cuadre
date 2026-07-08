@@ -1,3 +1,4 @@
+import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import { Alert, Pressable, ScrollView, Switch, Text, TextInput, View } from "react-native";
@@ -5,9 +6,11 @@ import { Alert, Pressable, ScrollView, Switch, Text, TextInput, View } from "rea
 import type { HabitFormValues } from "@/domain/habitValidation";
 import { habitDraftFromForm, validateHabitForm } from "@/domain/habitValidation";
 import type { Habit, Weekday } from "@/domain/types";
+import { Icon, type IconName } from "@/presentation/components/Icon";
 import { useDeviceTimeZone } from "@/presentation/hooks/useDeviceTimeZone";
 import { WEEKDAY_SHORT } from "@/presentation/labels";
-import { HABIT_COLORS, HABIT_ICONS } from "@/presentation/theme/colors";
+import { HABIT_COLORS, iconSwatchGradient } from "@/presentation/theme/colors";
+import { DEFAULT_HABIT_ICON, HABIT_ICON_CATEGORIES } from "@/presentation/theme/habitIcons";
 import { useHabitStore } from "@/state/habitStore";
 
 const ALL_WEEKDAYS: Weekday[] = [1, 2, 3, 4, 5, 6, 7];
@@ -58,7 +61,7 @@ export function HabitFormScreen({ habitId }: HabitFormScreenProps) {
     return {
       name: "",
       description: "",
-      icon: HABIT_ICONS[0] ?? "🎯",
+      icon: DEFAULT_HABIT_ICON,
       color: HABIT_COLORS[0] ?? "#22c55e",
       frequencyType: "daily",
       weekdays: [],
@@ -161,7 +164,7 @@ export function HabitFormScreen({ habitId }: HabitFormScreenProps) {
 
       <Text className="mb-1.5 text-xs font-semibold uppercase text-base-muted">Nombre</Text>
       <TextInput
-        className="mb-1 rounded-xl border border-base-border bg-base-card px-4 py-3 text-base text-base-text"
+        className="mb-1 rounded-xl border border-base-borderSoft bg-base-card px-4 py-3 text-base text-base-text"
         placeholder="Ej. Leer 20 minutos"
         placeholderTextColor="#64748b"
         value={values.name}
@@ -174,7 +177,7 @@ export function HabitFormScreen({ habitId }: HabitFormScreenProps) {
         Descripción (opcional)
       </Text>
       <TextInput
-        className="rounded-xl border border-base-border bg-base-card px-4 py-3 text-base text-base-text"
+        className="rounded-xl border border-base-borderSoft bg-base-card px-4 py-3 text-base text-base-text"
         placeholder="¿Por qué importa este hábito?"
         placeholderTextColor="#64748b"
         value={values.description}
@@ -183,23 +186,50 @@ export function HabitFormScreen({ habitId }: HabitFormScreenProps) {
       />
 
       <Text className="mb-1.5 mt-4 text-xs font-semibold uppercase text-base-muted">Icono</Text>
-      <View className="flex-row flex-wrap gap-2">
-        {HABIT_ICONS.map((icon) => (
-          <Pressable
-            key={icon}
-            className={
-              values.icon === icon
-                ? "h-11 w-11 items-center justify-center rounded-xl border-2 border-habit-green bg-base-card"
-                : "h-11 w-11 items-center justify-center rounded-xl border border-base-border bg-base-card"
-            }
-            onPress={() => patch({ icon })}
-          >
-            <Text className="text-xl">{icon}</Text>
-          </Pressable>
-        ))}
-      </View>
+      {HABIT_ICON_CATEGORIES.map((group) => (
+        <View key={group.category} className="mb-3">
+          <Text className="mb-1.5 text-[11px] text-base-muted">{group.category}</Text>
+          <View className="flex-row flex-wrap gap-2">
+            {group.icons.map((option) => {
+              const isSelected = values.icon === option.id;
+              return (
+                <Pressable
+                  key={option.id}
+                  className={
+                    isSelected
+                      ? "h-11 w-11 items-center justify-center rounded-xl border-2 border-habit-green"
+                      : "h-11 w-11 items-center justify-center rounded-xl border border-base-borderSoft bg-base-card"
+                  }
+                  onPress={() => patch({ icon: option.id })}
+                  accessibilityRole="button"
+                  accessibilityLabel={option.label}
+                >
+                  {isSelected ? (
+                    <LinearGradient
+                      colors={iconSwatchGradient(values.color)}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        borderRadius: 10,
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Icon name={option.id} size={20} weight="fill" color={values.color} />
+                    </LinearGradient>
+                  ) : (
+                    <Icon name={option.id} size={20} weight="regular" color="#94a3b8" />
+                  )}
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      ))}
 
-      <Text className="mb-1.5 mt-4 text-xs font-semibold uppercase text-base-muted">Color</Text>
+      <Text className="mb-1.5 mt-2 text-xs font-semibold uppercase text-base-muted">Color</Text>
       <View className="flex-row flex-wrap gap-2.5">
         {HABIT_COLORS.map((color) => (
           <Pressable
@@ -225,7 +255,7 @@ export function HabitFormScreen({ habitId }: HabitFormScreenProps) {
             className={
               values.frequencyType === option.value
                 ? "flex-1 items-center rounded-xl bg-habit-green py-2.5"
-                : "flex-1 items-center rounded-xl border border-base-border bg-base-card py-2.5"
+                : "flex-1 items-center rounded-xl border border-base-borderSoft bg-base-card py-2.5"
             }
             onPress={() => patch({ frequencyType: option.value })}
           >
@@ -253,7 +283,7 @@ export function HabitFormScreen({ habitId }: HabitFormScreenProps) {
                   className={
                     isSelected
                       ? "h-10 flex-1 items-center justify-center rounded-lg bg-habit-green"
-                      : "h-10 flex-1 items-center justify-center rounded-lg border border-base-border bg-base-card"
+                      : "h-10 flex-1 items-center justify-center rounded-lg border border-base-borderSoft bg-base-card"
                   }
                   onPress={() => toggleWeekday(weekday)}
                 >
@@ -271,14 +301,14 @@ export function HabitFormScreen({ habitId }: HabitFormScreenProps) {
       ) : null}
 
       {values.frequencyType === "times_per_week" ? (
-        <View className="mt-3 flex-row items-center justify-center gap-6 rounded-xl border border-base-border bg-base-card py-3">
+        <View className="mt-3 flex-row items-center justify-center gap-6 rounded-xl border border-base-borderSoft bg-base-card py-3">
           <Pressable
             className="h-10 w-10 items-center justify-center rounded-full bg-base-bg"
             onPress={() => patch({ targetCount: Math.max(1, values.targetCount - 1) })}
             accessibilityRole="button"
             accessibilityLabel="Reducir objetivo semanal"
           >
-            <Text className="text-xl text-base-text">−</Text>
+            <Icon name="minus" size={16} color="#f1f5f9" />
           </Pressable>
           <Text className="text-lg font-bold text-base-text">
             {values.targetCount} {values.targetCount === 1 ? "vez" : "veces"}
@@ -289,7 +319,7 @@ export function HabitFormScreen({ habitId }: HabitFormScreenProps) {
             accessibilityRole="button"
             accessibilityLabel="Aumentar objetivo semanal"
           >
-            <Text className="text-xl text-base-text">+</Text>
+            <Icon name="plus" size={16} color="#f1f5f9" />
           </Pressable>
         </View>
       ) : null}
@@ -305,7 +335,7 @@ export function HabitFormScreen({ habitId }: HabitFormScreenProps) {
       </View>
 
       {values.reminderEnabled ? (
-        <View className="flex-row items-center justify-center gap-4 rounded-xl border border-base-border bg-base-card py-3">
+        <View className="flex-row items-center justify-center gap-4 rounded-xl border border-base-borderSoft bg-base-card py-3">
           <TimeStepper
             label="Hora"
             value={values.reminderHour}
@@ -369,7 +399,7 @@ function TimeStepper({ label, value, max, step = 1, onChange }: TimeStepperProps
           accessibilityRole="button"
           accessibilityLabel={`Reducir ${label}`}
         >
-          <Text className="text-base text-base-text">−</Text>
+          <Icon name="minus" size={14} color="#f1f5f9" />
         </Pressable>
         <Text className="w-9 text-center text-lg font-bold text-base-text">
           {value.toString().padStart(2, "0")}
@@ -380,7 +410,7 @@ function TimeStepper({ label, value, max, step = 1, onChange }: TimeStepperProps
           accessibilityRole="button"
           accessibilityLabel={`Aumentar ${label}`}
         >
-          <Text className="text-base text-base-text">+</Text>
+          <Icon name="plus" size={14} color="#f1f5f9" />
         </Pressable>
       </View>
     </View>

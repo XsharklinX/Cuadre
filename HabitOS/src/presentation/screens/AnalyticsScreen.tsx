@@ -8,10 +8,14 @@ import {
   compareHabits,
   rankWeekdaysByCompletion,
 } from "@/domain/insights";
+import { EmptyState } from "@/presentation/components/EmptyState";
 import { HeatmapGrid } from "@/presentation/components/HeatmapGrid";
+import { Icon, type IconName } from "@/presentation/components/Icon";
 import { useDeviceTimeZone } from "@/presentation/hooks/useDeviceTimeZone";
 import { WEEKDAY_SHORT } from "@/presentation/labels";
+import { iconSwatchGradient } from "@/presentation/theme/colors";
 import { useHabitStore } from "@/state/habitStore";
+import { LinearGradient } from "expo-linear-gradient";
 
 const WEEKDAY_FULL: Record<number, string> = {
   1: "Lunes",
@@ -49,15 +53,11 @@ export function AnalyticsScreen() {
 
   if (habits.length === 0) {
     return (
-      <View className="flex-1 items-center justify-center px-8">
-        <Text className="mb-3 text-5xl">📊</Text>
-        <Text className="mb-1 text-center text-lg font-semibold text-base-text">
-          Aún no hay datos
-        </Text>
-        <Text className="text-center text-sm text-base-muted">
-          Crea hábitos y complétalos por unos días para ver tus analíticas aquí.
-        </Text>
-      </View>
+      <EmptyState
+        title="Aún no hay datos"
+        subtitle="Crea hábitos y complétalos por unos días para ver tus analíticas aquí."
+        icon="chart-bar"
+      />
     );
   }
 
@@ -65,7 +65,7 @@ export function AnalyticsScreen() {
     <ScrollView className="flex-1" contentContainerStyle={{ padding: 20, paddingBottom: 48 }}>
       <Text className="mb-4 text-2xl font-bold text-base-text">Analíticas</Text>
 
-      <View className="rounded-2xl border border-base-border bg-base-card p-4">
+      <View className="rounded-2xl border border-base-borderSoft bg-base-card p-4">
         <View className="mb-3 flex-row items-center justify-between">
           <Text className="text-sm font-semibold text-base-text">Último año</Text>
           <Text className="text-sm font-bold text-habit-green">{Math.round(overallRate * 100)}%</Text>
@@ -74,7 +74,7 @@ export function AnalyticsScreen() {
       </View>
 
       <Text className="mb-3 mt-6 text-lg font-bold text-base-text">Tendencia mensual</Text>
-      <View className="rounded-2xl border border-base-border bg-base-card p-4">
+      <View className="rounded-2xl border border-base-borderSoft bg-base-card p-4">
         <View className="flex-row items-end justify-between" style={{ height: 90 }}>
           {monthlyTrend.map((point) => (
             <View key={point.monthStart} className="flex-1 items-center">
@@ -95,12 +95,15 @@ export function AnalyticsScreen() {
       </View>
 
       <Text className="mb-3 mt-6 text-lg font-bold text-base-text">Mejores y peores días</Text>
-      <View className="rounded-2xl border border-base-border bg-base-card p-4">
+      <View className="rounded-2xl border border-base-borderSoft bg-base-card p-4">
         {bestWeekday ? (
           <View className="mb-2 flex-row items-center justify-between">
-            <Text className="text-sm text-base-muted">
-              🟢 {WEEKDAY_FULL[bestWeekday.weekday]} es tu mejor día
-            </Text>
+            <View className="flex-row items-center gap-1.5">
+              <Icon name="check-circle" size={16} weight="fill" color="#22c55e" />
+              <Text className="text-sm text-base-muted">
+                {WEEKDAY_FULL[bestWeekday.weekday]} es tu mejor día
+              </Text>
+            </View>
             <Text className="text-sm font-bold text-habit-green">
               {Math.round(bestWeekday.rate * 100)}%
             </Text>
@@ -108,9 +111,12 @@ export function AnalyticsScreen() {
         ) : null}
         {worstWeekday && worstWeekday.weekday !== bestWeekday?.weekday ? (
           <View className="flex-row items-center justify-between">
-            <Text className="text-sm text-base-muted">
-              🔴 {WEEKDAY_FULL[worstWeekday.weekday]} es tu día más difícil
-            </Text>
+            <View className="flex-row items-center gap-1.5">
+              <Icon name="x-circle" size={16} weight="fill" color="#f43f5e" />
+              <Text className="text-sm text-base-muted">
+                {WEEKDAY_FULL[worstWeekday.weekday]} es tu día más difícil
+              </Text>
+            </View>
             <Text className="text-sm font-bold text-habit-rose">
               {Math.round(worstWeekday.rate * 100)}%
             </Text>
@@ -143,14 +149,16 @@ export function AnalyticsScreen() {
         habitComparison.map((entry) => (
           <View
             key={entry.habit.id}
-            className="mb-2.5 flex-row items-center rounded-xl border border-base-border bg-base-card p-3"
+            className="mb-2.5 flex-row items-center rounded-xl border border-base-borderSoft bg-base-card p-3"
           >
-            <View
-              className="mr-3 h-9 w-9 items-center justify-center rounded-lg"
-              style={{ backgroundColor: `${entry.habit.color}33` }}
+            <LinearGradient
+              colors={iconSwatchGradient(entry.habit.color)}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={{ width: 36, height: 36, borderRadius: 10, marginRight: 12, alignItems: "center", justifyContent: "center" }}
             >
-              <Text className="text-base">{entry.habit.icon}</Text>
-            </View>
+              <Icon name={entry.habit.icon as IconName} size={18} color={entry.habit.color} weight="fill" />
+            </LinearGradient>
             <View className="flex-1">
               <Text className="text-sm font-semibold text-base-text" numberOfLines={1}>
                 {entry.habit.name}
@@ -164,7 +172,10 @@ export function AnalyticsScreen() {
             </View>
             <View className="ml-3 items-end">
               <Text className="text-sm font-bold text-base-text">{Math.round(entry.windowRate * 100)}%</Text>
-              <Text className="text-[10px] text-base-muted">🔥 {entry.currentStreak}</Text>
+              <View className="flex-row items-center gap-0.5">
+                <Icon name="fire" size={10} weight="fill" color="#f59e0b" />
+                <Text className="text-[10px] text-base-muted">{entry.currentStreak}</Text>
+              </View>
             </View>
           </View>
         ))

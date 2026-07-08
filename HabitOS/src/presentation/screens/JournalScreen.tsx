@@ -1,10 +1,14 @@
 import { useMemo, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 
+import { LinearGradient } from "expo-linear-gradient";
+
 import { addDays, endOfMonth, startOfMonth, todayLogicalDate, weekdayOf } from "@/dates/logicalDate";
 import type { LogicalDate } from "@/domain/types";
+import { Icon, type IconName } from "@/presentation/components/Icon";
 import { useDeviceTimeZone } from "@/presentation/hooks/useDeviceTimeZone";
 import { formatMonth, frequencyLabel, WEEKDAY_SHORT } from "@/presentation/labels";
+import { iconSwatchGradient, UI } from "@/presentation/theme/colors";
 import { useHabitStore } from "@/state/habitStore";
 import { buildJournalFromData, type JournalDay } from "@/use-cases/buildJournal";
 
@@ -35,7 +39,7 @@ export function JournalScreen() {
           accessibilityRole="button"
           accessibilityLabel="Mes anterior"
         >
-          <Text className="text-base-text">‹</Text>
+          <Icon name="caret-left" size={16} color={UI.text} />
         </Pressable>
         <Text className="text-base font-semibold text-base-text">{formatMonth(monthDate)}</Text>
         <Pressable
@@ -44,11 +48,11 @@ export function JournalScreen() {
           accessibilityRole="button"
           accessibilityLabel="Mes siguiente"
         >
-          <Text className="text-base-text">›</Text>
+          <Icon name="caret-right" size={16} color={UI.text} />
         </Pressable>
       </View>
 
-      <View className="rounded-2xl border border-base-border bg-base-card p-3">
+      <View className="rounded-2xl border border-base-borderSoft bg-base-card p-3">
         <View className="mb-2 flex-row">
           {([1, 2, 3, 4, 5, 6, 7] as const).map((weekday) => (
             <Text key={weekday} className="flex-1 text-center text-xs text-base-muted">
@@ -93,15 +97,17 @@ export function JournalScreen() {
         activeHabits.map(({ habit, analytics }) => (
           <View
             key={habit.id}
-            className="mb-3 rounded-2xl border border-base-border bg-base-card p-4"
+            className="mb-3 rounded-2xl border border-base-borderSoft bg-base-card p-4"
           >
             <View className="flex-row items-center">
-              <View
-                className="mr-3 h-10 w-10 items-center justify-center rounded-lg"
-                style={{ backgroundColor: `${habit.color}33` }}
+              <LinearGradient
+                colors={iconSwatchGradient(habit.color)}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{ width: 40, height: 40, borderRadius: 12, marginRight: 12, alignItems: "center", justifyContent: "center" }}
               >
-                <Text className="text-lg">{habit.icon}</Text>
-              </View>
+                <Icon name={habit.icon as IconName} size={20} color={habit.color} weight="fill" />
+              </LinearGradient>
               <View className="flex-1">
                 <Text className="font-semibold text-base-text" numberOfLines={1}>
                   {habit.name}
@@ -112,12 +118,14 @@ export function JournalScreen() {
               </View>
             </View>
             <View className="mt-3 flex-row justify-between">
-              <Metric label="Racha" value={`🔥 ${analytics.currentStreak}`} />
+              <Metric label="Racha" value={`${analytics.currentStreak}`} icon="fire" />
               <Metric label="Mejor racha" value={`${analytics.bestStreak}`} />
               <Metric label="Mes" value={`${Math.round(analytics.completionRate * 100)}%`} />
               <Metric
                 label="Tendencia"
-                value={`${analytics.periodDelta >= 0 ? "▲" : "▼"} ${Math.abs(Math.round(analytics.periodDelta * 100))}%`}
+                value={`${Math.abs(Math.round(analytics.periodDelta * 100))}%`}
+                icon={analytics.periodDelta >= 0 ? "trend-up" : "trend-down"}
+                iconColor={analytics.periodDelta >= 0 ? "#22c55e" : "#f43f5e"}
               />
             </View>
           </View>
@@ -127,10 +135,23 @@ export function JournalScreen() {
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function Metric({
+  label,
+  value,
+  icon,
+  iconColor = "#f59e0b",
+}: {
+  label: string;
+  value: string;
+  icon?: IconName;
+  iconColor?: string;
+}) {
   return (
     <View className="items-center">
-      <Text className="text-sm font-bold text-base-text">{value}</Text>
+      <View className="flex-row items-center gap-1">
+        {icon ? <Icon name={icon} size={12} weight="fill" color={iconColor} /> : null}
+        <Text className="text-sm font-bold text-base-text">{value}</Text>
+      </View>
       <Text className="mt-0.5 text-[10px] text-base-muted">{label}</Text>
     </View>
   );

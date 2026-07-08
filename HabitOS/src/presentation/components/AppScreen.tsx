@@ -1,6 +1,8 @@
+import { LinearGradient } from "expo-linear-gradient";
 import type { ReactNode } from "react";
-import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+import { gradients } from "@/presentation/theme/colors";
 
 interface AppScreenProps {
   children: ReactNode;
@@ -10,11 +12,11 @@ export function AppScreen({ children }: AppScreenProps) {
   const insets = useSafeAreaInsets();
 
   return (
-    <View
-      className="flex-1 bg-base-bg"
-      style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
+    <LinearGradient
+      colors={gradients.screenBg}
+      style={{ flex: 1, paddingTop: insets.top, paddingBottom: insets.bottom }}
     >
       {children}
-    </View>
+    </LinearGradient>
   );
 }

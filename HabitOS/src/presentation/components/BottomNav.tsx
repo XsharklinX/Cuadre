@@ -1,18 +1,24 @@
 import { router, usePathname } from "expo-router";
 import { Pressable, Text, View } from "react-native";
 
-const TABS = [
-  { path: "/", label: "Hoy", icon: "☀️" },
-  { path: "/journal", label: "Diario", icon: "📅" },
-  { path: "/analytics", label: "Analíticas", icon: "📊" },
-  { path: "/achievements", label: "Logros", icon: "🏆" },
-] as const;
+import { Icon, type IconName } from "@/presentation/components/Icon";
+import { UI, shadows } from "@/presentation/theme/colors";
+
+const TABS: Array<{ path: "/" | "/journal" | "/analytics" | "/achievements"; label: string; icon: IconName }> = [
+  { path: "/", label: "Hoy", icon: "sun" },
+  { path: "/journal", label: "Diario", icon: "calendar-blank" },
+  { path: "/analytics", label: "Analíticas", icon: "chart-bar" },
+  { path: "/achievements", label: "Logros", icon: "trophy" },
+];
 
 export function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <View className="flex-row border-t border-base-border bg-base-card">
+    <View
+      className="flex-row border-t border-base-borderSoft bg-base-card"
+      style={shadows.floating}
+    >
       {TABS.map((tab) => {
         const isActive = pathname === tab.path;
         return (
@@ -27,8 +33,8 @@ export function BottomNav() {
             accessibilityRole="tab"
             accessibilityState={{ selected: isActive }}
           >
-            <Text className="text-lg">{tab.icon}</Text>
-            <Text className={isActive ? "text-habit-green text-xs font-semibold" : "text-base-muted text-xs"}>
+            <Icon name={tab.icon} size={22} weight={isActive ? "fill" : "regular"} color={isActive ? UI.accent : UI.muted} />
+            <Text className={isActive ? "text-habit-green text-xs font-semibold mt-1" : "text-base-muted text-xs mt-1"}>
               {tab.label}
             </Text>
           </Pressable>
