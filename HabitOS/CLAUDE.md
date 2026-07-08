@@ -12,7 +12,15 @@ App móvil (Android-first) de creación y seguimiento de hábitos. Sucesora de H
 
 ## Stack
 
-Expo SDK 56 · React Native 0.85 (New Architecture + Hermes) · expo-router · Zustand 5 · react-native-mmkv 4 · NativeWind 4 · Zod · Temporal polyfill · Vitest.
+Expo SDK 56 · React Native 0.85 (New Architecture + Hermes) · expo-router · Zustand 5 · react-native-mmkv 4 · NativeWind 4 · Zod · Temporal polyfill · Vitest · phosphor-react-native (iconos SVG) · react-native-svg · expo-linear-gradient.
+
+## Sistema visual
+
+- **Nunca emojis como iconos** — todo icono pasa por `src/presentation/components/Icon.tsx` (wrapper tipado de Phosphor; `IconName` atrapa nombres inválidos en compile time). Para añadir un icono: importarlo de phosphor-react-native y registrarlo en `REGISTRY`.
+- `Habit.icon` guarda un id de icono (ej. `"barbell"`), NO un glifo — por eso las notificaciones usan solo `habit.name` en el título.
+- Catálogos: `src/presentation/theme/habitIcons.ts` (por categoría, para el picker) y `achievementIcons.ts` (logros; el dominio guarda solo strings).
+- Tokens únicos en `src/theme/tokens.js` (+ `tokens.d.ts`): colores (compartidos con `tailwind.config.js` — no duplicar hex a mano), `shadows` (resting/pressed/floating) y `gradients`. `src/presentation/theme/colors.ts` re-exporta.
+- `ProgressRing` (SVG) para progreso diario y XP; swatches de icono con `LinearGradient` del color del hábito.
 
 > Regla heredada: consultar docs versionadas https://docs.expo.dev/versions/v56.0.0/ antes de usar APIs de Expo.
 
