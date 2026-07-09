@@ -6,6 +6,7 @@ import {
   startOfWeek,
   weekdayOf,
 } from "@/dates/logicalDate";
+import { habitCreatedDate } from "@/domain/habitDates";
 import type { Habit, HabitCompletion, LogicalDate } from "@/domain/types";
 
 export function isHabitDueOnDate(habit: Habit, date: LogicalDate): boolean {
@@ -13,7 +14,7 @@ export function isHabitDueOnDate(habit: Habit, date: LogicalDate): boolean {
     return false;
   }
 
-  const createdDate = habit.createdAt.slice(0, 10) as LogicalDate;
+  const createdDate = habitCreatedDate(habit);
   if (compareLogicalDates(date, createdDate) < 0) {
     return false;
   }
@@ -81,7 +82,7 @@ export function requiredCompletionsForPeriod(
     return 0;
   }
 
-  const createdDate = habit.createdAt.slice(0, 10) as LogicalDate;
+  const createdDate = habitCreatedDate(habit);
   const effectiveStart = compareLogicalDates(createdDate, periodStart) > 0 ? createdDate : periodStart;
   if (compareLogicalDates(effectiveStart, periodEnd) > 0) {
     return 0;

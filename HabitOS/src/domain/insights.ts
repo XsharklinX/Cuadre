@@ -7,6 +7,7 @@ import {
   weekdayOf,
 } from "@/dates/logicalDate";
 import { isCompletedOnDate, isHabitDueOnDate } from "@/domain/frequency";
+import { habitArchivedDate, habitCreatedDate } from "@/domain/habitDates";
 import { calculateBestStreak, calculateCurrentStreak } from "@/domain/streaks";
 import type { Habit, HabitCompletion, LogicalDate, Weekday } from "@/domain/types";
 
@@ -41,7 +42,7 @@ export interface HabitComparison {
 /** Treats a habit as due on `date` using the frequency rules that were in effect at the
  * time, ignoring its *current* archived status (archiving must not erase history). */
 function wasHabitDueOnDate(habit: Habit, date: LogicalDate): boolean {
-  const archivedDate = habit.archivedAt ? (habit.archivedAt.slice(0, 10) as LogicalDate) : undefined;
+  const archivedDate = habitArchivedDate(habit);
   if (archivedDate && compareLogicalDates(date, archivedDate) > 0) {
     return false;
   }
@@ -153,7 +154,7 @@ export function compareHabits(
   return habits
     .filter((habit) => habit.status === "active")
     .map((habit) => {
-      const createdDate = habit.createdAt.slice(0, 10) as LogicalDate;
+      const createdDate = habitCreatedDate(habit);
       const effectiveStart = compareLogicalDates(createdDate, windowStart) > 0 ? createdDate : windowStart;
 
       let dueCount = 0;

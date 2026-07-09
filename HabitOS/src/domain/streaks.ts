@@ -6,6 +6,7 @@ import {
   isHabitDueOnDate,
   previousEvaluationPeriod,
 } from "@/domain/frequency";
+import { habitCreatedDate } from "@/domain/habitDates";
 import type { Habit, HabitCompletion, LogicalDate } from "@/domain/types";
 
 export function calculateCurrentStreak(
@@ -25,7 +26,7 @@ export function calculateCurrentStreak(
   let cursor = today;
   let isCurrentDay = true;
 
-  while (compareLogicalDates(cursor, habit.createdAt.slice(0, 10) as LogicalDate) >= 0) {
+  while (compareLogicalDates(cursor, habitCreatedDate(habit)) >= 0) {
     if (!isHabitDueOnDate(habit, cursor)) {
       cursor = addDays(cursor, -1);
       isCurrentDay = false;
@@ -62,7 +63,7 @@ export function calculateBestStreak(
     return calculateWeeklyBestStreak(habit, completions, throughDate);
   }
 
-  const start = habit.createdAt.slice(0, 10) as LogicalDate;
+  const start = habitCreatedDate(habit);
   let best = 0;
   let current = 0;
 
@@ -94,7 +95,7 @@ function calculateWeeklyCurrentStreak(
 
   let streak = 0;
   let cursorStart = startOfWeek(today, frequency.weekStartsOn);
-  const createdDate = habit.createdAt.slice(0, 10) as LogicalDate;
+  const createdDate = habitCreatedDate(habit);
   let isCurrentPeriod = true;
 
   while (compareLogicalDates(cursorStart, createdDate) >= 0 || isDateInsideWeek(createdDate, cursorStart)) {
@@ -128,7 +129,7 @@ function calculateWeeklyBestStreak(
     return 0;
   }
 
-  const createdDate = habit.createdAt.slice(0, 10) as LogicalDate;
+  const createdDate = habitCreatedDate(habit);
   let cursorStart = startOfWeek(createdDate, frequency.weekStartsOn);
   const finalStart = startOfWeek(throughDate, frequency.weekStartsOn);
   let best = 0;

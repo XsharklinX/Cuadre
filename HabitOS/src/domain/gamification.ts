@@ -2,6 +2,7 @@ import { Temporal } from "@js-temporal/polyfill";
 
 import { addDays, compareLogicalDates, datesBetweenInclusive, startOfWeek } from "@/dates/logicalDate";
 import { isCompletedOnDate, isHabitDueOnDate } from "@/domain/frequency";
+import { habitArchivedDate, habitCreatedDate } from "@/domain/habitDates";
 import { calculateBestStreak, calculateCurrentStreak } from "@/domain/streaks";
 import type { Habit, HabitCompletion, LogicalDate } from "@/domain/types";
 
@@ -95,8 +96,8 @@ export function levelFromXp(totalXp: number): LevelProgress {
 
 export function calculateHabitXp(habit: Habit, completions: HabitCompletion[], today: LogicalDate): number {
   const evalHabit: Habit = habit.status === "archived" ? { ...habit, status: "active" } : habit;
-  const createdDate = habit.createdAt.slice(0, 10) as LogicalDate;
-  const archivedDate = habit.archivedAt ? (habit.archivedAt.slice(0, 10) as LogicalDate) : undefined;
+  const createdDate = habitCreatedDate(habit);
+  const archivedDate = habitArchivedDate(habit);
   const end = archivedDate && compareLogicalDates(archivedDate, today) < 0 ? archivedDate : today;
 
   if (compareLogicalDates(createdDate, end) > 0) {
@@ -129,7 +130,7 @@ export function hasPerfectWeek(habits: Habit[], completions: HabitCompletion[], 
   }
 
   const earliest = habits
-    .map((habit) => habit.createdAt.slice(0, 10) as LogicalDate)
+    .map((habit) => habitCreatedDate(habit))
     .sort((left, right) => compareLogicalDates(left, right))[0];
   if (!earliest) {
     return false;
