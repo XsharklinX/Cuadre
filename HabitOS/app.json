@@ -2,7 +2,7 @@
   "expo": {
     "name": "HabitOS",
     "slug": "habitos",
-    "version": "0.1.0",
+    "version": "0.1.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -16,7 +16,8 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "versionCode": 2
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -31,7 +32,8 @@
           "backgroundColor": "#0f172a",
           "imageWidth": 160
         }
-      ]
+      ],
+      "./plugins/withAndroidHabitWidget"
     ]
   }
 }

@@ -7,3 +7,10 @@ ios/
 *.log
 .DS_Store
 *.tsbuildinfo
+
+# Release signing — NUNCA subir esto a git ni compartirlo.
+# Perder release.keystore significa no poder volver a actualizar la app en Play Store
+# bajo la misma ficha (Google exige el mismo certificado en cada versión subida).
+# Haz un respaldo de estos dos archivos en un lugar seguro (fuera de este repo).
+release.keystore
+keystore.properties

@@ -37,10 +37,12 @@
     "vitest": "4.1.9"
   },
   "scripts": {
-    "postinstall": "node scripts/patch-foojay-resolver.js",
+    "postinstall": "node scripts/patch-foojay-resolver.js && node scripts/ensure-release-signing.js",
     "start": "expo start",
     "android": "node scripts/run-android.js",
     "android:release": "node scripts/run-android.js --release",
+    "build:apk": "node scripts/gradle-build.js apk",
+    "build:aab": "node scripts/gradle-build.js aab",
     "web": "expo start --web",
     "test": "vitest run --pool=forks --fileParallelism=false --testTimeout=15000",
     "test:watch": "vitest",
