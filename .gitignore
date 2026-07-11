@@ -1,0 +1,4 @@
+# Dependencias: NUNCA trackear node_modules de ningún proyecto.
+# (El repo llegó a trackear $harky/node_modules y al desincronizarse
+#  rompió builds con archivos faltantes — bug de earth-lock, jul 2026.)
+**/node_modules/
