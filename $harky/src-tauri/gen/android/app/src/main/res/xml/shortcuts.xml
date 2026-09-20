@@ -12,8 +12,8 @@
         android:shortcutLongLabel="@string/shortcut_add_expense_long">
         <intent
             android:action="android.intent.action.VIEW"
-            android:targetPackage="com.sharky.finanzas"
-            android:targetClass="com.sharky.finanzas.MainActivity"
+            android:targetPackage="com.sharky.miapp"
+            android:targetClass="com.sharky.miapp.MainActivity"
             android:data="sharky://shortcut/add-expense" />
     </shortcut>
     <shortcut
@@ -24,8 +24,8 @@
         android:shortcutLongLabel="@string/shortcut_add_income_long">
         <intent
             android:action="android.intent.action.VIEW"
-            android:targetPackage="com.sharky.finanzas"
-            android:targetClass="com.sharky.finanzas.MainActivity"
+            android:targetPackage="com.sharky.miapp"
+            android:targetClass="com.sharky.miapp.MainActivity"
             android:data="sharky://shortcut/add-income" />
     </shortcut>
     <shortcut
@@ -36,8 +36,8 @@
         android:shortcutLongLabel="@string/shortcut_reports_long">
         <intent
             android:action="android.intent.action.VIEW"
-            android:targetPackage="com.sharky.finanzas"
-            android:targetClass="com.sharky.finanzas.MainActivity"
+            android:targetPackage="com.sharky.miapp"
+            android:targetClass="com.sharky.miapp.MainActivity"
             android:data="sharky://shortcut/reports" />
     </shortcut>
 </shortcuts>

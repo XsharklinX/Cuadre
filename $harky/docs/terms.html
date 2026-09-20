@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>$harky - Terms of Use</title>
+    <meta name="description" content="Terms of Use for the $harky personal finance app." />
+    <meta name="theme-color" content="#0b1220" />
+    <link rel="icon" href="./assets/icon.svg" />
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #060a13;
+        --panel: rgba(15, 23, 42, 0.78);
+        --text: #f8fafc;
+        --muted: #9aa8bd;
+        --line: rgba(148, 163, 184, 0.2);
+        --accent: #3b82f6;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at top left, rgba(59, 130, 246, 0.24), transparent 34rem),
+          radial-gradient(circle at 80% 20%, rgba(34, 197, 94, 0.11), transparent 30rem),
+          linear-gradient(180deg, #080d18 0%, var(--bg) 54%, #05070c 100%);
+        color: var(--text);
+        min-height: 100vh;
+      }
+
+      a { color: var(--accent); }
+
+      .shell {
+        width: min(760px, calc(100% - 40px));
+        margin: 0 auto;
+        padding: 40px 0 60px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-weight: 850;
+        letter-spacing: -0.04em;
+        margin-bottom: 28px;
+      }
+
+      .brand img { width: 36px; height: 36px; border-radius: 11px; }
+      .brand span { color: var(--accent); }
+
+      h1 {
+        font-size: clamp(28px, 5vw, 40px);
+        letter-spacing: -0.04em;
+        margin: 0 0 6px;
+      }
+
+      .updated {
+        color: var(--muted);
+        font-size: 14px;
+        margin: 0 0 32px;
+      }
+
+      .card {
+        border: 1px solid var(--line);
+        background: var(--panel);
+        border-radius: 18px;
+        padding: 22px 24px;
+        margin-bottom: 16px;
+      }
+
+      .card h3 {
+        margin: 0 0 10px;
+        font-size: 16px;
+        letter-spacing: -0.01em;
+      }
+
+      .card p {
+        margin: 0 0 10px;
+        color: var(--muted);
+        line-height: 1.7;
+        font-size: 14.5px;
+      }
+
+      .card p:last-child { margin-bottom: 0; }
+
+      .back {
+        display: inline-block;
+        margin-top: 24px;
+        font-size: 14px;
+        color: var(--muted);
+      }
+
+      .back:hover { color: var(--text); }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <a class="brand" href="./index.html" aria-label="$harky home">
+        <img src="./assets/icon.svg" alt="" />
+        <strong><span>$</span>harky</strong>
+      </a>
+
+      <h1>Terms of Use</h1>
+      <p class="updated">Last updated: June 7, 2026</p>
+
+      <div class="card">
+        <h3>1. Acceptance of these terms</h3>
+        <p>By downloading, installing or using $harky ("the app"), you agree to these Terms of Use. If you do not agree with them, please do not use the app.</p>
+      </div>
+
+      <div class="card">
+        <h3>2. Description of the service</h3>
+        <p>$harky is a personal finance management tool that lets you track income, expenses, budgets and savings goals. It is an informational and organizational tool: it is not a financial institution, a bank, or an investment advisor, and it does not replace professional advice.</p>
+      </div>
+
+      <div class="card">
+        <h3>3. Not financial advice</h3>
+        <p>The information, calculations, projections and reports the app generates are based solely on the data you enter and are for guidance only. They do not constitute financial, legal, accounting or tax advice. We recommend consulting a qualified professional before making important financial decisions.</p>
+      </div>
+
+      <div class="card">
+        <h3>4. Your responsibility for your data</h3>
+        <p>You are solely responsible for the accuracy of the information you enter, and for keeping backups of your data (the app includes a backup export/import feature for this purpose).</p>
+        <p>If you choose to use Google sign-in and cloud sync, you are responsible for keeping your Google account secure and for any activity that happens through it.</p>
+      </div>
+
+      <div class="card">
+        <h3>5. Acceptable use</h3>
+        <p>You agree to use $harky lawfully, and not to attempt to breach, reverse-engineer, overload, or otherwise compromise the security of the app or the services that support it.</p>
+      </div>
+
+      <div class="card">
+        <h3>6. Intellectual property</h3>
+        <p>The "$harky" name, its logo, visual design, source code and content are the property of David Bonilla, except for third-party libraries used under their respective open-source licenses.</p>
+      </div>
+
+      <div class="card">
+        <h3>7. Service availability</h3>
+        <p>We make a reasonable effort to keep the app running correctly, but we do not guarantee it will be error-free, uninterrupted, or always available - particularly for features that depend on external services (Google, Supabase).</p>
+      </div>
+
+      <div class="card">
+        <h3>8. Limitation of liability</h3>
+        <p>To the maximum extent permitted by applicable law, David Bonilla will not be liable for indirect, incidental or consequential damages arising from the use or inability to use the app - including, among others, data loss or financial decisions made based on its information. The app is provided "as is" and "as available", without warranties of any kind, express or implied.</p>
+      </div>
+
+      <div class="card">
+        <h3>9. Changes to the service and these terms</h3>
+        <p>We may update, modify or discontinue features of the app, as well as these Terms of Use, at any time. We will notify you of relevant changes inside the app. If you keep using $harky after a change, you are considered to have accepted the new terms.</p>
+      </div>
+
+      <div class="card">
+        <h3>10. Termination</h3>
+        <p>You can stop using the app and delete your data whenever you want. We may suspend or limit features that depend on third-party services if those services change their terms or become unavailable.</p>
+      </div>
+
+      <div class="card">
+        <h3>11. Governing law</h3>
+        <p>These Terms are governed by the laws of the Dominican Republic, without prejudice to any consumer-protection rules that may apply to you based on your place of residence.</p>
+      </div>
+
+      <div class="card">
+        <h3>12. Contact</h3>
+        <p>For questions about these Terms of Use, write to us at contactosharklin@gmail.com.</p>
+      </div>
+
+      <a class="back" href="./privacy.html">&larr; Privacy Policy</a>
+    </main>
+  </body>
+</html>

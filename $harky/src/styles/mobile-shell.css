@@ -1,10 +1,10 @@
-﻿  /* Native mobile architecture */
+  /* Native mobile architecture */
   .mobile-app {
     /* Alias themed CSS vars → --m-* so all mobile elements respond to theme */
     --m-bg:      var(--bg,      #121212);
     --m-surface: var(--surface, #1b1b1b);
     --m-surface-2: var(--surface-2, #242424);
-    --m-border:  var(--border,  rgba(255,255,255,.08));
+    --m-border:  color-mix(in oklab, var(--text, #f5f5f5) 13%, transparent);
     --m-text:    var(--text,    #f5f5f5);
     --m-muted:   var(--text-dim, #a7a7a7);
     --m-primary: var(--accent,  #ffdd3d);
@@ -16,19 +16,90 @@
     --m-radius-lg: 26px;
     --m-touch: 44px;
     --m-elevation: 0 18px 44px rgba(0,0,0,.26);
+    --m-elevation-sm: 0 10px 28px rgba(0,0,0,.18);
+    --m-duration-fast: 160ms;
+    --m-duration: 190ms;
+    --m-duration-slow: 220ms;
+    --m-ease: cubic-bezier(.2, 0, 0, 1);
+    --m-ease-out: cubic-bezier(.2, .8, .2, 1);
+    /* Banda de marca (héroe de Perfil y cabecera de Notificaciones). Antes el
+       degradado y sus blancos iban fijos "porque el fondo siempre es oscuro":
+       en tema claro eso dejaba dos bloques casi negros en medio de la pantalla.
+       Ahora la banda es un token y cada tema pone el suyo. */
+    --m-brand-band: linear-gradient(150deg, #16294d 0%, #0e1c34 55%, #0a1220 100%);
+    --m-brand-on: #ffffff;
+    --m-brand-on-dim: rgba(255,255,255,.58);
+    --m-brand-layer: rgba(255,255,255,.10);
+    --m-brand-layer-strong: rgba(255,255,255,.20);
+    --m-brand-line: rgba(255,255,255,.14);
     background: var(--m-bg);
     display: block;
+    height: calc(100dvh / var(--fs, 1));
+    max-height: calc(100dvh / var(--fs, 1));
+    min-height: calc(100dvh / var(--fs, 1));
     min-width: 0;
     overflow: hidden;
+    touch-action: pan-y pinch-zoom;
     width: 100%;
+  }
+  /* ── Tema claro ────────────────────────────────────────
+     El móvil se diseñó dark-first y el tema claro solo heredaba los 6 tokens
+     de base.css, así que todo lo demás (verdes/rojos pensados para fondo
+     oscuro, sombras negras, bandas de marca) seguía siendo de tema oscuro.
+     Aquí van los ajustes que faltaban. */
+  .mobile-app[data-theme="light"] {
+    /* var(--m-income) y var(--m-expense) se quedan en ~2:1 sobre blanco — ilegibles para cifras.
+       Estos pasan AA (≥4.5:1) manteniendo el mismo tono. */
+    --m-income: #0d9268;
+    --m-expense: #d13350;
+    /* Sombras negras al 26% sobre fondo claro se ven como suciedad gris; la
+       elevación en claro se consigue con una sombra tenue y tintada. */
+    --m-elevation: 0 12px 32px rgba(23,32,51,.10);
+    --m-elevation-sm: 0 6px 18px rgba(23,32,51,.07);
+    --m-brand-band: linear-gradient(150deg, #dbe6fa 0%, #e9eff9 55%, #f2f5fb 100%);
+    --m-brand-on: #14203a;
+    --m-brand-on-dim: rgba(20,32,58,.62);
+    --m-brand-layer: rgba(20,32,58,.07);
+    --m-brand-layer-strong: rgba(20,32,58,.14);
+    --m-brand-line: rgba(20,32,58,.12);
+  }
+
+  .app.mobile-app {
+    display: block;
+    grid-template-columns: none;
+    height: calc(100dvh / var(--fs, 1));
+    max-height: calc(100dvh / var(--fs, 1));
+    min-height: calc(100dvh / var(--fs, 1));
+    min-width: calc(100vw / var(--fs, 1));
+    overflow: hidden;
+    width: calc(100vw / var(--fs, 1));
+  }
+
+  /* Tablet / pantalla grande: en vez de estirar la UI móvil a lo ancho (que se
+     ve mal y Play lo marca), se centra en una columna tipo teléfono con un fondo
+     alrededor. El `transform` es clave: convierte a .mobile-app en el bloque
+     contenedor de sus descendientes `position: fixed` (bottom nav, sheets, que
+     se montan aquí vía SheetPortal), anclándolos a la columna y no al viewport
+     completo. En teléfonos (< 700px) no aplica y todo queda igual. */
+  @media (min-width: 700px) {
+    html, body, #root { background: #05070d; }
+    .app.mobile-app {
+      width: calc(clamp(380px, 44vw, 540px) / var(--fs, 1));
+      min-width: auto;
+      max-width: calc(540px / var(--fs, 1));
+      margin-inline: auto;
+      transform: translateZ(0);
+      box-shadow: 0 0 0 1px var(--m-border), 0 24px 80px rgba(0,0,0,.5);
+    }
   }
   .mobile-shell {
     background: var(--m-bg);
     color: var(--m-text);
     display: flex;
     flex-direction: column;
-    height: 100dvh;
-    max-height: 100dvh;
+    height: calc(100dvh / var(--fs, 1));
+    max-height: calc(100dvh / var(--fs, 1));
+    min-height: calc(100dvh / var(--fs, 1));
     overflow: hidden;
     width: 100%;
     -webkit-tap-highlight-color: transparent;
@@ -37,28 +108,94 @@
   .mobile-app select,
   .mobile-app input,
   .mobile-app a {
-    touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
     cursor: pointer;
   }
+  .mobile-app button,
+  .mobile-app [role="button"],
+  .mobile-app a,
+  .mobile-app .mobile-tx-row,
+  .mobile-app .mrep-account-row,
+  .mobile-app .mpr-link-row,
+  .mobile-app .mbud-row {
+    transition:
+      background-color var(--m-duration-fast) var(--m-ease),
+      border-color var(--m-duration-fast) var(--m-ease),
+      color var(--m-duration-fast) var(--m-ease),
+      opacity var(--m-duration-fast) var(--m-ease),
+      transform var(--m-duration-fast) var(--m-ease);
+  }
+  .mobile-app button:active:not(:disabled),
+  .mobile-app [role="button"]:active,
+  .mobile-app a:active,
+  .mobile-app .mobile-tx-row:active,
+  .mobile-app .mrep-account-row:active,
+  .mobile-app .mpr-link-row:active,
+  .mobile-app .mbud-row:active {
+    opacity: .86;
+    transform: scale(.985);
+  }
+  .mobile-app button:disabled {
+    cursor: default;
+    opacity: .46;
+  }
+  .mobile-app button:focus-visible,
+  .mobile-app a:focus-visible,
+  .mobile-app input:focus-visible,
+  .mobile-app select:focus-visible {
+    outline: 2px solid color-mix(in oklab, var(--m-primary) 72%, transparent);
+    outline-offset: 2px;
+  }
   .mobile-topbar {
-    align-items: center;
     background: var(--m-bg);
     border-bottom: 1px solid var(--m-border);
-    display: grid;
-    gap: 8px;
-    grid-template-columns: 48px 1fr auto;
-    padding: calc(12px + env(safe-area-inset-top)) 12px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: calc(8px + env(safe-area-inset-top)) 10px 8px 12px;
     position: sticky;
     top: 0;
     z-index: 30;
   }
-  .mobile-topbar h1 {
-    font-size: 22px;
+  /* Los lados a 1fr son iguales por definición, así que la columna del medio
+     queda centrada respecto a la pantalla sin importar cuántos iconos lleve
+     cada lado. `minmax(0,…)` en las tres permite que el título se recorte con
+     puntos suspensivos antes de empujar a los iconos fuera. */
+  .mobile-topbar-row {
+    align-items: center;
+    display: grid;
+    gap: 6px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, auto) minmax(0, 1fr);
+    min-width: 0;
+  }
+  .mobile-topbar-side {
+    align-items: center;
+    display: flex;
+    gap: 2px;
+    min-width: 0;
+  }
+  /* stretch (no start/end): el lado se ciñe a su celda del grid y, con fuente
+     grande, sus botones encogen DENTRO de la celda en vez de desbordar e
+     invadir el título. `justify-content` mantiene los iconos pegados al borde. */
+  .mobile-topbar-left { justify-self: stretch; justify-content: flex-start; }
+  .mobile-topbar-right { justify-self: stretch; justify-content: flex-end; }
+  .mobile-topbar-menu {
+    margin-left: -6px;
+  }
+  .mobile-topbar-title {
+    font-size: 19px;
     font-weight: 850;
     letter-spacing: -.03em;
     margin: 0;
+    min-width: 0;
+    overflow: hidden;
     text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mobile-topbar-back {
+    flex-shrink: 0;
+    margin-left: -8px;
   }
   .mobile-icon-btn {
     align-items: center;
@@ -71,27 +208,99 @@
     justify-content: center;
     place-items: center;
     width: 44px;
+    /* Permite encoger el botón (no el icono) cuando la barra está apretada
+       (fuente grande), evitando que los grupos de iconos invadan el título. */
+    min-width: 32px;
+    flex-shrink: 1;
   }
   .mobile-icon-btn:active { background: color-mix(in oklab, var(--m-text) 10%, transparent); }
-  .mobile-topbar-right {
-    align-items: center;
-    display: flex;
-    gap: 2px;
+  .mobile-bell-btn { position: relative; }
+  .mobile-bell-badge {
+    position: absolute;
+    top: 5px;
+    right: 4px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    box-sizing: border-box;
+    border-radius: 999px;
+    background: #ff5470;
+    box-shadow: 0 0 0 2px var(--m-bg);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 850;
+    line-height: 12px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
   }
   .mobile-currency-btn {
     align-items: center;
-    background: color-mix(in oklab, var(--m-text) 8%, transparent);
+    background: transparent;
     border: 0;
-    border-radius: 20px;
-    color: var(--m-text);
+    border-radius: 999px;
+    color: var(--m-muted);
     display: flex;
-    gap: 4px;
-    height: 34px;
-    padding: 0 10px 0 8px;
+    flex-shrink: 0; /* no encoger la moneda (clipa "BRL"); que achiquen los iconos */
+    gap: 5px;
+    height: 44px;
+    padding: 0 10px;
+    white-space: nowrap;
   }
-  .mobile-currency-btn:active { background: color-mix(in oklab, var(--m-text) 14%, transparent); }
-  .mobile-currency-flag { font-size: 16px; line-height: 1; }
-  .mobile-currency-code { font-size: 12px; font-weight: 700; letter-spacing: .04em; }
+  .mobile-currency-btn:active { background: color-mix(in oklab, var(--m-text) 10%, transparent); }
+  .mobile-currency-flag { font-size: 15px; line-height: 1; }
+  .mobile-currency-code { color: var(--m-text); font-size: 12px; font-weight: 700; letter-spacing: .04em; }
+
+  /* Indicador de estado de sincronización cloud */
+  .mobile-sync-badge {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    border-radius: 999px;
+    display: grid;
+    height: 44px;
+    place-items: center;
+    position: relative;
+    width: 40px;
+  }
+  .mobile-sync-badge:active { background: color-mix(in oklab, var(--m-text) 10%, transparent); }
+  .mobile-sync-badge.synced   { color: var(--m-muted); }
+  .mobile-sync-badge.pending  { color: var(--m-primary); }
+  .mobile-sync-badge.conflict { color: var(--m-expense); }
+  .mobile-sync-badge.busy     { color: var(--m-primary); }
+  .mobile-sync-badge.busy svg { animation: spin .7s linear infinite; }
+  .mobile-sync-count {
+    align-items: center;
+    background: var(--m-expense);
+    border-radius: 999px;
+    color: #151515;
+    display: flex;
+    font-size: 10px;
+    font-weight: 800;
+    height: 14px;
+    justify-content: center;
+    min-width: 14px;
+    padding: 0 3px;
+    position: absolute;
+    right: 2px;
+    top: 6px;
+  }
+
+  /* El título ("Movimientos") compite por espacio con hasta 5 controles a la
+     derecha (sync, moneda, campanita, buscar, ajustes) — en pantallas medianas
+     ya alcanza a apretarse contra el elipsis. Ocultar el código de moneda
+     (queda solo la bandera) le devuelve ancho al título sin perder el ícono. */
+  @media (max-width: 420px) {
+    .mobile-currency-btn { gap: 0; padding: 0 6px; }
+    .mobile-currency-code { display: none; }
+  }
+  @media (max-width: 360px) {
+    .mobile-topbar { gap: 6px; }
+    .mobile-topbar-title { font-size: 17px; }
+    /* En pantallas estrechas los 44px de cada botón no caben con el título en
+       medio: se aprietan un poco antes que dejar que el título se recorte. */
+    .mobile-topbar .mobile-icon-btn { height: 40px; width: 38px; }
+  }
   /* ── Currency sheet ── */
   .mcur-sheet {
     background: var(--surface);
@@ -121,9 +330,9 @@
     border-radius: 50%;
     color: var(--text);
     display: grid;
-    height: 30px;
+    height: 38px;
     place-items: center;
-    width: 30px;
+    width: 38px;
   }
   .mcur-subtitle {
     color: var(--text-dim);
@@ -146,7 +355,7 @@
     gap: 12px;
     padding: 10px 12px;
     text-align: left;
-    transition: background .15s;
+    transition: background var(--m-duration-fast) var(--m-ease);
     width: 100%;
   }
   .mcur-row:active,
@@ -168,54 +377,215 @@
     margin: 0;
     padding: 10px 20px 14px;
   }
+  /* ── Currency converter (MobileCurrencyConverter) ── */
+  .mconv-sheet {
+    max-height: calc(calc(100dvh / var(--fs, 1)) - env(safe-area-inset-top) - 10px);
+    overflow-y: auto;
+  }
+  .mconv-body {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    gap: 4px;
+    padding: 14px 20px 4px;
+    position: relative;
+  }
+  .mconv-card {
+    background: color-mix(in oklab, var(--text) 5%, transparent);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px 16px 16px;
+  }
+  .mconv-card-result {
+    background:
+      radial-gradient(circle at 90% 0%, color-mix(in oklab, var(--accent) 14%, transparent), transparent 55%),
+      color-mix(in oklab, var(--text) 5%, transparent);
+    border-color: color-mix(in oklab, var(--accent) 24%, var(--border));
+  }
+  .mconv-card-top { display: flex; }
+  .mconv-currency-btn {
+    align-items: center;
+    background: color-mix(in oklab, var(--text) 7%, transparent);
+    border: 0;
+    border-radius: 12px;
+    color: var(--text);
+    display: flex;
+    gap: 7px;
+    padding: 7px 11px 7px 8px;
+  }
+  .mconv-currency-btn strong { font-size: 14px; font-weight: 850; }
+  .mconv-currency-btn small { color: var(--text-dim); font-size: 12px; font-weight: 650; }
+  .mconv-chevron { color: var(--text-dim); margin-left: 1px; }
+  .mconv-flag { font-size: 19px; line-height: 1; }
+  .mconv-amount-display,
+  .mconv-result-value {
+    color: var(--text);
+    font-size: 26px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 850;
+    letter-spacing: -.02em;
+    overflow: hidden;
+    text-align: right;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mconv-result-value { color: var(--accent); text-align: right; width: 100%; }
+  .mconv-swap {
+    align-self: center;
+    background: var(--surface);
+    border: 3px solid var(--surface);
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px var(--border);
+    color: var(--accent);
+    display: grid;
+    height: 40px;
+    margin: -19px 0;
+    place-items: center;
+    position: relative;
+    transition: transform var(--m-duration-fast) var(--m-ease);
+    width: 40px;
+    z-index: 1;
+  }
+  .mconv-swap:active { transform: rotate(180deg); }
+  .mconv-rate-line {
+    align-items: center;
+    color: var(--text-dim);
+    display: flex;
+    font-size: 12.5px;
+    font-weight: 650;
+    gap: 6px;
+    justify-content: center;
+    padding: 10px 2px 0;
+  }
+  .mconv-picker-back {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    color: var(--accent);
+    display: flex;
+    font-size: 12px;
+    font-weight: 750;
+    gap: 5px;
+    padding: 0;
+  }
+  .mconv-fetched-note {
+    border-top: 0;
+    padding: 2px 2px 0;
+  }
+  .mconv-numpad {
+    display: grid;
+    flex-shrink: 0;
+    gap: 8px;
+    grid-template-columns: repeat(3, 1fr);
+    padding: 10px 20px calc(14px + env(safe-area-inset-bottom));
+  }
+  .mconv-numpad-key {
+    background: color-mix(in oklab, var(--text) 6%, transparent);
+    border: 0;
+    border-radius: 14px;
+    color: var(--text);
+    font-size: 20px;
+    font-weight: 650;
+    height: clamp(44px, 8dvh, 54px);
+  }
+  .mconv-numpad-key:active { background: color-mix(in oklab, var(--text) 12%, transparent); }
+  .mconv-numpad-back {
+    align-items: center;
+    background: color-mix(in oklab, var(--text) 8%, transparent);
+    border: 0;
+    border-radius: 14px;
+    color: var(--text);
+    display: grid;
+    height: clamp(44px, 8dvh, 54px);
+    place-items: center;
+  }
+  .mconv-numpad-back:active { background: color-mix(in oklab, var(--text) 16%, transparent); }
   /* ── Goals (MobileGoals) ── */
-  .mgl-root { display: flex; flex-direction: column; min-height: 100%; padding: 0 0 120px; position: relative; }
+  .mgl-root { display: flex; flex-direction: column; min-height: 100%; padding: 10px 0 120px; position: relative; }
+  .mgl-ring { position: relative; flex-shrink: 0; }
+  /* Solo el SVG del anillo (hijo directo) se rota para empezar el progreso
+     arriba. Antes era `.mgl-ring svg` (descendiente) y rotaba también el <svg>
+     del icono de la meta → los iconos salían "de lado". */
+  .mgl-ring > svg { display: block; transform: rotate(-90deg); }
+  .mgl-ring-content {
+    align-items: center;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    inset: 0;
+    justify-content: center;
+    position: absolute;
+  }
+  .mgl-ring-content strong { font-size: 15px; font-weight: 850; }
   .mgl-summary {
     align-items: center;
-    background: var(--m-surface);
-    border-bottom: 1px solid var(--m-border);
+    background: color-mix(in oklab, var(--m-surface) 92%, var(--m-primary));
+    border: 1px solid color-mix(in oklab, var(--m-text) 8%, transparent);
+    border-radius: 20px;
     display: flex;
-    gap: 0;
-    padding: 16px 20px;
+    gap: 16px;
+    margin: 0 16px 4px;
+    padding: 16px;
   }
-  .mgl-sum-item { display: flex; flex: 1; flex-direction: column; gap: 2px; text-align: center; }
-  .mgl-sum-label { color: var(--m-muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
-  .mgl-sum-value { color: var(--m-text); font-size: 18px; font-weight: 800; }
-  .mgl-sum-div { background: var(--m-border); width: 1px; height: 36px; flex-shrink: 0; }
-  .mgl-list { display: flex; flex-direction: column; gap: 12px; padding: 16px 16px 0; }
-  .mgl-card-wrap { display: flex; flex-direction: column; gap: 0; }
-  .mgl-card {
+  .mgl-summary-rows { display: flex; flex: 1; flex-direction: column; gap: 8px; min-width: 0; }
+  .mgl-summary-row { align-items: center; display: flex; justify-content: space-between; gap: 8px; }
+  .mgl-summary-row-dim { border-top: 1px solid color-mix(in oklab, var(--m-text) 8%, transparent); padding-top: 8px; }
+  .mgl-sum-label { color: var(--m-muted); font-size: 11px; font-weight: 750; text-transform: uppercase; letter-spacing: .06em; }
+  .mgl-sum-value { color: var(--m-text); font-size: 14px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mgl-list { display: flex; flex-direction: column; gap: 14px; padding: 14px 16px 0; }
+  .mgl-card-wrap {
     background: var(--m-surface);
     border: 1px solid var(--m-border);
-    border-bottom: 0;
-    border-radius: 16px 16px 0 0;
+    border-radius: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    overflow: hidden;
+  }
+  .mgl-card {
+    background: transparent;
+    border: 0;
+    border-radius: 0;
     color: var(--m-text);
     display: flex;
     flex-direction: column;
     gap: 10px;
-    padding: 14px 16px 12px;
+    padding: 15px 16px 13px;
     text-align: left;
     width: 100%;
   }
-  .mgl-card-top { align-items: center; display: flex; gap: 10px; }
-  .mgl-icon { align-items: center; border-radius: 12px; display: grid; flex-shrink: 0; height: 44px; place-items: center; width: 44px; }
-  .mgl-card-info { display: flex; flex: 1; flex-direction: column; gap: 2px; }
-  .mgl-card-info strong { font-size: 15px; font-weight: 700; }
-  .mgl-card-info small  { color: var(--m-muted); font-size: 12px; }
+  .mgl-card-top { align-items: center; display: flex; gap: 12px; }
+  .mgl-card-info { display: flex; flex: 1; flex-direction: column; gap: 3px; min-width: 0; }
+  .mgl-card-info strong { font-size: 15px; font-weight: 850; letter-spacing: -.01em; }
+  .mgl-card-amounts { color: var(--m-text); font-size: 12.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .mgl-pct { font-size: 18px; font-weight: 800; flex-shrink: 0; }
-  .mgl-bar-track { background: var(--m-surface-2); border-radius: 99px; height: 6px; overflow: hidden; }
-  .mgl-bar-fill  { border-radius: 99px; height: 100%; transition: width .4s; }
-  .mgl-card-bottom { color: var(--m-muted); display: flex; font-size: 13px; gap: 4px; }
-  .mgl-dim { color: var(--m-muted); }
+  .mgl-dim { color: var(--m-muted); font-weight: 600; }
+  .mgl-card-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .mgl-chip {
+    align-items: center;
+    background: color-mix(in oklab, var(--m-text) 6%, transparent);
+    border-radius: 99px;
+    color: var(--m-muted);
+    display: flex;
+    font-size: 10.5px;
+    font-weight: 700;
+    gap: 4px;
+    padding: 4px 9px;
+  }
+  .mgl-chip-done { background: color-mix(in oklab, #30d158 18%, transparent); color: #30d158; }
+  .mgl-chip-warn { background: color-mix(in oklab, #ff6b35 18%, transparent); color: #ff6b35; }
+  .mgl-chip-proj { background: color-mix(in oklab, var(--m-primary) 15%, transparent); color: var(--m-primary); }
   .mgl-card-actions {
     align-items: center;
-    background: var(--m-surface-2);
-    border: 1px solid var(--m-border);
-    border-radius: 0 0 16px 16px;
-    border-top: 0;
+    background: color-mix(in oklab, var(--m-text) 4%, transparent);
+    border-top: 1px solid var(--m-border);
+    border-radius: 0;
     display: flex;
     gap: 0;
-    padding: 4px 6px;
+    padding: 5px 6px;
   }
   .mgl-action-btn {
     align-items: center;
@@ -233,23 +603,27 @@
   .mgl-action-btn:first-child { color: var(--m-primary); flex: 1; }
   .mgl-action-btn:active { background: color-mix(in oklab, var(--m-text) 8%, transparent); }
   .mgl-action-del { color: #e8445a !important; }
-  .mgl-fab {
+  /* Botón "Nueva meta" en línea al final de la lista. Antes era un FAB con
+     position:fixed, pero `.mobile-report-pane` usa `will-change: transform`,
+     lo que convierte a ese contenedor en el bloque de referencia del fixed y
+     dejaba el botón flotando a media pantalla, encima de la tarjeta. En línea
+     no depende del viewport y siempre queda debajo de las metas. */
+  .mgl-add-goal {
     align-items: center;
-    background: var(--m-primary);
-    border: 0;
-    border-radius: 50%;
-    bottom: calc(100px + env(safe-area-inset-bottom));
-    box-shadow: 0 4px 20px color-mix(in oklab, var(--m-primary) 40%, transparent);
-    color: #000;
-    display: grid;
-    height: 56px;
-    place-items: center;
-    position: fixed;
-    right: 20px;
-    width: 56px;
-    z-index: 20;
+    background: color-mix(in oklab, var(--m-primary) 14%, transparent);
+    border: 1px dashed color-mix(in oklab, var(--m-primary) 45%, transparent);
+    border-radius: 16px;
+    color: var(--m-primary);
+    display: flex;
+    font-size: 15px;
+    font-weight: 750;
+    gap: 8px;
+    height: 52px;
+    justify-content: center;
+    margin-top: 2px;
+    width: 100%;
   }
-  .mgl-fab:active { transform: scale(.94); }
+  .mgl-add-goal:active { background: color-mix(in oklab, var(--m-primary) 22%, transparent); }
   .mgl-empty { align-items: center; display: flex; flex-direction: column; gap: 12px; padding: 60px 20px; }
   .mgl-empty p { color: var(--m-muted); font-size: 16px; margin: 0; }
   .mgl-empty-btn {
@@ -263,23 +637,40 @@
     padding: 12px 28px;
   }
   /* Goal form */
+  /* Higher specificity than .mobile-detail-sheet section (0,1,1): sin esto,
+     la regla genérica le mete padding/overflow-y propios y rompe el layout
+     interno del numpad (se ve todo apilado arriba, como con .mpr-editor-sheet). */
+  .mobile-detail-sheet .mgl-form,
   .mgl-form {
     background: var(--surface);
     border-radius: 20px 20px 0 0;
     color: var(--text);
     display: flex;
     flex-direction: column;
-    max-height: 92dvh;
-    padding-bottom: env(safe-area-inset-bottom);
+    max-height: calc(calc(100dvh / var(--fs, 1)) - env(safe-area-inset-top) - 10px);
+    min-height: 0;
+    overflow: hidden;
+    padding: 0;
     width: 100%;
   }
   .mgl-form header {
     align-items: center;
     border-bottom: 1px solid var(--border);
     display: flex;
+    flex-shrink: 0;
     justify-content: space-between;
     padding: 18px 20px 14px;
+    position: relative;
   }
+  /* Halo sutil del acento, como el editor de Cuentas */
+  .mgl-form header::before {
+    background: radial-gradient(120% 140% at 22% -10%, color-mix(in oklab, var(--accent) 14%, transparent), transparent 60%);
+    content: '';
+    inset: 0;
+    pointer-events: none;
+    position: absolute;
+  }
+  .mgl-form header > * { position: relative; }
   .mgl-form header span { font-size: 17px; font-weight: 750; letter-spacing: -.02em; }
   .mgl-form header button {
     background: color-mix(in oklab, var(--text) 8%, transparent);
@@ -287,13 +678,253 @@
     border-radius: 50%;
     color: var(--text);
     display: grid;
-    height: 30px;
+    height: 44px;
     place-items: center;
-    width: 30px;
+    width: 44px;
   }
-  .mgl-form-body { display: flex; flex-direction: column; flex: 1; gap: 16px; overflow-y: auto; padding: 16px 20px; }
+  .mgl-form-body { display: flex; flex-direction: column; flex: 1; gap: 16px; min-height: 0; overflow-y: auto; padding: 16px 20px; }
+
+  /* ── Selector de propósito (paso previo a crear una meta) ── */
+  .mgl-purpose-sheet {
+    background: var(--surface);
+    border-radius: 20px 20px 0 0;
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    max-height: calc(calc(100dvh / var(--fs, 1)) - env(safe-area-inset-top) - 10px);
+    min-height: 0;
+    overflow: hidden;
+    width: 100%;
+  }
+  .mgl-purpose-sheet header {
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-shrink: 0;
+    justify-content: space-between;
+    padding: 18px 20px 14px;
+    position: relative;
+  }
+  .mgl-purpose-sheet header::before {
+    background: radial-gradient(120% 140% at 22% -10%, color-mix(in oklab, var(--accent) 14%, transparent), transparent 60%);
+    content: '';
+    inset: 0;
+    pointer-events: none;
+    position: absolute;
+  }
+  .mgl-purpose-sheet header > * { position: relative; }
+  .mgl-purpose-sheet header span:not([aria-hidden]) { font-size: 17px; font-weight: 750; letter-spacing: -.02em; }
+  .mgl-purpose-sheet header span[aria-hidden] { width: 44px; }
+  .mgl-purpose-sheet header button {
+    background: color-mix(in oklab, var(--text) 8%, transparent);
+    border: 0;
+    border-radius: 50%;
+    color: var(--text);
+    display: grid;
+    height: 44px;
+    place-items: center;
+    width: 44px;
+  }
+  .mgl-purpose-body {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    overflow-y: auto;
+    padding: 18px 20px calc(20px + env(safe-area-inset-bottom));
+  }
+  .mgl-purpose-body h2 {
+    font-size: 22px;
+    font-weight: 850;
+    letter-spacing: -.02em;
+    margin: 0;
+  }
+  .mgl-purpose-body > p {
+    color: var(--text-dim);
+    font-size: 14px;
+    margin: -8px 0 4px;
+  }
+  /* Objetivos preestablecidos: grid de tarjetas concretas (icono + nombre) */
+  .mgl-preset-grid {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .mgl-preset-card {
+    align-items: center;
+    background: color-mix(in oklab, var(--text) 4%, transparent);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    display: flex;
+    gap: 11px;
+    min-height: 64px;
+    padding: 12px;
+    text-align: left;
+    transition: border-color .16s ease, background .16s ease, transform .12s ease;
+  }
+  .mgl-preset-card:active { transform: scale(.97); }
+  .mgl-preset-icon {
+    align-items: center;
+    border-radius: 12px;
+    display: grid;
+    flex-shrink: 0;
+    height: 40px;
+    place-items: center;
+    width: 40px;
+  }
+  .mgl-preset-name {
+    font-size: 14px;
+    font-weight: 800;
+    line-height: 1.2;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .mgl-preset-custom {
+    align-items: center;
+    background: color-mix(in oklab, var(--accent) 8%, transparent);
+    border: 1px dashed color-mix(in oklab, var(--accent) 40%, var(--border));
+    border-radius: 16px;
+    display: flex;
+    gap: 12px;
+    margin-top: 12px;
+    padding: 14px;
+    text-align: left;
+    width: 100%;
+  }
+  .mgl-preset-custom:active { transform: scale(.98); }
+  .mgl-preset-custom-icon {
+    align-items: center;
+    background: color-mix(in oklab, var(--accent) 20%, transparent);
+    border-radius: 12px;
+    color: var(--accent);
+    display: grid;
+    flex-shrink: 0;
+    height: 40px;
+    place-items: center;
+    width: 40px;
+  }
+  .mgl-preset-custom span:not(.mgl-preset-custom-icon) {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .mgl-preset-custom strong { font-size: 15px; font-weight: 800; }
+  .mgl-preset-custom small { color: var(--text-dim); font-size: 12.5px; line-height: 1.35; }
+  /* Chips de objetivo dentro del formulario (crear y editar) */
+  .mgl-preset-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .mgl-preset-chip {
+    align-items: center;
+    background: color-mix(in oklab, var(--text) 5%, transparent);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    color: var(--text-dim);
+    display: inline-flex;
+    font-size: 12px;
+    font-weight: 750;
+    gap: 5px;
+    min-height: 32px;
+    padding: 0 11px;
+  }
+  .mgl-preset-chip.on {
+    background: color-mix(in oklab, var(--accent) 16%, transparent);
+    border-color: color-mix(in oklab, var(--accent) 40%, transparent);
+    color: var(--text);
+  }
   .mgl-field { display: flex; flex-direction: column; gap: 6px; }
   .mgl-field > span { color: var(--text-dim); font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+
+  /* Aporte automático: tarjeta cohesiva (antes eran bloques sueltos apilados que
+     se sentían sobrecargados). El resumen en lenguaje natural encabeza. */
+  .mgl-auto-card {
+    border: 1px solid var(--m-border);
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-top: 4px;
+    padding: 14px;
+  }
+  .mgl-auto-summary {
+    align-items: center;
+    background: color-mix(in oklab, currentColor 12%, transparent);
+    border-radius: 10px;
+    display: flex;
+    font-size: 12.5px;
+    font-weight: 800;
+    gap: 8px;
+    line-height: 1.35;
+    padding: 10px 12px;
+  }
+  .mgl-auto-summary svg { flex-shrink: 0; }
+  /* Días de cobro mensual lado a lado cuando son 2 pagos. */
+  .mgl-day-selects { display: grid; gap: 10px; grid-template-columns: 1fr 1fr; }
+  .mgl-day-selects .mgl-field:only-child { grid-column: 1 / -1; }
+  /* El interruptor del reto se separa con una línea sutil arriba. */
+  .mgl-auto-ramp-toggle { border-top: 1px solid var(--m-border); margin-top: 2px; padding-top: 14px; }
+  /* Vista previa del reto incremental de ahorro */
+  .mgl-ramp-preview {
+    background: color-mix(in oklab, var(--text) 4%, transparent);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px 14px;
+  }
+  .mgl-ramp-seq { align-items: center; color: var(--text); display: flex; flex-wrap: wrap; font-size: 14px; font-weight: 800; gap: 8px; }
+  .mgl-ramp-seq > span { position: relative; }
+  .mgl-ramp-seq > span:not(.mgl-ramp-dots)::after {
+    color: var(--text-dim);
+    content: '→';
+    font-weight: 600;
+    margin-left: 8px;
+  }
+  .mgl-ramp-dots { color: var(--text-dim); letter-spacing: 2px; }
+  .mgl-ramp-preview small { color: var(--text-dim); font-size: 12px; font-weight: 650; }
+  /* Selector de día de cobro (plan semanal) */
+  .mgl-weekday-row { display: grid; gap: 5px; grid-template-columns: repeat(7, 1fr); }
+  .mgl-weekday {
+    align-items: center;
+    background: color-mix(in oklab, var(--text) 5%, transparent);
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    color: var(--text-dim);
+    display: flex;
+    font-size: 11px;
+    font-weight: 800;
+    justify-content: center;
+    min-height: 42px;
+    padding: 0 2px;
+    text-transform: capitalize;
+  }
+  .mgl-weekday.on { font-weight: 900; }
+  .mgl-weekday-hint { color: var(--text-dim); font-size: 11px; margin-top: 2px; }
+  /* Calculadora inversa: sugerencia de aporte según fecha límite */
+  .mgl-suggestion {
+    align-items: center;
+    background: color-mix(in oklab, var(--text) 4%, transparent);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    display: flex;
+    gap: 9px;
+    padding: 11px 12px;
+  }
+  .mgl-suggestion > span { color: var(--text); flex: 1; font-size: 12.5px; font-weight: 650; line-height: 1.35; min-width: 0; }
+  .mgl-suggestion-use {
+    border: 0;
+    border-radius: 99px;
+    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: 800;
+    min-height: 34px;
+    padding: 0 14px;
+  }
   .mgl-field em { font-style: normal; opacity: .5; }
   .mgl-input {
     background: color-mix(in oklab, var(--text) 6%, transparent);
@@ -311,11 +942,16 @@
   .mgl-color-dot {
     border: 3px solid transparent;
     border-radius: 50%;
-    height: 32px;
-    outline-offset: 2px;
-    width: 32px;
+    height: 40px;
+    transition: transform var(--m-duration-fast, 160ms) var(--m-ease, ease), box-shadow var(--m-duration-fast, 160ms) var(--m-ease, ease);
+    width: 40px;
   }
-  .mgl-color-dot.on { outline: 2px solid var(--text); }
+  /* Mismo tratamiento que el editor de Cuentas: anillo + glow del propio color */
+  .mgl-color-dot.on {
+    border-color: var(--bg);
+    box-shadow: 0 0 0 2px currentColor, 0 4px 12px color-mix(in oklab, currentColor 45%, transparent);
+    transform: scale(1.12);
+  }
   .mgl-icons { display: grid; gap: 8px; grid-template-columns: repeat(6, 1fr); }
   .mgl-icon-btn {
     align-items: center;
@@ -333,8 +969,9 @@
     align-items: center;
     border-top: 1px solid var(--border);
     display: flex;
+    flex-shrink: 0;
     gap: 10px;
-    padding: 14px 20px;
+    padding: 14px 20px calc(14px + env(safe-area-inset-bottom));
   }
   .mgl-btn-cancel {
     background: color-mix(in oklab, var(--text) 8%, transparent);
@@ -355,6 +992,40 @@
     font-weight: 700;
     height: 48px;
   }
+  /* Goal detail sheet */
+  .mgl-detail-del { flex: 0 0 auto; color: #e8445a; padding: 0 16px; width: auto; }
+  .mgl-detail-body { display: flex; flex-direction: column; flex: 1; gap: 18px; min-height: 0; overflow-y: auto; padding: 20px 20px 4px; }
+  .mgl-detail-hero {
+    align-items: center;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 4px 0 2px;
+  }
+  .mgl-detail-hero .mgl-ring-content strong { font-size: 22px; }
+  .mgl-detail-done-badge { margin-top: -2px; }
+  .mgl-detail-stats {
+    background: color-mix(in oklab, var(--text) 5%, transparent);
+    border-radius: 16px;
+    display: grid;
+    gap: 4px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    padding: 14px 10px;
+  }
+  .mgl-detail-stat { display: flex; flex-direction: column; gap: 4px; text-align: center; }
+  .mgl-detail-stat span { color: var(--text-dim); font-size: 10px; font-weight: 750; letter-spacing: .05em; text-transform: uppercase; }
+  .mgl-detail-stat strong { font-size: 14px; font-weight: 850; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mgl-detail-auto { justify-content: center; }
+  .mgl-detail-history-title { color: var(--text-dim); font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+  .mgl-detail-history-empty { color: var(--text-dim); font-size: 13px; margin: 10px 0 0; text-align: center; }
+  .mgl-history-list { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; }
+  .mgl-history-row { align-items: center; border-top: 1px solid var(--border); display: flex; gap: 10px; padding: 10px 2px; }
+  .mgl-history-row:first-child { border-top: 0; }
+  .mgl-history-icon { align-items: center; border-radius: 50%; display: grid; flex-shrink: 0; height: 30px; place-items: center; width: 30px; }
+  .mgl-history-info { display: flex; flex: 1; flex-direction: column; gap: 1px; min-width: 0; }
+  .mgl-history-info strong { font-size: 13.5px; font-weight: 800; }
+  .mgl-history-info small { color: var(--text-dim); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mgl-history-date { color: var(--text-dim); flex-shrink: 0; font-size: 11.5px; font-weight: 650; }
   /* Contribute sheet */
   .mgl-contrib-display {
     align-items: center;
@@ -375,40 +1046,448 @@
   }
   .mgl-contrib-display strong { font-size: 22px; font-weight: 800; }
   .mgl-contrib-display small { color: var(--text-dim); font-size: 14px; }
-  .mobile-month {
+  /* Numpad de metas */
+  .mgl-amount-tap {
     align-items: center;
-    color: var(--m-muted);
+    background: color-mix(in oklab, var(--text) 6%, transparent);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--text);
+    display: flex;
+    font-size: 17px;
+    font-weight: 700;
+    gap: 8px;
+    height: 48px;
+    justify-content: space-between;
+    padding: 0 14px;
+    width: 100%;
+  }
+  /* En modo numpad el sheet ocupa una altura fija y el propio numpad se ancla
+     abajo (justify-content: flex-end), de modo que las teclas queden siempre
+     al alcance del pulgar en la parte inferior de la pantalla — no a media
+     altura ni arriba, que era el comportamiento reportado. */
+  /* Sheet del numpad: se ajusta a su contenido (una tecla ~52px × 4 filas),
+     no ocupa una fracción fija de pantalla — antes forzaba 72dvh y dejaba un
+     gran hueco vacío arriba del teclado. */
+  .mgl-form-numpad {
+    height: auto;
+  }
+  .mgl-numpad-view {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  }
+  .mgl-numpad-display {
+    color: var(--text);
+    flex: 0 0 auto;
+    font-size: clamp(24px, 7.5vw, 32px);
+    font-weight: 800;
+    letter-spacing: -.02em;
+    min-height: 44px;
+    overflow: hidden;
+    padding: 2px 4px 4px;
+    text-align: right;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mgl-numpad-grid {
+    display: grid;
+    gap: 7px;
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .mgl-numpad-key {
+    background: var(--surface);
+    border: 0;
+    border-radius: 13px;
+    color: var(--text);
+    font-size: 20px;
+    font-weight: 600;
+    height: 52px;
+  }
+  .mgl-numpad-key:active { background: color-mix(in oklab, var(--text) 12%, var(--surface)); }
+  .mgl-numpad-back {
+    align-items: center;
+    background: color-mix(in oklab, var(--text) 8%, transparent);
+    border: 0;
+    border-radius: 13px;
+    color: var(--text);
+    display: grid;
+    height: 52px;
+    place-items: center;
+  }
+  .mgl-numpad-back:active { background: color-mix(in oklab, var(--text) 16%, transparent); }
+  .mgl-numpad-done {
+    background: var(--accent);
+    border: 0;
+    border-radius: 13px;
+    color: #000;
+    flex: 0 0 auto;
+    font-size: 16px;
+    font-weight: 700;
+    height: 48px;
+    margin-top: 2px;
+    width: 100%;
+  }
+  .mgl-numpad-done:active { opacity: .85; }
+  /* ── Selector de mes horizontal deslizable (Análisis > Gráficos) ── */
+  .mobile-month-strip {
     display: flex;
     gap: 6px;
-    justify-content: center;
-    margin-top: 7px;
+    overflow-x: auto;
+    padding: 2px 2px 4px;
+    scroll-padding-inline: 2px;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    width: 100%;
+  }
+  .mobile-month-strip::-webkit-scrollbar { display: none; }
+  .mobile-month-chip {
+    align-items: center;
+    background: color-mix(in oklab, var(--accent) 10%, transparent);
+    border: 1px solid color-mix(in oklab, var(--accent) 18%, transparent);
+    border-radius: 12px;
+    color: var(--m-text);
+    display: flex;
+    flex: 0 0 calc((100% - 24px) / 3.5);
+    flex-direction: column;
+    gap: 2px;
+    padding: 7px 4px;
+    scroll-snap-align: center;
+  }
+  .mobile-month-chip-month {
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: -.01em;
     text-transform: capitalize;
   }
-  .mobile-month span {
-    color: var(--m-text);
-    font-size: 13px;
-    font-weight: 750;
-    min-width: 128px;
-    text-align: center;
-  }
-  .mobile-month button {
-    background: var(--m-surface-2);
-    border: 0;
-    border-radius: 999px;
+  .mobile-month-chip-year {
     color: var(--m-muted);
-    display: grid;
-    height: var(--m-touch);
-    place-items: center;
-    width: var(--m-touch);
+    font-size: 11px;
+    font-weight: 600;
   }
-  .mobile-month button:disabled { opacity: .28; }
+  .mobile-month-chip.on {
+    background: color-mix(in oklab, var(--accent) 24%, transparent);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .mobile-month-chip.on .mobile-month-chip-year { color: var(--accent); }
+  /* ── Calendario (MobileCalendar) ── */
+  .mcal-root { display: flex; flex-direction: column; padding: 0 12px 120px; }
+  .mcal-header {
+    align-items: center;
+    display: flex;
+    gap: 8px;
+    justify-content: space-between;
+    padding: 12px 0;
+  }
+  .mcal-month-label { font-size: 16px; font-weight: 750; letter-spacing: -.02em; }
+  .mcal-nav {
+    align-items: center;
+    background: color-mix(in oklab, var(--text) 8%, transparent);
+    border: 0;
+    border-radius: 10px;
+    color: var(--text);
+    display: grid;
+    height: 44px;
+    place-items: center;
+    width: 44px;
+  }
+  .mcal-nav:active { background: color-mix(in oklab, var(--accent) 22%, transparent); }
+  .mcal-grid {
+    display: grid;
+    gap: 4px;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+  .mcal-dow {
+    color: var(--text-dim);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 0;
+    text-align: center;
+    text-transform: uppercase;
+  }
+  .mcal-empty { min-height: 62px; }
+  .mcal-day {
+    background: color-mix(in oklab, var(--text) 5%, transparent);
+    border: 0;
+    border-radius: 10px;
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-height: 62px;
+    min-width: 0;
+    padding: 6px 4px;
+    position: relative;
+    text-align: center;
+    width: 100%;
+  }
+  .mcal-day.over { background: color-mix(in oklab, #ff453a 12%, transparent); }
+  .mcal-day.today { outline: 2px solid var(--accent); }
+  .mcal-day.selected { outline: 2px solid #5bc0ff; }
+  .mcal-day-num { font-size: 13px; font-weight: 700; }
+  /* Totales del mes: un vistazo a lo que entró y salió sin sumar celdas. */
+  .mcal-totals {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: 1fr 1fr;
+    padding: 0 0 10px;
+  }
+  .mcal-totals > div {
+    background: color-mix(in oklab, var(--text) 5%, transparent);
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 12px;
+  }
+  .mcal-totals small { color: var(--text-dim); font-size: 11px; }
+  .mcal-totals strong { font-size: 15px; font-weight: 750; letter-spacing: -.01em; }
+  .mcal-t-inc { color: #30d158; }
+  .mcal-t-exp { color: #ff453a; }
+  /* Puntos por día: se empujan al fondo de la celda. */
+  .mcal-dots {
+    display: flex;
+    gap: 3px;
+    justify-content: center;
+    margin-top: auto;
+    min-height: 8px;
+  }
+  .mcal-footer { display: flex; flex-direction: column; gap: 6px; padding: 12px 4px 0; }
+  .mcal-budget-label { color: var(--text-dim); font-size: 13px; }
+  .mcal-budget-label strong { color: var(--text); }
+  .mcal-legend { align-items: center; color: var(--text-dim); display: flex; flex-wrap: wrap; font-size: 12px; gap: 8px 16px; }
+  .mcal-legend span { align-items: center; display: inline-flex; }
+  .mcal-dot {
+    border-radius: 50%;
+    display: inline-block;
+    height: 8px;
+    width: 8px;
+  }
+  .mcal-legend .mcal-dot { margin-right: 4px; }
+  .mcal-dot.inc  { background: #30d158; }
+  .mcal-dot.exp  { background: #ff453a; }
+  .mcal-dot.bill { background: #5bc0ff; }
+  /* Cobros previstos del día tocado. */
+  .mcal-upcoming {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 16px;
+  }
+  .mcal-upcoming-title { color: var(--text-dim); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
+  .mcal-upcoming-row {
+    align-items: center;
+    background: color-mix(in oklab, #5bc0ff 10%, transparent);
+    border-radius: 10px;
+    display: flex;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+  .mcal-upcoming-note { flex: 1; font-size: 14px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mcal-upcoming-amt { color: #5bc0ff; font-size: 14px; font-weight: 700; }
+  .mcal-detail { margin-top: 16px; }
+  .mcal-empty-day { color: var(--text-dim); font-size: 14px; padding: 16px 4px; text-align: center; }
   .mobile-content {
     flex: 1;
+    height: 0;
     min-height: 0;
     overflow-y: auto;
     overscroll-behavior-y: contain;
+    scroll-behavior: auto;
+    scroll-padding-bottom: calc(112px + env(safe-area-inset-bottom));
+    scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
+    touch-action: pan-y pinch-zoom;
     padding: 0 0 calc(100px + env(safe-area-inset-bottom));
+  }
+  .mobile-content::-webkit-scrollbar {
+    display: none;
+  }
+  .mobile-content.mobile-content-locked {
+    overflow: hidden !important;
+    touch-action: none;
+  }
+  .mobile-loading-overlay {
+    align-items: center;
+    background: rgba(0,0,0,.48);
+    color: var(--m-text);
+    display: flex;
+    font-size: 13px;
+    font-weight: 850;
+    gap: 10px;
+    inset: 0;
+    justify-content: center;
+    position: fixed;
+    z-index: 180;
+  }
+  .mobile-skeleton-screen {
+    display: grid;
+    gap: 14px;
+    padding: 16px;
+  }
+  .mobile-skeleton-card,
+  .mobile-skeleton-line,
+  .mobile-skeleton-pill {
+    animation: mobile-skeleton-shimmer 1.05s linear infinite;
+    background:
+      linear-gradient(90deg,
+        color-mix(in oklab, var(--m-surface) 92%, #000) 0%,
+        color-mix(in oklab, var(--m-surface-2) 82%, var(--m-text)) 45%,
+        color-mix(in oklab, var(--m-surface) 92%, #000) 88%);
+    background-size: 220% 100%;
+  }
+  .mobile-skeleton-card {
+    border-radius: 22px;
+    height: 112px;
+  }
+  .mobile-skeleton-line {
+    border-radius: 999px;
+    height: 18px;
+  }
+  .mobile-skeleton-line.short { width: 46%; }
+  .mobile-skeleton-line.medium { width: 68%; }
+  .mobile-skeleton-pill {
+    border-radius: 999px;
+    height: 42px;
+  }
+  @keyframes mobile-skeleton-shimmer {
+    from { background-position: 120% 0; }
+    to { background-position: -120% 0; }
+  }
+  .mobile-loading-overlay span {
+    animation: mobile-spin .75s linear infinite;
+    border: 2px solid color-mix(in oklab, var(--m-text) 18%, transparent);
+    border-top-color: var(--m-primary);
+    border-radius: 999px;
+    height: 18px;
+    width: 18px;
+  }
+  .mobile-loading-overlay.mobile-loading-skeleton {
+    align-items: stretch;
+    background: var(--m-bg);
+    display: block;
+    padding-top: calc(12px + env(safe-area-inset-top));
+  }
+  @keyframes mobile-spin {
+    to { transform: rotate(360deg); }
+  }
+  .mobile-route,
+  .mobile-movements-screen,
+  .mrep-root,
+  .mpr-root,
+  .mbud-root,
+  .man-root {
+    min-height: 100%;
+  }
+  .mobile-route {
+    animation: mobile-route-in var(--m-duration-fast) var(--m-ease) both;
+    overflow: visible;
+    will-change: opacity, transform;
+  }
+  .mobile-tab-segment {
+    backdrop-filter: blur(16px);
+    background: color-mix(in oklab, var(--m-bg) 88%, transparent);
+    border-bottom: 1px solid var(--m-border);
+    padding: 12px 16px 0;
+    position: sticky;
+    top: 0;
+    z-index: 12;
+  }
+  /* Sin will-change permanente: esta capa ya vive dentro de `.mobile-route`,
+     que tiene su propia animación de entrada + will-change. Promover DOS
+     capas compuestas anidadas (cada una con su transform activo) es un patrón
+     conocido de romper el scroll táctil en WebView de Android, aunque en
+     Chromium de escritorio no se note. */
+  .mobile-report-pane {
+    min-height: 100%;
+  }
+  .mobile-tool-pane {
+    min-height: 100%;
+  }
+  .mobile-report-pane-next {
+    animation: mobileReportPaneNext var(--m-duration) var(--m-ease-out) both;
+  }
+  .mobile-report-pane-prev {
+    animation: mobileReportPanePrev var(--m-duration) var(--m-ease-out) both;
+  }
+  .mobile-tool-pane-next {
+    animation: mobileToolPaneNext var(--m-duration) var(--m-ease-out) both;
+  }
+  .mobile-tool-pane-prev {
+    animation: mobileToolPanePrev var(--m-duration) var(--m-ease-out) both;
+  }
+  @keyframes mobile-route-in {
+    from { opacity: .88; transform: translate3d(0, 6px, 0); }
+    to { opacity: 1; transform: translate3d(0, 0, 0); }
+  }
+  @keyframes mobileReportPaneNext {
+    from { opacity: .72; transform: translate3d(14px, 0, 0); }
+    to { opacity: 1; transform: translate3d(0, 0, 0); }
+  }
+  @keyframes mobileReportPanePrev {
+    from { opacity: .72; transform: translate3d(-14px, 0, 0); }
+    to { opacity: 1; transform: translate3d(0, 0, 0); }
+  }
+  @keyframes mobileToolPaneNext {
+    from { opacity: .68; transform: translate3d(0, 12px, 0); }
+    to { opacity: 1; transform: translate3d(0, 0, 0); }
+  }
+  @keyframes mobileToolPanePrev {
+    from { opacity: .68; transform: translate3d(0, -10px, 0); }
+    to { opacity: 1; transform: translate3d(0, 0, 0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .mobile-route,
+    .mobile-report-pane-next,
+    .mobile-report-pane-prev,
+    .mobile-tool-pane-next,
+    .mobile-tool-pane-prev {
+      animation: none;
+    }
+  }
+  .mobile-shell .view-error {
+    align-items: flex-start;
+    background: color-mix(in oklab, var(--m-surface) 96%, #000);
+    border: 1px solid var(--m-border);
+    border-radius: 20px;
+    color: var(--m-text);
+    display: flex;
+    gap: 12px;
+    margin: 16px;
+    padding: 16px;
+  }
+  .mobile-shell .view-error h2 {
+    font-size: 17px;
+    font-weight: 900;
+    letter-spacing: -.02em;
+    margin: 0 0 6px;
+  }
+  .mobile-shell .view-error p {
+    color: var(--m-muted);
+    font-size: 13px;
+    line-height: 1.45;
+    margin: 0 0 10px;
+  }
+  .mobile-shell .view-error .diagnostic-details {
+    background: var(--m-bg);
+    border: 1px solid var(--m-border);
+    border-radius: 12px;
+    color: var(--m-muted);
+    font-size: 11px;
+    max-height: 180px;
+    overflow: auto;
+    padding: 10px;
+    white-space: pre-wrap;
+  }
+  .mobile-shell .view-error .error-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .mobile-shell .view-error button {
+    min-height: 42px;
   }
   .mobile-route { min-height: 100%; }
   .mobile-summary-strip {
@@ -416,7 +1495,7 @@
     display: grid;
     gap: 0;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    padding: 10px 18px 14px;
+    padding: 8px 14px 10px;
   }
   .mobile-summary-strip .mini-stat {
     background: transparent;
@@ -424,33 +1503,123 @@
     padding: 8px 4px;
     text-align: center;
   }
+  .mobile-summary-strip .mini-stat-button {
+    align-items: center;
+    appearance: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    justify-content: center;
+  }
   .mobile-summary-strip .mini-stat small {
     color: var(--m-muted);
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 750;
   }
   .mobile-summary-strip .mini-stat strong {
     color: var(--m-text);
-    font-size: 20px;
+    font-size: 18px;
+  }
+  .mobile-summary-strip .mini-stat-hint {
+    align-items: center;
+    color: var(--m-muted);
+    display: inline-flex;
+    font-size: 11px;
+    font-weight: 750;
+    gap: 4px;
+  }
+  .mobile-summary-strip-movements {
+    background: color-mix(in oklab, var(--m-bg) 92%, var(--m-surface));
+    border-bottom: 1px solid var(--m-border);
+    padding-bottom: 6px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .mobile-summary-strip-movements .mini-stat {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+  }
+  .mobile-summary-strip-movements .mini-stat strong {
+    display: block;
+    font-size: 15px;
+    line-height: 1.15;
+    /* max-width:100% es imprescindible: sin él, con ellipsis pero sin límite de
+       ancho el número toma su ancho completo y, centrado en la columna, se sale
+       de pantalla con saldos grandes + fuente grande (el ellipsis nunca actúa). */
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mobile-summary-strip-movements .mini-stat-button strong {
+    font-size: 15px;
   }
   .mobile-list-card {
     background: var(--m-surface);
-    border-top: 1px solid var(--m-border);
+    border: 1px solid var(--m-border);
+    border-radius: 22px;
+    box-shadow: var(--m-elevation-sm);
+    overflow: hidden;
+  }
+  .mobile-list-card.mobile-list-card-flat {
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .mobile-list-card.mobile-list-card-flat .mobile-movement-tools,
+  .mobile-list-card.mobile-list-card-flat .mobile-day-header,
+  .mobile-list-card.mobile-list-card-flat .mobile-list-card.compact .mobile-tx-row {
+    background: transparent;
+  }
+  .mobile-list-card.mobile-list-card-flat .mobile-movement-tools {
+    border-bottom: 1px solid var(--m-border);
+    padding: 14px 16px 10px;
+  }
+  .mobile-list-card.mobile-list-card-flat .mobile-day-header {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .mobile-list-card.mobile-list-card-flat .mobile-tx-row {
+    background: var(--m-bg);
+    border-bottom-color: color-mix(in oklab, var(--m-border) 85%, transparent);
+    padding-left: 16px;
+    padding-right: 16px;
   }
   .mobile-list-card.compact {
     background: transparent;
-    border-top: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
   }
   .mobile-movement-tools {
+    align-items: center;
     background: var(--m-surface);
     border-bottom: 1px solid var(--m-border);
-    display: grid;
-    gap: 10px;
+    display: flex;
+    gap: 8px;
     padding: 12px 16px;
+  }
+  .mobile-movement-tools .mobile-filter-chips { flex: 1; min-width: 0; }
+  .mobile-movement-tools .mobile-search-chip { flex-shrink: 0; }
+  .mobile-balance-breakdown-inline {
+    border-left: 0;
+    border-radius: 0;
+    border-right: 0;
+    margin: 0 0 8px;
+  }
+  .mobile-balance-dot {
+    border-radius: 999px;
+    display: inline-block;
+    flex: 0 0 8px;
+    height: 8px;
+    width: 8px;
   }
   .mobile-filter-chips {
     display: flex;
-    gap: 8px;
+    gap: 6px;
     overflow-x: auto;
     scrollbar-width: none;
   }
@@ -462,9 +1631,9 @@
     border-radius: 999px;
     color: var(--m-muted);
     flex: 0 0 auto;
-    font-size: 13px;
-    font-weight: 850;
-    min-height: 44px;
+    font-size: 12px;
+    font-weight: 800;
+    min-height: 40px;
     padding: 0 14px;
   }
   .mobile-filter-chips button.on {
@@ -474,25 +1643,33 @@
   .mobile-search-chip {
     align-items: center;
     display: inline-flex;
-    gap: 8px;
-    justify-self: start;
+    gap: 6px;
   }
   .mobile-day-header {
     align-items: center;
-    background: var(--m-surface);
-    border-bottom: 1px solid rgba(255,255,255,.04);
+    background: color-mix(in oklab, var(--m-primary) 7%, var(--m-surface));
+    border-bottom: 1px solid var(--m-border);
     color: var(--m-muted);
     display: flex;
-    font-size: 13px;
+    font-size: 12px;
     justify-content: space-between;
-    padding: 13px 26px 8px;
+    padding: 12px 16px 8px;
     text-transform: capitalize;
   }
   .mobile-day-header strong {
     color: var(--m-muted);
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 700;
   }
+  .mobile-day-totals {
+    align-items: center;
+    display: flex;
+    font-size: 11px;
+    font-weight: 750;
+    gap: 6px;
+  }
+  .day-exp { color: var(--m-expense); }
+  .day-inc { color: var(--m-income); }
   .mobile-tx-row {
     align-items: center;
     background: var(--m-surface);
@@ -500,10 +1677,10 @@
     border-bottom: 1px solid var(--m-border);
     color: var(--m-text);
     display: grid;
-    gap: 15px;
-    grid-template-columns: 52px minmax(0, 1fr) auto;
-    min-height: 78px;
-    padding: 12px 26px;
+    gap: 14px;
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+    min-height: 72px;
+    padding: 12px 16px;
     text-align: left;
     width: 100%;
   }
@@ -514,22 +1691,118 @@
   }
   .mobile-tx-swipe .mobile-tx-row {
     position: relative;
-    transition: transform .18s ease;
+    transition: transform var(--m-duration) var(--m-ease);
     z-index: 2;
   }
   .mobile-tx-swipe.open .mobile-tx-row {
-    transform: translateX(-154px);
+    transform: translateX(-160px);
+  }
+  /* Con Duplicar son 3 acciones (gasto/ingreso); sin él, 2 (transferencia). */
+  .mobile-tx-swipe.has-dup.open .mobile-tx-row {
+    transform: translateX(-240px);
   }
   .mobile-row-actions {
     bottom: 0;
     display: grid;
-    grid-template-columns: 77px 77px;
+    grid-template-columns: repeat(2, 80px);
     position: absolute;
     right: 0;
     top: 0;
-    width: 154px;
+    width: 160px;
     z-index: 1;
   }
+  .mobile-tx-swipe.has-dup .mobile-row-actions {
+    grid-template-columns: repeat(3, 80px);
+    width: 240px;
+  }
+
+  /* ── Selección múltiple ── */
+  .mobile-tx-swipe.selected { background: color-mix(in oklab, var(--m-primary) 12%, transparent); }
+  .mobile-tx-check {
+    align-items: center;
+    background: var(--m-surface-2);
+    border: 2px solid color-mix(in oklab, var(--m-text) 26%, transparent);
+    border-radius: 50%;
+    color: var(--m-primary-text);
+    display: grid;
+    flex: 0 0 40px;
+    height: 40px;
+    justify-items: center;
+    place-items: center;
+    width: 40px;
+  }
+  .mobile-tx-check.on { background: var(--m-primary); border-color: transparent; }
+  .mobile-select-bar {
+    align-items: center;
+    background: var(--m-surface);
+    border-top: 1px solid var(--m-border);
+    bottom: 0;
+    box-shadow: 0 -8px 24px rgba(0,0,0,.18);
+    display: flex;
+    gap: 10px;
+    left: 0;
+    padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
+    position: fixed;
+    right: 0;
+    z-index: 60;
+  }
+  .mobile-select-cancel {
+    align-items: center;
+    background: var(--m-surface-2);
+    border: 0;
+    border-radius: 999px;
+    color: var(--m-text);
+    display: grid;
+    height: 40px;
+    place-items: center;
+    width: 40px;
+  }
+  .mobile-select-count { color: var(--m-text); flex: 1; font-size: 14px; font-weight: 800; }
+  .mobile-select-action {
+    align-items: center;
+    background: var(--m-surface-2);
+    border: 0;
+    border-radius: 12px;
+    color: var(--m-text);
+    display: flex;
+    font-size: 13px;
+    font-weight: 800;
+    gap: 6px;
+    padding: 10px 14px;
+  }
+  .mobile-select-action.danger { background: color-mix(in oklab, var(--m-expense) 16%, var(--m-surface-2)); color: var(--m-expense); }
+  .mobile-select-action:disabled { opacity: .45; }
+  .mobile-bulk-cat {
+    background: var(--m-bg);
+    border-radius: 20px 20px 0 0;
+    max-height: 70vh;
+    overflow-y: auto;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .mobile-bulk-cat header {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+    padding: 16px 16px 8px;
+  }
+  .mobile-bulk-cat header span { font-size: 16px; font-weight: 850; }
+  .mobile-bulk-cat header button { background: none; border: 0; color: var(--m-muted); }
+  .mobile-bulk-cat-grid {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: repeat(4, 1fr);
+    padding: 8px 16px 20px;
+  }
+  .mobile-bulk-cat-grid button {
+    align-items: center;
+    background: none;
+    border: 0;
+    color: var(--m-text);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .mobile-bulk-cat-grid small { font-size: 11px; font-weight: 650; text-align: center; }
   .mobile-row-actions button {
     align-items: center;
     background: var(--m-surface-2);
@@ -543,18 +1816,18 @@
     justify-content: center;
   }
   .mobile-row-actions button.danger {
-    background: color-mix(in oklab, #ff6b8a 15%, var(--m-surface-2));
-    color: #ff6b8a;
+    background: color-mix(in oklab, var(--m-expense) 15%, var(--m-surface-2));
+    color: var(--m-expense);
   }
   .mobile-row-actions button.danger.confirm {
-    background: #ff6b8a;
+    background: var(--m-expense);
     color: #1a0810;
     font-size: 10px;
   }
   .mobile-tx-row b {
     display: block;
-    font-size: 19px;
-    font-weight: 700;
+    font-size: 15px;
+    font-weight: 850;
     letter-spacing: -.02em;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -564,18 +1837,18 @@
     color: var(--m-muted);
     display: block;
     font-size: 12px;
-    margin-top: 5px;
+    margin-top: 3px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
   .mobile-tx-row > strong {
     color: var(--m-text);
-    font-size: 17px;
+    font-size: 16px;
     font-variant-numeric: tabular-nums;
-    font-weight: 750;
+    font-weight: 900;
   }
-  .mobile-tx-row > strong.income { color: #35d0a2; }
+  .mobile-tx-row > strong.income { color: var(--m-income); }
   .mobile-list-card.compact .mobile-tx-row,
   .mobile-section-card .mobile-tx-row {
     background: var(--m-surface);
@@ -586,10 +1859,10 @@
     border-radius: 999px;
     color: #ffdd3d;
     display: grid;
-    font-size: 22px;
-    height: 48px;
+    font-size: 18px;
+    height: 44px;
     place-items: center;
-    width: 48px;
+    width: 44px;
   }
   .mobile-empty-list {
     align-items: center;
@@ -613,6 +1886,7 @@
     padding-bottom: calc(20px + env(safe-area-inset-bottom));
     position: fixed;
     right: 0;
+    touch-action: pan-y pinch-zoom;
     top: 0;
     z-index: 130;
   }
@@ -620,8 +1894,13 @@
     align-items: center;
     display: grid;
     grid-template-columns: 90px 1fr 90px;
-    padding: calc(14px + env(safe-area-inset-top)) 16px 12px;
+    padding: calc(14px + env(safe-area-inset-top)) 16px 14px;
     text-align: center;
+  }
+  .mobile-search-head strong {
+    font-size: 17px;
+    font-weight: 900;
+    letter-spacing: -.02em;
   }
   .mobile-search-head button {
     background: transparent;
@@ -649,8 +1928,101 @@
     min-height: 50px;
     outline: 0;
   }
+  /* Botón "Limpiar" del encabezado de búsqueda (columna derecha del grid) */
+  .mobile-search-clear { text-align: right !important; }
+  .mobile-search-clear:disabled { color: var(--m-muted) !important; opacity: .5; }
+
+  /* Chips de etiquetas: fila que hace scroll horizontal sin empujar el cuerpo.
+     Son la puerta visible al filtro por #etiqueta. */
+  .mobile-search-tags {
+    display: flex;
+    gap: 7px;
+    margin: 0 0 12px;
+    overflow-x: auto;
+    padding: 0 16px 2px;
+    scrollbar-width: none;
+  }
+  .mobile-search-tags::-webkit-scrollbar { display: none; }
+  .mobile-search-tag {
+    align-items: center;
+    background: var(--m-surface-2);
+    border: 1px solid var(--m-border);
+    border-radius: 999px;
+    color: var(--m-text);
+    display: inline-flex;
+    flex: none;
+    font-size: 13px;
+    font-weight: 700;
+    gap: 5px;
+    padding: 7px 13px;
+  }
+  .mobile-search-tag.on { background: var(--m-primary); border-color: transparent; color: var(--m-primary-text); }
+  .mobile-search-tagtotal {
+    align-items: center;
+    background: var(--m-surface-2);
+    border-radius: 12px;
+    display: flex;
+    justify-content: space-between;
+    margin: 0 16px 14px;
+    padding: 11px 14px;
+  }
+  .mobile-search-tagtotal span { color: var(--m-muted); font-size: 12.5px; font-weight: 700; }
+  .mobile-search-tagtotal strong { font-size: 16px; font-variant-numeric: tabular-nums; font-weight: 900; }
+  .mobile-search-tagtotal .expense { color: var(--m-expense); }
+  /* Badge con nº de filtros activos sobre el chip de búsqueda */
+  .mobile-search-chip.has-filters { border-color: var(--m-primary); color: var(--m-text); }
+  .mobile-filter-badge {
+    align-items: center;
+    background: var(--m-primary);
+    border-radius: 999px;
+    color: #151515;
+    display: inline-flex;
+    font-size: 11px;
+    font-weight: 800;
+    height: 16px;
+    justify-content: center;
+    min-width: 16px;
+    padding: 0 4px;
+  }
+  /* Panel de filtros avanzados (cuenta / categoría / rango de fechas) */
+  .mobile-filter-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin: 0 16px 14px;
+  }
+  .mobile-filter-dates { display: flex; gap: 10px; }
+  .mobile-filter-dates .mobile-filter-field { flex: 1; }
+  .mobile-filter-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+  .mobile-filter-field > label {
+    color: var(--m-muted);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+  }
+  .mobile-filter-field select,
+  .mobile-filter-field input[type="date"] {
+    appearance: none;
+    background: var(--m-surface-2);
+    border: 1px solid var(--m-border);
+    border-radius: 12px;
+    color: var(--m-text);
+    font-size: 15px;
+    min-height: 46px;
+    outline: 0;
+    padding: 0 13px;
+    width: 100%;
+  }
+  .mobile-filter-results {
+    color: var(--m-muted);
+    font-size: 12px;
+    font-weight: 700;
+    margin: 0 16px 8px;
+  }
   .mobile-detail-sheet {
     align-items: flex-end;
+    animation: mobile-overlay-in var(--m-duration-fast) var(--m-ease) both;
     background: rgba(0,0,0,.55);
     bottom: 0;
     display: flex;
@@ -658,19 +2030,128 @@
     position: fixed;
     right: 0;
     top: 0;
+    overscroll-behavior: contain;
+    touch-action: none;
     z-index: 125;
   }
   .mobile-detail-sheet section {
+    animation: mobile-sheet-up var(--m-duration) var(--m-ease-out);
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 26px 26px 0 0;
     color: var(--text);
-    max-height: 88dvh;
+    max-height: min(88dvh, calc(calc(100dvh / var(--fs, 1)) - env(safe-area-inset-top) - 12px));
     overflow-y: auto;
     overscroll-behavior-y: contain;
     -webkit-overflow-scrolling: touch;
     padding: 18px 18px calc(22px + env(safe-area-inset-bottom));
+    touch-action: pan-y pinch-zoom;
     width: 100%;
+  }
+  /* Variante centrada: para sheets cortos que deben verse completos sin
+     quedar tapados por la barra inferior (p.ej. detalle de transacción) */
+  .mobile-detail-sheet.centered {
+    align-items: center;
+    padding: 16px;
+  }
+  .mobile-detail-sheet.centered section {
+    border-radius: 24px;
+    max-height: calc(calc(100dvh / var(--fs, 1)) - 32px);
+    max-width: 420px;
+    padding: 18px;
+  }
+  .mobile-transaction-sheet {
+    align-items: flex-end;
+    background: rgba(2, 6, 14, .78);
+    backdrop-filter: blur(10px);
+  }
+  /* ── Update available dialog ── */
+  .mup-card {
+    align-items: center;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 28px 24px 22px;
+    position: relative;
+    text-align: center;
+  }
+  .mup-close {
+    align-items: center;
+    background: color-mix(in oklab, var(--text) 8%, transparent);
+    border: 0;
+    border-radius: 50%;
+    color: var(--text);
+    display: grid;
+    height: 44px;
+    place-items: center;
+    position: absolute;
+    right: 14px;
+    top: 14px;
+    width: 44px;
+  }
+  .mup-brand { border-radius: 16px; margin-bottom: 6px; }
+  .mup-card h2 { font-size: 18px; font-weight: 850; letter-spacing: -.01em; margin: 0; }
+  .mup-card p { color: var(--text-dim); font-size: 13.5px; line-height: 1.5; margin: 0 0 6px; }
+  .mup-cta {
+    align-items: center;
+    background: var(--accent, #ffdd3d);
+    border: 0;
+    border-radius: 14px;
+    color: #000;
+    display: flex;
+    font-size: 15px;
+    font-weight: 750;
+    gap: 8px;
+    height: 50px;
+    justify-content: center;
+    margin-top: 6px;
+    width: 100%;
+  }
+  .mup-cta:active { opacity: .88; }
+  .mup-later {
+    background: transparent;
+    border: 0;
+    color: var(--text-dim);
+    font-size: 13.5px;
+    font-weight: 650;
+    height: 40px;
+    width: 100%;
+  }
+  .mobile-transaction-sheet section {
+    background:
+      linear-gradient(180deg,
+        color-mix(in oklab, var(--m-surface, #111827) 94%, #1d4ed8 6%),
+        color-mix(in oklab, var(--m-bg, #080d16) 94%, #000 6%));
+    border-color: color-mix(in oklab, var(--m-text, #f8fafc) 12%, transparent);
+    border-radius: 24px 24px 0 0;
+    box-shadow: 0 -22px 56px rgba(0,0,0,.42);
+    color: var(--m-text, #f8fafc);
+    max-height: 78dvh;
+    padding-top: 14px;
+  }
+  .mobile-transaction-sheet header {
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .mobile-transaction-sheet h2 {
+    font-size: 24px;
+    margin-bottom: 8px;
+  }
+  .mobile-transaction-sheet dl div {
+    background: color-mix(in oklab, var(--m-text, #f8fafc) 6%, transparent);
+    border: 1px solid color-mix(in oklab, var(--m-text, #f8fafc) 8%, transparent);
+    border-radius: 14px;
+    margin-bottom: 8px;
+  }
+  .mobile-transaction-sheet .mobile-detail-actions button {
+    background: color-mix(in oklab, var(--m-text, #f8fafc) 7%, transparent);
+    border-color: color-mix(in oklab, var(--m-text, #f8fafc) 10%, transparent);
+    color: var(--m-text, #f8fafc);
+  }
+  .mobile-transaction-sheet .mobile-detail-actions button.danger {
+    background: color-mix(in oklab, var(--m-expense) 18%, transparent);
+    border-color: color-mix(in oklab, var(--m-expense) 28%, transparent);
+    color: var(--m-expense);
   }
   .mobile-detail-sheet header {
     align-items: center;
@@ -717,7 +2198,7 @@
     letter-spacing: -.05em;
     margin-bottom: 18px;
   }
-  .mobile-detail-sheet > section > strong.income { color: #35d0a2; }
+  .mobile-detail-sheet > section > strong.income { color: var(--m-income); }
   .mobile-detail-sheet dl {
     display: grid;
     gap: 1px;
@@ -738,6 +2219,564 @@
     grid-template-columns: 1fr 1fr;
     margin-top: 14px;
   }
+  .mtop-tools-section {
+    margin: 14px 0 0;
+  }
+  .mobile-tools-sheet-wrap {
+    align-items: flex-end;
+  }
+  /* ── Centro de notificaciones (campanita) ── diseño propio, no las filas
+     de Configuración reutilizadas: la hoja ocupa casi toda la pantalla (se
+     siente como una pantalla, no un panel flotando encima de Movimientos),
+     y cada tarjeta tiene su propia jerarquía en vez de pelear por una sola
+     fila de 56px. */
+  .mnc-wrap {
+    align-items: flex-end;
+  }
+  .mnc-sheet {
+    background: var(--m-bg);
+    border: 0;
+    border-radius: 26px 26px 0 0;
+    display: flex;
+    flex-direction: column;
+    max-height: min(92dvh, 880px);
+    min-height: 62dvh;
+    overflow: hidden;
+    padding: 0;
+    width: 100%;
+  }
+  /* Cabecera con gradiente de marca (misma familia que el héroe del Perfil):
+     una banda con glow que le da identidad al panel en vez de una fila plana.
+     El degradado y sus capas salen de los tokens --m-brand-*, así que en tema
+     claro la banda es clara y el texto oscuro. */
+  .mnc-top {
+    background:
+      radial-gradient(circle at 88% -20%, color-mix(in oklab, var(--m-primary) 26%, transparent), transparent 60%),
+      var(--m-brand-band);
+    flex-shrink: 0;
+    position: relative;
+  }
+  .mnc-handle {
+    background: var(--m-brand-layer-strong);
+    border-radius: 999px;
+    height: 4px;
+    margin: 10px auto 0;
+    width: 36px;
+  }
+  .mnc-header {
+    align-items: center;
+    display: flex;
+    gap: 12px;
+    padding: 14px 16px 16px;
+    position: relative;
+  }
+  .mnc-header-icon {
+    align-items: center;
+    background: var(--m-brand-layer);
+    border: 1px solid var(--m-brand-line);
+    border-radius: 13px;
+    box-shadow: 0 0 18px color-mix(in oklab, var(--m-primary) 30%, transparent);
+    color: var(--m-brand-on);
+    display: flex;
+    flex-shrink: 0;
+    height: 40px;
+    justify-content: center;
+    position: relative;
+    width: 40px;
+  }
+  .mnc-header-icon-dot {
+    background: #ff5470;
+    /* El borde imita el fondo de la banda para que el punto parezca recortado
+       sobre ella; con un azul oscuro fijo, en tema claro salía un anillo negro. */
+    border: 2px solid color-mix(in oklab, var(--m-brand-on) 12%, var(--m-bg));
+    border-radius: 999px;
+    height: 11px;
+    position: absolute;
+    right: -2px;
+    top: -2px;
+    width: 11px;
+  }
+  .mnc-header-text { display: flex; flex: 1; flex-direction: column; gap: 1px; min-width: 0; }
+  .mnc-header-text span {
+    color: var(--m-brand-on);
+    font-size: 18px;
+    font-weight: 850;
+    letter-spacing: -.02em;
+  }
+  .mnc-header-text small { color: var(--m-brand-on-dim); font-size: 12.5px; font-weight: 650; }
+  .mnc-close {
+    align-items: center;
+    background: var(--m-brand-layer);
+    border: 0;
+    border-radius: 999px;
+    color: #fff;
+    display: flex;
+    flex-shrink: 0;
+    height: 36px;
+    justify-content: center;
+    width: 36px;
+  }
+  .mnc-close:active { background: var(--m-brand-layer-strong); }
+  .mnc-body {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 16px 18px calc(24px + env(safe-area-inset-bottom));
+  }
+  .mnc-group-title {
+    align-items: center;
+    color: var(--m-muted);
+    display: flex;
+    font-size: 12px;
+    font-weight: 850;
+    gap: 7px;
+    letter-spacing: 0.05em;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+  }
+  .mnc-group-dot {
+    border-radius: 999px;
+    flex-shrink: 0;
+    height: 7px;
+    width: 7px;
+  }
+  .mnc-group-dot-detected { background: #5b9bff; }
+  .mnc-group-dot-alert { background: #f7b231; }
+  .mnc-group-count {
+    background: color-mix(in oklab, var(--m-text) 10%, transparent);
+    border-radius: 999px;
+    color: var(--m-text);
+    font-size: 11px;
+    min-width: 18px;
+    padding: 1px 7px;
+    text-align: center;
+  }
+  .mnc-card-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  /* Tarjeta de transacción detectada */
+  .mnc-card {
+    background: var(--m-surface);
+    border-radius: 18px;
+    box-shadow: 0 1px 0 color-mix(in oklab, #fff 4%, transparent) inset;
+    padding: 14px 14px 12px;
+  }
+  .mnc-card-top {
+    align-items: flex-start;
+    display: flex;
+    gap: 11px;
+  }
+  .mnc-card-icon {
+    align-items: center;
+    border-radius: 12px;
+    display: flex;
+    flex-shrink: 0;
+    height: 40px;
+    justify-content: center;
+    width: 40px;
+  }
+  .mnc-card-title {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    padding-top: 1px;
+  }
+  .mnc-card-title b {
+    color: var(--m-text);
+    font-size: 15px;
+    font-weight: 750;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mnc-card-title small { color: var(--m-muted); font-size: 12.5px; }
+  .mnc-card-amount {
+    flex-shrink: 0;
+    font-size: 15px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 800;
+    padding-top: 1px;
+  }
+  .mnc-card-amount.income { color: var(--m-income); }
+  .mnc-card-amount.expense { color: var(--m-expense); }
+  .mnc-card-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0 51px; }
+  .mnc-card-account,
+  .mnc-card-chip {
+    align-items: center;
+    background: color-mix(in oklab, var(--m-text) 6%, transparent);
+    border: 0;
+    border-radius: 999px;
+    color: var(--m-muted);
+    display: inline-flex;
+    font-size: 12px;
+    font-weight: 700;
+    gap: 5px;
+    padding: 5px 10px 5px 9px;
+  }
+  /* Chip de categoría sugerida: tinte del color de la propia categoría. */
+  .mnc-card-cat { background: color-mix(in oklab, currentColor 14%, transparent); }
+  .mnc-card-account:active,
+  .mnc-card-chip:active { background: color-mix(in oklab, var(--m-text) 11%, transparent); }
+  .mnc-card-account-edit { color: color-mix(in oklab, var(--m-muted) 70%, transparent); }
+  .mnc-card-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .mnc-card-dismiss,
+  .mnc-card-accept {
+    align-items: center;
+    border: 0;
+    border-radius: 12px;
+    display: flex;
+    font-size: 13px;
+    font-weight: 800;
+    gap: 6px;
+    height: 40px;
+    justify-content: center;
+  }
+  .mnc-card-dismiss {
+    background: color-mix(in oklab, var(--m-text) 7%, transparent);
+    color: var(--m-muted);
+    flex: none;
+    width: 40%;
+  }
+  .mnc-card-dismiss:active { background: color-mix(in oklab, var(--m-text) 12%, transparent); }
+  .mnc-card-accept {
+    background: var(--m-primary);
+    color: #151515;
+    flex: 1;
+  }
+  .mnc-card-accept:active { filter: brightness(.92); }
+
+  /* Tarjeta de aviso financiero — franja de color a la izquierda según
+     severidad, en vez de un ícono chico sobre fondo plano. */
+  .mnc-alert-row {
+    align-items: stretch;
+    background: var(--m-surface);
+    border-left: 3px solid var(--m-border);
+    border-radius: 14px;
+    display: flex;
+    gap: 2px;
+  }
+  .mnc-alert-row[data-level="warn"] { border-left-color: #f7b231; }
+  .mnc-alert-row[data-level="danger"] { border-left-color: #ff5470; }
+  .mnc-alert {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    display: flex;
+    flex: 1;
+    gap: 12px;
+    min-width: 0;
+    padding: 13px 8px 13px 14px;
+    text-align: left;
+  }
+  .mnc-alert:active { background: color-mix(in oklab, var(--m-text) 4%, transparent); }
+  .mnc-alert-icon {
+    align-items: center;
+    background: color-mix(in oklab, var(--m-text) 8%, transparent);
+    border-radius: 11px;
+    color: var(--m-muted);
+    display: flex;
+    flex-shrink: 0;
+    height: 38px;
+    justify-content: center;
+    width: 38px;
+  }
+  .mnc-alert-row[data-level="warn"] .mnc-alert-icon { background: #f7b23122; color: #f7b231; }
+  .mnc-alert-row[data-level="danger"] .mnc-alert-icon { background: #ff547022; color: #ff5470; }
+  .mnc-alert-text {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .mnc-alert-text b { color: var(--m-text); font-size: 14.5px; font-weight: 750; }
+  .mnc-alert-text small { color: var(--m-muted); font-size: 12.5px; line-height: 1.4; }
+  .mnc-alert-arrow {
+    color: var(--m-muted);
+    flex-shrink: 0;
+    transform: rotate(90deg);
+  }
+  .mnc-alert-dismiss {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    color: var(--m-muted);
+    display: flex;
+    flex-shrink: 0;
+    justify-content: center;
+    padding: 0 14px;
+  }
+  .mnc-alert-dismiss:active { color: #ff5470; }
+
+  /* Elegir alcance al descartar un aviso de pago recurrente: "solo esta vez"
+     vs. no volver a avisar de ese pago. */
+  .mnc-choice-overlay {
+    align-items: flex-end;
+    background: rgba(0,0,0,.6);
+    display: flex;
+    inset: 0;
+    justify-content: center;
+    position: fixed;
+    z-index: 500;
+  }
+  .mnc-choice {
+    background: var(--m-bg, #0f0f10);
+    border-radius: 20px 20px 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-width: 460px;
+    padding: 18px 16px calc(18px + env(safe-area-inset-bottom, 0px));
+    width: 100%;
+  }
+  .mnc-choice strong { font-size: 15px; }
+  .mnc-choice small { color: var(--m-muted); font-size: 12px; margin-bottom: 6px; }
+  .mnc-choice-btn {
+    background: var(--m-surface);
+    border: 1px solid var(--m-border);
+    border-radius: 12px;
+    color: var(--m-text);
+    font-size: 14px;
+    font-weight: 700;
+    padding: 13px;
+    text-align: left;
+  }
+  .mnc-choice-btn-strong { border-color: #ff5470; color: #ff5470; }
+  .mnc-choice-cancel {
+    background: none;
+    border: 0;
+    color: var(--m-muted);
+    font-size: 13px;
+    font-weight: 700;
+    padding: 10px;
+  }
+
+  /* ── Historial: avisos nativos ya disparados (semanal, fx, actividad...)
+     que antes solo vivían en la bandeja de Android y desaparecían sin dejar
+     rastro dentro de la app. Cada fila es tocable (navega) + un botón de
+     basurero aparte (borra), nunca se borran solos al tocarlos. ── */
+  .mnc-group-dot-history { background: #8b95a1; }
+  .mnc-history-row {
+    align-items: stretch;
+    background: var(--m-surface);
+    border-radius: 14px;
+    display: flex;
+    gap: 4px;
+  }
+  .mnc-history-tap {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    display: flex;
+    flex: 1;
+    gap: 12px;
+    min-width: 0;
+    padding: 12px 6px 12px 14px;
+    text-align: left;
+  }
+  .mnc-history-tap:active { background: color-mix(in oklab, var(--m-text) 4%, transparent); border-radius: 14px 0 0 14px; }
+  .mnc-history-icon {
+    align-items: center;
+    background: color-mix(in oklab, var(--m-text) 8%, transparent);
+    border-radius: 11px;
+    color: var(--m-muted);
+    display: flex;
+    flex-shrink: 0;
+    height: 36px;
+    justify-content: center;
+    width: 36px;
+  }
+  .mnc-history-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .mnc-history-text b { color: var(--m-text); font-size: 14px; font-weight: 750; }
+  .mnc-history-text small {
+    color: var(--m-muted);
+    font-size: 12px;
+    line-height: 1.35;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mnc-history-time { color: var(--m-muted); font-size: 11px; font-weight: 600; margin-top: 1px; opacity: .8; }
+  .mnc-history-delete {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    color: var(--m-muted);
+    display: flex;
+    flex-shrink: 0;
+    justify-content: center;
+    padding: 0 14px;
+  }
+  .mnc-history-delete:active { color: #ff5470; }
+
+  .mnc-empty {
+    align-items: center;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 56px 24px 64px;
+    text-align: center;
+  }
+  .mnc-empty-icon {
+    align-items: center;
+    background: color-mix(in oklab, var(--m-text) 7%, transparent);
+    border-radius: 999px;
+    color: var(--m-muted);
+    display: flex;
+    height: 68px;
+    justify-content: center;
+    margin-bottom: 6px;
+    width: 68px;
+  }
+  .mnc-empty b { color: var(--m-text); font-size: 16px; font-weight: 850; }
+  .mnc-empty small {
+    color: var(--m-muted);
+    font-size: 13px;
+    line-height: 1.5;
+    max-width: 260px;
+  }
+  .mobile-tools-sheet {
+    background: color-mix(in oklab, var(--surface) 96%, #000);
+    border-radius: 28px 28px 0 0;
+    max-height: min(80dvh, 760px);
+    padding: 18px 0 calc(18px + env(safe-area-inset-bottom));
+  }
+  .mobile-tools-sheet > header,
+  .mobile-tools-copy,
+  .mobile-tools-group-title {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+  .mobile-tools-copy {
+    padding-bottom: 10px;
+  }
+  .mobile-tools-copy p {
+    color: var(--m-muted);
+    font-size: 13px;
+    line-height: 1.45;
+    margin: 0;
+  }
+  .mobile-tools-group {
+    border-top: 1px solid var(--m-border);
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin-top: 8px;
+    padding-top: 14px;
+  }
+  .mobile-tools-sheet .mobile-tools-group:first-of-type {
+    border-top: 0;
+    margin-top: 0;
+    padding-top: 8px;
+  }
+  .mobile-tools-group-title {
+    color: var(--m-muted);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+  }
+  .mobile-tools-grid {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: 1fr 1fr;
+    padding: 0 20px;
+  }
+  .mobile-tools-card {
+    align-items: flex-start;
+    background: color-mix(in oklab, var(--m-text) 4%, var(--m-surface));
+    border: 1px solid var(--m-border);
+    border-radius: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 136px;
+    padding: 16px;
+    text-align: left;
+  }
+  .mobile-tools-card:active,
+  .mobile-tools-row:active {
+    background: color-mix(in oklab, var(--m-text) 7%, var(--m-surface));
+  }
+  .mobile-tools-card-icon,
+  .mobile-tools-row-icon {
+    align-items: center;
+    border-radius: 14px;
+    display: inline-flex;
+    flex-shrink: 0;
+    height: 44px;
+    justify-content: center;
+    width: 44px;
+  }
+  .mobile-tools-card strong,
+  .mobile-tools-row b {
+    color: var(--m-text);
+    font-size: 15px;
+    font-weight: 800;
+  }
+  .mobile-tools-card small,
+  .mobile-tools-row small {
+    color: var(--m-muted);
+    font-size: 12px;
+    line-height: 1.35;
+  }
+  .mobile-tools-list {
+    border-top: 1px solid var(--m-border);
+  }
+  .mobile-tools-row {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid var(--m-border);
+    color: inherit;
+    display: flex;
+    gap: 14px;
+    padding: 16px 20px;
+    text-align: left;
+    width: 100%;
+  }
+  .mobile-tools-row > div {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .mobile-tools-row-arrow {
+    color: var(--m-muted);
+    flex-shrink: 0;
+    transform: rotate(90deg);
+  }
+  @keyframes mobile-sheet-up {
+    from { opacity: 0; transform: translateY(18px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes mobile-overlay-in {
+    from { background: rgba(0,0,0,0); }
+    to { background: rgba(0,0,0,.55); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .mobile-detail-sheet,
+    .mobile-detail-sheet section,
+    .mobile-fab-menu,
+    .mobile-create-amount-row.shake,
+    .mobile-loading-overlay span {
+      animation: none !important;
+    }
+  }
   .mobile-detail-actions button {
     align-items: center;
     background: var(--m-surface-2);
@@ -752,22 +2791,34 @@
   }
   .mobile-detail-actions button.danger {
     background: #3a1820;
-    color: #ff6b8a;
+    color: var(--m-expense);
   }
   .mobile-bottom-nav {
     align-items: center;
-    background: var(--m-surface);
-    border-top: 1px solid rgba(255,255,255,.07);
+    background: color-mix(in oklab, var(--m-surface) 94%, var(--m-bg));
+    border-top: 1px solid var(--m-border);
     bottom: 0;
-    box-shadow: 0 -14px 30px rgba(0,0,0,.35);
+    box-shadow: 0 -18px 32px rgba(0,0,0,.22);
     display: grid;
-    grid-template-columns: 1fr 1fr 82px 1fr 1fr;
+    /* minmax(0,1fr), no `1fr` a secas: con `1fr` el mínimo es el min-content de
+       la etiqueta ("Movimientos"), así que con fuente grande (fontScale 1.35) las
+       columnas crecen, el grid rebasa el ancho fijo y empuja "Cuentas"/"Perfil"
+       fuera de pantalla (se perdía el acceso a esas pestañas). minmax(0,...) deja
+       encoger las columnas y la etiqueta se recorta con ellipsis si hace falta. */
+    grid-template-columns: repeat(2, minmax(0, 1fr)) 82px repeat(2, minmax(0, 1fr));
     left: 0;
     min-height: 78px;
     padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
     position: fixed;
     right: 0;
     z-index: 80;
+  }
+  /* body:has — los sheets ahora se portalan a <body> (SheetPortal), ya no
+     viven dentro de .mobile-shell */
+  body:has(.mobile-detail-sheet) .mobile-bottom-nav {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(calc(100% + env(safe-area-inset-bottom)));
   }
   .mobile-bottom-nav > button {
     align-items: center;
@@ -776,22 +2827,126 @@
     color: var(--m-muted);
     display: flex;
     flex-direction: column;
-    font-size: 11px;
+    font-size: 10.5px;
     font-weight: 800;
     gap: 5px;
     justify-content: center;
     min-height: 58px;
+    min-width: 0;
+    transition: color var(--m-duration-fast) var(--m-ease);
+  }
+  /* La etiqueta se recorta antes que empujar la pestaña fuera de pantalla. */
+  .mobile-bottom-nav > button > span {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .mobile-bottom-nav > button.on {
-    color: #ffdd3d;
+    color: var(--m-primary);
+  }
+  .mobile-bottom-nav > button.on svg {
+    transform: translateY(-1px);
+  }
+  .mobile-add-fab-wrap {
+    align-items: center; display: flex; justify-content: center; position: relative;
   }
   .mobile-bottom-nav .mobile-add-fab {
-    background: #ffdd3d;
+    background: var(--m-primary);
     border-radius: 999px;
-    box-shadow: 0 10px 30px rgba(255,221,61,.22);
-    color: #151515;
+    box-shadow: 0 10px 30px color-mix(in oklab, var(--m-primary) 35%, transparent);
+    color: var(--m-primary-text);
     height: 66px;
     margin: -26px auto 0;
     min-height: 66px;
+    touch-action: none;
     width: 66px;
   }
+  .mobile-fab-menu-backdrop { inset: 0; position: fixed; z-index: 85; }
+  .mobile-fab-menu {
+    animation: mfab-pop var(--m-duration-fast) var(--m-ease-out);
+    background: var(--m-surface);
+    border: 1px solid var(--m-border);
+    border-radius: 16px;
+    bottom: 88px;
+    box-shadow: 0 18px 40px rgba(0,0,0,.2);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    left: 50%;
+    padding: 8px;
+    position: absolute;
+    transform: translateX(-50%);
+    z-index: 90;
+  }
+  .mobile-fab-menu button {
+    align-items: center; border: 0; border-radius: 12px;
+    display: flex; font-size: 14px; font-weight: 800;
+    gap: 8px; padding: 12px 20px; white-space: nowrap;
+  }
+  .mobile-fab-menu button.expense { background: color-mix(in oklab, var(--m-expense) 16%, transparent); color: var(--m-expense); }
+  .mobile-fab-menu button.income  { background: color-mix(in oklab, var(--m-income) 16%, transparent); color: var(--m-income); }
+  @keyframes mfab-pop {
+    from { opacity: 0; transform: translateX(-50%) translateY(8px) scale(.92); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  }
+
+/* ── Centro de notificaciones: jerarquía ───────────────────
+   Tenía tres bloques —detectados, avisos e historial— con exactamente el
+   mismo tratamiento: punto de color y contador. Tres grupos de igual peso no
+   son una jerarquía, son un volcado con encabezados. */
+.mnc-group-title {
+  align-items: center;
+  color: var(--text-dim);
+  display: flex;
+  font-size: 11px;
+  font-weight: 850;
+  gap: 8px;
+  letter-spacing: .07em;
+  padding: 0 2px 8px;
+  text-transform: uppercase;
+  width: 100%;
+}
+/* Lo que pide acción se distingue de lo que solo informa. */
+.mnc-group-title.primary { color: var(--accent); }
+.mnc-group-title.toggle {
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+  min-height: 40px;
+  padding-bottom: 0;
+  text-align: left;
+}
+.mnc-group-title.toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mnc-group-count {
+  background: var(--track);
+  border-radius: 999px;
+  color: var(--text-dim);
+  font-size: 10.5px;
+  font-weight: 850;
+  letter-spacing: 0;
+  padding: 1px 7px;
+}
+.mnc-group-title.primary .mnc-group-count {
+  background: color-mix(in oklab, var(--accent) 18%, transparent);
+  color: var(--accent);
+}
+
+/* Aviso de posible repetido. La app no decide por el usuario: dos cafés del
+   mismo precio el mismo día son dos gastos legítimos, y desde aquí no hay
+   forma de distinguirlos. Se avisa y se deja decidir. */
+.mnc-card-dup {
+  align-items: center;
+  background: color-mix(in oklab, var(--warn) 14%, transparent);
+  border-radius: 9px;
+  color: var(--warn);
+  display: flex;
+  font-size: 11.5px;
+  font-weight: 750;
+  gap: 6px;
+  line-height: 15px;
+  margin: 0 0 8px;
+  padding: 7px 9px;
+}
+.mnc-card-dup svg { flex-shrink: 0; }

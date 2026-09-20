@@ -1,0 +1,19 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Capabilities granted to the main window",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "notification:default",
+    "opener:allow-open-url",
+    "opener:allow-default-urls",
+    "dialog:default",
+    "biometric:default",
+    "mlkit-ocr:default",
+    "local-reminders:default",
+    "bank-notifications:default",
+    "keystore:default",
+    "home-widget:default"
+  ]
+}

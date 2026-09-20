@@ -1,12 +1,12 @@
 <resources>
-    <string name="app_name">$harky</string>
-    <string name="main_activity_title">$harky</string>
+    <string name="app_name">$harky Finanzas</string>
+    <string name="main_activity_title">$harky Finanzas</string>
 
     <!-- Accesos directos (mantener presionado el ícono de la app) -->
     <string name="shortcut_add_expense_short">Gasto</string>
     <string name="shortcut_add_expense_long">Agregar gasto</string>
     <string name="shortcut_add_income_short">Ingreso</string>
     <string name="shortcut_add_income_long">Agregar ingreso</string>
-    <string name="shortcut_reports_short">Reportes</string>
-    <string name="shortcut_reports_long">Ver reportes</string>
+    <string name="shortcut_reports_short">Informes</string>
+    <string name="shortcut_reports_long">Abrir informes</string>
 </resources>

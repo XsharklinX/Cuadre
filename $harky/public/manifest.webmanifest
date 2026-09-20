@@ -1,0 +1,21 @@
+{
+  "name": "$harky Gestión de Finanzas",
+  "short_name": "$harky",
+  "description": "Gestión personal de finanzas, presupuestos y metas.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0e16",
+  "theme_color": "#0a0e16",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

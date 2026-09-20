@@ -5,67 +5,67 @@ export const TODAY = new Date()
 
 // ── Monedas ───────────────────────────────────────────────
 export const CURRENCIES: Record<CurrencyCode, Currency> = {
-  DOP: { code: 'DOP', symbol: 'RD$', rate: 1,            decimals: 2 },
-  USD: { code: 'USD', symbol: 'US$', rate: 1 / 58.5,     decimals: 2 },
-  EUR: { code: 'EUR', symbol: '€',   rate: 0.92 / 58.5,  decimals: 2 },
-  MXN: { code: 'MXN', symbol: 'MX$', rate: 17.1 / 58.5,  decimals: 2 },
-  GBP: { code: 'GBP', symbol: '£',   rate: 0.79 / 58.5,  decimals: 2 },
-  COP: { code: 'COP', symbol: 'COP', rate: 3950 / 58.5,  decimals: 0 },
-  ARS: { code: 'ARS', symbol: 'AR$', rate: 900 / 58.5,   decimals: 0 },
-  BRL: { code: 'BRL', symbol: 'R$',  rate: 5.0 / 58.5,   decimals: 2 },
-  CAD: { code: 'CAD', symbol: 'CA$', rate: 1.36 / 58.5,  decimals: 2 },
+  DOP: { code: 'DOP', symbol: 'RD$', decimals: 2 },
+  USD: { code: 'USD', symbol: 'US$', decimals: 2 },
+  EUR: { code: 'EUR', symbol: '€',   decimals: 2 },
+  MXN: { code: 'MXN', symbol: 'MX$', decimals: 2 },
+  GBP: { code: 'GBP', symbol: '£',   decimals: 2 },
+  COP: { code: 'COP', symbol: 'COP', decimals: 0 },
+  ARS: { code: 'ARS', symbol: 'AR$', decimals: 0 },
+  BRL: { code: 'BRL', symbol: 'R$',  decimals: 2 },
+  CAD: { code: 'CAD', symbol: 'CA$', decimals: 2 },
 }
 
 // ── Seeds ─────────────────────────────────────────────────
 
 // Demo accounts (only used in makeDemo)
 const ACCOUNTS_DEMO: Account[] = [
-  { id: 'acc_popular', name: 'Main Bank',    short: 'Debit',   type: 'debit',   color: '#3b82f6', balance: 84250.75,   last4: '4821' },
-  { id: 'acc_bhd',     name: 'Savings Bank', short: 'Savings', type: 'savings', color: '#22c55e', balance: 152800.00,  last4: '1093' },
-  { id: 'acc_visa',    name: 'Visa Platinum', short: 'Credit', type: 'credit',  color: '#a78bfa', balance: -23410.40, last4: '7745', limit: 120000 },
-  { id: 'acc_cash',    name: 'Cash',          short: 'Cash',   type: 'cash',    color: '#f59e0b', balance: 6500.00,   last4: null },
+  { id: 'acc_popular', name: 'Banco Principal', short: 'Débito',  type: 'debit',   color: '#3b82f6', balance: 84250.75,   last4: '4821' },
+  { id: 'acc_bhd',     name: 'Banco de Ahorros', short: 'Ahorros', type: 'savings', color: '#22c55e', balance: 152800.00,  last4: '1093' },
+  { id: 'acc_visa',    name: 'Visa Platino',     short: 'Crédito', type: 'credit',  color: '#a78bfa', balance: -23410.40, last4: '7745', limit: 120000 },
+  { id: 'acc_cash',    name: 'Efectivo',          short: 'Efectivo', type: 'cash',    color: '#f59e0b', balance: 6500.00,   last4: null },
 ]
 
 // Fresh start: only one Cash account
 const ACCOUNTS_EMPTY: Account[] = [
-  { id: 'acc_cash', name: 'Cash', short: 'Cash', type: 'cash', color: '#f59e0b', balance: 0, last4: null },
+  { id: 'acc_cash', name: 'Efectivo', short: 'Efectivo', type: 'cash', color: '#f59e0b', balance: 0, last4: null },
 ]
 
 const CATEGORIES_SEED: Category[] = [
-  { id: 'cat_renta',   name: 'Housing',       type: 'expense', color: '#6366f1', budget: 0, icon: 'home'   },
-  { id: 'cat_super',   name: 'Groceries',     type: 'expense', color: '#2dd4bf', budget: 0, icon: 'cart'   },
-  { id: 'cat_rest',    name: 'Restaurants',   type: 'expense', color: '#f59e0b', budget: 0, icon: 'food'   },
-  { id: 'cat_trans',   name: 'Transport',     type: 'expense', color: '#38bdf8', budget: 0, icon: 'car'    },
-  { id: 'cat_serv',    name: 'Utilities',     type: 'expense', color: '#c084fc', budget: 0, icon: 'bolt'   },
-  { id: 'cat_ocio',    name: 'Entertainment', type: 'expense', color: '#f472b6', budget: 0, icon: 'play'   },
-  { id: 'cat_salud',   name: 'Health',        type: 'expense', color: '#fb7185', budget: 0, icon: 'heart'  },
-  { id: 'cat_compras', name: 'Shopping',      type: 'expense', color: '#facc15', budget: 0, icon: 'bag'    },
-  { id: 'cat_edu',     name: 'Education',     type: 'expense', color: '#818cf8', budget: 0, icon: 'book'   },
-  { id: 'cat_salario', name: 'Salary',        type: 'income',  color: '#22c55e', budget: 0, icon: 'wallet' },
-  { id: 'cat_free',    name: 'Freelance',     type: 'income',  color: '#34d399', budget: 0, icon: 'laptop' },
-  { id: 'cat_inv',     name: 'Investments',   type: 'income',  color: '#10b981', budget: 0, icon: 'trend'  },
+  { id: 'cat_renta',   name: 'Vivienda',        type: 'expense', color: '#6366f1', budget: 0, icon: 'home'   },
+  { id: 'cat_super',   name: 'Supermercado',    type: 'expense', color: '#2dd4bf', budget: 0, icon: 'cart'   },
+  { id: 'cat_rest',    name: 'Restaurantes',    type: 'expense', color: '#f59e0b', budget: 0, icon: 'food'   },
+  { id: 'cat_trans',   name: 'Transporte',      type: 'expense', color: '#38bdf8', budget: 0, icon: 'car'    },
+  { id: 'cat_serv',    name: 'Servicios',       type: 'expense', color: '#c084fc', budget: 0, icon: 'bolt'   },
+  { id: 'cat_ocio',    name: 'Entretenimiento', type: 'expense', color: '#f472b6', budget: 0, icon: 'play'   },
+  { id: 'cat_salud',   name: 'Salud',           type: 'expense', color: '#fb7185', budget: 0, icon: 'heart'  },
+  { id: 'cat_compras', name: 'Compras',         type: 'expense', color: '#facc15', budget: 0, icon: 'bag'    },
+  { id: 'cat_edu',     name: 'Educación',       type: 'expense', color: '#818cf8', budget: 0, icon: 'book'   },
+  { id: 'cat_salario', name: 'Salario',         type: 'income',  color: '#22c55e', budget: 0, icon: 'wallet' },
+  { id: 'cat_free',    name: 'Freelance',       type: 'income',  color: '#34d399', budget: 0, icon: 'laptop' },
+  { id: 'cat_inv',     name: 'Inversiones',     type: 'income',  color: '#10b981', budget: 0, icon: 'trend'  },
 ]
 
 const GOALS_SEED: Goal[] = [
-  { id: 'goal_viaje',  name: 'Trip to the Beach',    target: 80000,  saved: 46500,  color: '#38bdf8', deadline: '2026-12-01', icon: 'play'   },
-  { id: 'goal_emerg',  name: 'Emergency fund',       target: 200000, saved: 132000, color: '#22c55e', deadline: '2027-06-01', icon: 'heart'  },
-  { id: 'goal_laptop', name: 'New MacBook',          target: 110000, saved: 28000,  color: '#a78bfa', deadline: '2026-09-01', icon: 'laptop' },
+  { id: 'goal_viaje',  name: 'Viaje a la playa',     target: 80000,  saved: 46500,  color: '#38bdf8', deadline: '2026-12-01', icon: 'play'   },
+  { id: 'goal_emerg',  name: 'Fondo de emergencia',  target: 200000, saved: 132000, color: '#22c55e', deadline: '2027-06-01', icon: 'heart'  },
+  { id: 'goal_laptop', name: 'MacBook nueva',        target: 110000, saved: 28000,  color: '#a78bfa', deadline: '2026-09-01', icon: 'laptop' },
 ]
 
 // ── Notas por categoría ───────────────────────────────────
 const NOTES: Record<string, string[]> = {
-  cat_renta:   ['Rent'],
-  cat_super:   ['Supermarket', 'Grocery store', 'Wholesale club', 'Weekly shopping'],
-  cat_rest:    ['Lunch out', 'Coffee shop', 'Dinner with friends', 'Fast food', 'Food delivery'],
-  cat_trans:   ['Gas', 'Uber', 'Toll', 'Parking', 'Car maintenance'],
-  cat_serv:    ['Electric bill', 'Water bill', 'Internet', 'Phone plan', 'Netflix'],
-  cat_ocio:    ['Movie theater', 'Spotify', 'Concert', 'Bar night', 'Bowling'],
-  cat_salud:   ['Pharmacy', 'Doctor visit', 'Gym membership', 'Lab tests'],
-  cat_compras: ['Clothing', 'Amazon order', 'Sneakers', 'Birthday gift', 'Hardware store'],
-  cat_edu:     ['Online course', 'Textbooks', 'Language class'],
-  cat_salario: ['Paycheck'],
-  cat_free:    ['Web design project', 'Logo client', 'Consulting'],
-  cat_inv:     ['Dividends', 'Savings interest'],
+  cat_renta:   ['Alquiler'],
+  cat_super:   ['Supermercado', 'Colmado', 'Club de mayoristas', 'Compras semanales'],
+  cat_rest:    ['Almuerzo fuera', 'Cafetería', 'Cena con amigos', 'Comida rápida', 'Pedido a domicilio'],
+  cat_trans:   ['Gasolina', 'Uber', 'Peaje', 'Estacionamiento', 'Mantenimiento del carro'],
+  cat_serv:    ['Factura de luz', 'Factura de agua', 'Internet', 'Plan telefónico', 'Netflix'],
+  cat_ocio:    ['Cine', 'Spotify', 'Concierto', 'Noche de bar', 'Boliche'],
+  cat_salud:   ['Farmacia', 'Consulta médica', 'Membresía del gimnasio', 'Análisis de laboratorio'],
+  cat_compras: ['Ropa', 'Pedido de Amazon', 'Tenis', 'Regalo de cumpleaños', 'Ferretería'],
+  cat_edu:     ['Curso en línea', 'Libros de texto', 'Clase de idiomas'],
+  cat_salario: ['Pago de nómina'],
+  cat_free:    ['Proyecto de diseño web', 'Cliente de logo', 'Consultoría'],
+  cat_inv:     ['Dividendos', 'Interés de ahorros'],
 }
 
 const EXPENSE_PLAN = [
@@ -95,8 +95,8 @@ const rand  = (min: number, max: number) => min + (max - min) * rng()
 const pick  = (arr: string[]) => arr[Math.floor(rng() * arr.length)]
 const jitter = (base: number, pct: number) => Math.round(base * (1 + (rng() - 0.5) * 2 * pct))
 
-export function newId(): string {
-  return 'tx_' + Date.now().toString(36) + '_' + Math.floor(rng() * 1e6).toString(36)
+export function newId(prefix = 'tx_'): string {
+  return prefix + Date.now().toString(36) + '_' + Math.floor(rng() * 1e6).toString(36)
 }
 
 function iso(y: number, m: number, d: number): string {
@@ -124,7 +124,7 @@ function genTransactions(): Transaction[] {
     for (const day of [15, daysInMonth]) {
       if (day <= maxDay)
         txns.push({ id: newId(), type: 'income', categoryId: 'cat_salario',
-          accountId: 'acc_popular', amount: 42500, date: iso(year, month, day), note: 'Paycheck' })
+          accountId: 'acc_popular', amount: 42500, date: iso(year, month, day), note: 'Pago de nómina' })
     }
     // Freelance
     if (rng() < 0.6) {

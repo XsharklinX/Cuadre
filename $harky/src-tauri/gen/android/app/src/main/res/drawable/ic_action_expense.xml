@@ -1,0 +1,12 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Ícono del botón "Gasto" de la notificación persistente: una barra
+         sólida (signo menos) — monocromo, sin relleno de color propio, para
+         que el sistema lo tiña de forma consistente con el resto. -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M5,11 L19,11 L19,13 L5,13 Z" />
+</vector>

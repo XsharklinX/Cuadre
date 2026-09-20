@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Superficie unica del widget. Reemplaza al gradiente de 3 paradas + borde
+  claro del diseno anterior: ahi cada elemento traia su propia tarjeta con
+  borde (fondo > tarjeta > chip), y ese anidamiento era la mitad del ruido
+  visual. Aqui la jerarquia la hace la tipografia, no las cajas.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="#0F1420" />
+    <stroke
+        android:width="1dp"
+        android:color="#1E2536" />
+    <corners android:radius="24dp" />
+</shape>

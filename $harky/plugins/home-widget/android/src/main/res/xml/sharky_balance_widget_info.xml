@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Balance: por defecto 2x2 (compacto). Se puede ensanchar hasta 4x2 y ahi el
+  provider cambia solo a la variante con cuentas y acciones.
+
+  `maxResizeHeight` lo limita a ~2 celdas de alto a proposito: el contenido cabe
+  en 2x2, y dejar que crezca a lo alto solo produciria hueco vacio — que es
+  exactamente lo que hacia el diseno anterior al comerse media pantalla.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="110dp"
+    android:minHeight="110dp"
+    android:minResizeWidth="110dp"
+    android:minResizeHeight="110dp"
+    android:maxResizeWidth="320dp"
+    android:maxResizeHeight="130dp"
+    android:targetCellWidth="2"
+    android:targetCellHeight="2"
+    android:updatePeriodMillis="3600000"
+    android:resizeMode="horizontal"
+    android:widgetCategory="home_screen"
+    android:initialLayout="@layout/widget_balance"
+    android:previewLayout="@layout/widget_balance"
+    android:description="@string/widget_description" />

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Barra de presupuesto en estado "ok". El color aqui SIGNIFICA algo: antes
+  todas las barras eran amarillas, asi que un presupuesto al 160% se veia igual
+  que uno al 32%.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@android:id/background">
+        <shape>
+            <corners android:radius="999dp" />
+            <solid android:color="#1B2130" />
+        </shape>
+    </item>
+    <item android:id="@android:id/progress">
+        <clip>
+            <shape>
+                <corners android:radius="999dp" />
+                <solid android:color="#35D0A2" />
+            </shape>
+        </clip>
+    </item>
+</layer-list>

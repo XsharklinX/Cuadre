@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1024px; height: 500px; overflow: hidden; }
+  body {
+    width: 1024px;
+    height: 500px;
+    background: #080F1E;
+    background-image:
+      radial-gradient(620px 420px at 82% 18%, rgba(59,111,255,.30), transparent 70%),
+      radial-gradient(700px 500px at 10% 100%, rgba(59,111,255,.12), transparent 70%);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    display: flex;
+    align-items: center;
+    position: relative;
+  }
+  .glow-line {
+    position: absolute;
+    opacity: .35;
+    filter: blur(1px);
+  }
+  .content {
+    display: flex;
+    align-items: center;
+    gap: 56px;
+    padding: 0 64px;
+    width: 100%;
+  }
+  .logo {
+    flex: 0 0 auto;
+    width: 220px;
+    height: 220px;
+  }
+  .text {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .brand {
+    font-size: 64px;
+    font-weight: 800;
+    color: #FFFFFF;
+    letter-spacing: -1px;
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+  }
+  .brand .dollar {
+    color: #4D82FF;
+  }
+  .tagline {
+    font-size: 26px;
+    font-weight: 600;
+    color: #D4E4F5;
+  }
+  .sub {
+    font-size: 17px;
+    color: #9E9EB8;
+    max-width: 560px;
+    line-height: 1.5;
+  }
+  .pills {
+    display: flex;
+    gap: 10px;
+    margin-top: 6px;
+  }
+  .pill {
+    border: 1px solid rgba(255,255,255,.12);
+    color: #D4E4F5;
+    background: rgba(255,255,255,.04);
+    border-radius: 999px;
+    padding: 7px 18px;
+    font-size: 14px;
+    font-weight: 600;
+  }
+</style>
+</head>
+<body>
+  <!-- baseline accent -->
+  <svg class="glow-line" width="1024" height="500" viewBox="0 0 1024 500" xmlns="http://www.w3.org/2000/svg">
+    <line x1="0" y1="430" x2="1024" y2="430" stroke="#3B6FFF" stroke-width="3" stroke-linecap="round" opacity="0.5"/>
+  </svg>
+
+  <div class="content">
+    <svg class="logo" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="glow-dot" x="-80%" y="-80%" width="260%" height="260%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="14" result="blur"/>
+          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <filter id="glow-line2" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur"/>
+          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+      <rect width="512" height="512" rx="96" fill="#0C1426"/>
+      <line x1="74" y1="385" x2="256" y2="148" stroke="#D4E4F5" stroke-width="26" stroke-linecap="round" filter="url(#glow-line2)"/>
+      <line x1="256" y1="148" x2="438" y2="385" stroke="#D4E4F5" stroke-width="26" stroke-linecap="round" filter="url(#glow-line2)"/>
+      <circle cx="256" cy="148" r="38" fill="#3B6FFF" opacity="0.20" filter="url(#glow-dot)"/>
+      <circle cx="256" cy="148" r="22" fill="#4D82FF"/>
+      <line x1="58" y1="422" x2="454" y2="422" stroke="#3B6FFF" stroke-width="9" stroke-linecap="round" opacity="0.55"/>
+    </svg>
+
+    <div class="text">
+      <div class="brand"><span class="dollar">$</span>harky</div>
+      <div class="tagline">Tus finanzas, simples y bajo control</div>
+      <div class="sub">
+        Registra gastos e ingresos, gestiona presupuestos, metas de ahorro y
+        cuentas, y mira tu progreso en reportes claros — todo en una app
+        rapida que funciona sin conexion.
+      </div>
+      <div class="pills">
+        <span class="pill">Presupuestos</span>
+        <span class="pill">Metas de ahorro</span>
+        <span class="pill">Reportes</span>
+        <span class="pill">100% privado</span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

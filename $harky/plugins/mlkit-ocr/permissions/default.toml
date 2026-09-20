@@ -1,0 +1,4 @@
+"$schema" = "schemas/schema.json"
+[default]
+description = "Permite usar el reconocimiento de texto on-device (ML Kit) para escanear recibos."
+permissions = ["allow-recognize-text", "allow-open-scanner"]

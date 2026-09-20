@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>$harky - Privacy Policy</title>
+    <meta name="description" content="Privacy Policy for the $harky personal finance app." />
+    <meta name="theme-color" content="#0b1220" />
+    <link rel="icon" href="./assets/icon.svg" />
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #060a13;
+        --panel: rgba(15, 23, 42, 0.78);
+        --text: #f8fafc;
+        --muted: #9aa8bd;
+        --line: rgba(148, 163, 184, 0.2);
+        --accent: #3b82f6;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at top left, rgba(59, 130, 246, 0.24), transparent 34rem),
+          radial-gradient(circle at 80% 20%, rgba(34, 197, 94, 0.11), transparent 30rem),
+          linear-gradient(180deg, #080d18 0%, var(--bg) 54%, #05070c 100%);
+        color: var(--text);
+        min-height: 100vh;
+      }
+
+      a { color: var(--accent); }
+
+      .shell {
+        width: min(760px, calc(100% - 40px));
+        margin: 0 auto;
+        padding: 40px 0 60px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-weight: 850;
+        letter-spacing: -0.04em;
+        margin-bottom: 28px;
+      }
+
+      .brand img { width: 36px; height: 36px; border-radius: 11px; }
+      .brand span { color: var(--accent); }
+
+      h1 {
+        font-size: clamp(28px, 5vw, 40px);
+        letter-spacing: -0.04em;
+        margin: 0 0 6px;
+      }
+
+      .updated {
+        color: var(--muted);
+        font-size: 14px;
+        margin: 0 0 32px;
+      }
+
+      .card {
+        border: 1px solid var(--line);
+        background: var(--panel);
+        border-radius: 18px;
+        padding: 22px 24px;
+        margin-bottom: 16px;
+      }
+
+      .card h3 {
+        margin: 0 0 10px;
+        font-size: 16px;
+        letter-spacing: -0.01em;
+      }
+
+      .card p {
+        margin: 0 0 10px;
+        color: var(--muted);
+        line-height: 1.7;
+        font-size: 14.5px;
+      }
+
+      .card p:last-child { margin-bottom: 0; }
+
+      .back {
+        display: inline-block;
+        margin-top: 24px;
+        font-size: 14px;
+        color: var(--muted);
+      }
+
+      .back:hover { color: var(--text); }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <a class="brand" href="./index.html" aria-label="$harky home">
+        <img src="./assets/icon.svg" alt="" />
+        <strong><span>$</span>harky</strong>
+      </a>
+
+      <h1>Privacy Policy</h1>
+      <p class="updated">Last updated: June 7, 2026</p>
+
+      <div class="card">
+        <h3>1. Who is responsible for your data</h3>
+        <p>$harky is developed and maintained by David Bonilla ("the Developer", "we", "us"). For any question about this Privacy Policy or your data, write to us at contactosharklin@gmail.com.</p>
+      </div>
+
+      <div class="card">
+        <h3>2. What data we collect</h3>
+        <p>Financial data you enter (accounts, transactions, categories, budgets and goals): stored only on your device, locally, unless you voluntarily turn on sync with your Google account as described below.</p>
+        <p>Google account data (optional): if you choose to sign in with Google, we receive the name, email address, profile photo and account identifier that Google provides, used solely to identify you inside the app and enable sync across your devices.</p>
+        <p>Cloud-synced data (optional): if you turn on sync, your accounts, transactions, categories, goals and contributions are stored on our database infrastructure (Supabase), linked to your user identifier, so you can access them from different devices.</p>
+        <p>Comments and suggestions: if you use the "Comments" section in Settings, the text you write is sent directly to us from within the app and may include basic context such as the app version and platform, so we can read and respond to it.</p>
+        <p>We do not include advertising or third-party commercial trackers, and we do not collect browsing data for marketing purposes.</p>
+      </div>
+
+      <div class="card">
+        <h3>3. How we use your data</h3>
+        <p>To make the app work: calculations, reports, budgets, projections and goals are generated locally from the information you enter.</p>
+        <p>To sync your data across your own devices when you sign in and turn that feature on.</p>
+        <p>To read and respond to the comments, questions or support requests you send us.</p>
+        <p>We never sell, rent or share your financial data for advertising or commercial purposes.</p>
+      </div>
+
+      <div class="card">
+        <h3>4. Who we share information with</h3>
+        <p>Google LLC, as the sign-in provider, only if you choose to use that feature. How Google handles your data is governed by its own privacy policy.</p>
+        <p>Supabase Inc., as our cloud database infrastructure provider, solely to securely store the data you choose to sync. Supabase acts as a data processor and does not use your information for its own purposes.</p>
+        <p>We do not share your information with advertisers, data brokers, or third parties for marketing purposes.</p>
+      </div>
+
+      <div class="card">
+        <h3>5. Data security</h3>
+        <p>We apply reasonable technical measures to protect your data: encryption in transit (HTTPS/TLS), secure credential storage, and authentication via the OAuth PKCE flow. No system is perfectly secure, so we cannot guarantee absolute protection.</p>
+      </div>
+
+      <div class="card">
+        <h3>6. Your rights and control over your data</h3>
+        <p>You can use $harky entirely offline and without creating an account; in that case your data never leaves your device.</p>
+        <p>You can export a copy of your data at any time from Settings &rarr; Data &rarr; Export backup, and restore it later.</p>
+        <p>You can permanently delete all your local data, and your synced cloud data, from Settings &rarr; Data &rarr; Delete all data.</p>
+        <p>You can sign out of Google and turn off sync at any time from Settings &rarr; Account.</p>
+        <p>If you want us to delete your account entirely, write to us at contactosharklin@gmail.com and we will handle your request within a reasonable time. See our <a href="./delete-account.html">account deletion instructions</a> for details.</p>
+      </div>
+
+      <div class="card">
+        <h3>7. Data retention</h3>
+        <p>Locally stored data stays on your device until you delete it or uninstall the app. Cloud-synced data is kept while your account is active or until you request its deletion.</p>
+      </div>
+
+      <div class="card">
+        <h3>8. Children</h3>
+        <p>$harky is not directed at children under 13, and we do not knowingly collect information from minors. If you believe a minor has provided us with personal data, please contact us so we can remove it.</p>
+      </div>
+
+      <div class="card">
+        <h3>9. Changes to this policy</h3>
+        <p>We may update this Privacy Policy from time to time. If the changes are significant, we will notify you inside the app. The date of the latest update always appears at the top of this document.</p>
+      </div>
+
+      <div class="card">
+        <h3>10. Contact</h3>
+        <p>For questions, data requests, or any privacy concern, write to us at contactosharklin@gmail.com.</p>
+      </div>
+
+      <a class="back" href="./terms.html">Terms of Use &rarr;</a>
+    </main>
+  </body>
+</html>

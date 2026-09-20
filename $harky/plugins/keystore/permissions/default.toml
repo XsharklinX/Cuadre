@@ -1,0 +1,4 @@
+"$schema" = "schemas/schema.json"
+[default]
+description = "Permite cifrar y descifrar datos sensibles usando una clave respaldada por Android Keystore."
+permissions = ["allow-encrypt", "allow-decrypt"]

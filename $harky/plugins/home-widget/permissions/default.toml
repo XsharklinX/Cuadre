@@ -1,0 +1,4 @@
+"$schema" = "schemas/schema.json"
+[default]
+description = "Permite sincronizar el snapshot de datos del widget, refrescar los widgets, consultar diagnostico y pedir anclar un widget a la pantalla de inicio."
+permissions = ["allow-sync-snapshot", "allow-get-diagnostics", "allow-refresh-widgets", "allow-request-pin"]

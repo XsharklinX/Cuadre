@@ -1,8 +1,59 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <uses-permission android:name="android.permission.USE_FINGERPRINT" />
+
+    <!-- Cámara: necesaria para que el WebView honre <input capture> y abra la
+         cámara al escanear un recibo. Sin este permiso, Android cae al selector
+         de archivos. El FileProvider de abajo entrega la URI a la app de cámara.
+         NOTA: este directorio se regenera con `tauri android init` — si eso
+         ocurre, hay que volver a agregar estos permisos. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <!-- NO se piden READ_MEDIA_IMAGES / READ_MEDIA_VIDEO / READ_EXTERNAL_STORAGE:
+         elegir un recibo de la galería usa el selector del sistema del WebView
+         (<input type="file">), que entrega la foto vía content:// SIN permiso de
+         almacenamiento — lo que exige la política de Google Play.
+         `tools:node="remove"` los ELIMINA del manifest final aunque una librería
+         (CameraX, ML Kit u otra) intente declararlos al mergear. Blindaje: así el
+         permiso no puede reaparecer nunca en el AAB. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" tools:node="remove" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" tools:node="remove" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" tools:node="remove" />
+    <!-- Vibración corta al auto-capturar en la cámara en vivo de recibos
+         (Fase 4 del roadmap) — permiso "normal", sin diálogo al usuario. -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- La cámara no es obligatoria: dispositivos sin cámara pueden instalar la app. -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+
+    <!-- Visibilidad de paquetes (Android 11+/API 30+): sin esto, el WebView hace
+         resolveActivity(ACTION_IMAGE_CAPTURE) == null y cae al selector de
+         archivos en vez de abrir la cámara al escanear un recibo.
+         NOTA: este directorio se regenera con `tauri android init` — si eso
+         ocurre, hay que volver a agregar este bloque <queries>. -->
+    <queries>
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE" />
+        </intent>
+        <intent>
+            <action android:name="android.media.action.VIDEO_CAPTURE" />
+        </intent>
+        <!-- Galerías instaladas: sin esto resolveActivity(ACTION_PICK) devuelve
+             null en Android 11+ aunque haya galerías, y el selector de foto de
+             perfil caería al explorador de archivos en vez de ofrecerlas. -->
+        <intent>
+            <action android:name="android.intent.action.PICK" />
+            <data android:mimeType="image/*" />
+        </intent>
+        <!-- Apps capaces de abrir un export ya guardado (PDF, Excel, CSV...)
+             desde el aviso de "Exportación completada". -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:mimeType="*/*" />
+        </intent>
+    </queries>
 
     <!-- AndroidTV support -->
     <uses-feature android:name="android.software.leanback" android:required="false" />
@@ -12,12 +63,14 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
         android:theme="@style/Theme.sharky"
+        android:resizeableActivity="true"
         android:usesCleartextTraffic="${usesCleartextTraffic}">
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"
             android:launchMode="singleTask"
             android:label="@string/main_activity_title"
             android:name=".MainActivity"
+            android:windowSoftInputMode="adjustResize"
             android:exported="true">
             <!-- Accesos directos al mantener presionado el ícono (ver res/xml/shortcuts.xml).
                  NOTA: este directorio se regenera con `tauri android init` — si eso ocurre,
@@ -50,19 +103,74 @@
                     android:scheme="sharky"
                     android:host="shortcut" />
             </intent-filter>
-            <!-- DEEP LINK PLUGIN. AUTO-GENERATED. DO NOT REMOVE. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
 
-            <!-- DEEP LINK PLUGIN. AUTO-GENERATED. DO NOT REMOVE. -->
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data
+                    android:scheme="sharky"
+                    android:host="notification" />
+            </intent-filter>
 
             <!-- Compartir hacia $harky: recibos (foto/PDF) desde Galería, Drive, WhatsApp, etc.
                  NOTA: este directorio se regenera con `tauri android init` — si eso ocurre,
-                 hay que volver a agregar este intent-filter. -->
+                 hay que volver a agregar estos dos intent-filters. -->
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="image/*" />
                 <data android:mimeType="application/pdf" />
             </intent-filter>
+            <!-- Recibos por lotes: varias fotos compartidas a la vez desde Galería. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+                <data android:mimeType="application/pdf" />
+            </intent-filter>
+            <!-- DEEP LINK PLUGIN. AUTO-GENERATED. DO NOT REMOVE. -->
+            <intent-filter >
+                <action android:name="android.intent.action.VIEW" />
+                <!-- ChromeOS ARC++ uses a different action for deep links -->
+                <action android:name="org.chromium.arc.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="sharky" />
+                <data android:host="shortcut" />
+                
+                
+                
+                
+            </intent-filter>
+            <intent-filter >
+                <action android:name="android.intent.action.VIEW" />
+                <!-- ChromeOS ARC++ uses a different action for deep links -->
+                <action android:name="org.chromium.arc.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="sharky" />
+                <data android:host="notification" />
+                
+                
+                
+                
+            </intent-filter>
+            <intent-filter >
+                <action android:name="android.intent.action.VIEW" />
+                <!-- ChromeOS ARC++ uses a different action for deep links -->
+                <action android:name="org.chromium.arc.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="sharky" />
+                <data android:host="auth" />
+                
+                
+                
+                
+            </intent-filter>
+            <!-- DEEP LINK PLUGIN. AUTO-GENERATED. DO NOT REMOVE. -->
         </activity>
 
         <provider
@@ -74,5 +182,82 @@
             android:name="android.support.FILE_PROVIDER_PATHS"
             android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- Plugin bank-notifications: acceso especial de notificaciones para
+             detectar transacciones bancarias (NotificationListenerService).
+             NOTA: este directorio se regenera con `tauri android init` — si eso
+             ocurre, hay que volver a agregar este <service>. -->
+        <service
+            android:name="com.sharky.finanzas.banknotifications.BankNotificationListenerService"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <!-- Plugin mlkit-ocr: pantalla de cámara en vivo para escanear recibos
+             (Fase 1 del roadmap de cámara). Tema propio a pantalla completa,
+             no el del splash de la app.
+             NOTA: este directorio se regenera con `tauri android init` — si eso
+             ocurre, hay que volver a agregar este <activity>. -->
+        <!-- Sin `screenOrientation`: desde Android 16 la restriccion se ignora
+             en pantallas grandes (plegables, tablets), y declararla solo
+             provocaba un aviso en Play Console sin cambiar el comportamiento
+             real. El escaner se adapta a la orientacion del dispositivo. -->
+        <activity
+            android:name="com.sharky.finanzas.mlkitocr.ScannerActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+            android:theme="@style/Theme.MlkitScanner" />
+
+        <!-- Plugin home-widget: widget de pantalla de inicio con saldo,
+             presupuesto y proximo pago (ver sharky-home-widget-plugin).
+             NOTA: este directorio se regenera con `tauri android init` — si eso
+             ocurre, hay que volver a agregar este <receiver>. -->
+        <receiver
+            android:name="com.sharky.finanzas.homewidget.SharkyBalanceWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/sharky_balance_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name="com.sharky.finanzas.homewidget.SharkyBudgetWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/sharky_budgets_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name="com.sharky.finanzas.homewidget.SharkyConverterWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/sharky_converter_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name="com.sharky.finanzas.homewidget.SharkyQuickAddWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/sharky_quickadd_widget_info" />
+        </receiver>
     </application>
 </manifest>

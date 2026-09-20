@@ -1,0 +1,52 @@
+# Dependencies
+node_modules/
+
+# Frontend build output
+dist/
+
+# Rust / Tauri build output
+src-tauri/target/
+src-tauri/gen/*
+!src-tauri/gen/android/
+!src-tauri/gen/android/**
+src-tauri/gen/android/.gradle/
+src-tauri/gen/android/**/build/
+src-tauri/gen/android/**/.cxx/
+src-tauri/gen/android/**/local.properties
+src-tauri/gen/android/**/tauri.properties
+
+# Plugins nativos (plugins/): solo se versiona la fuente. El resto lo regenera
+# el build — `.tauri/` es el glue que genera el CLI de Tauri, y target/build/
+# son artefactos de Cargo y Gradle.
+plugins/*/target/
+plugins/*/Cargo.lock
+plugins/*/android/build/
+plugins/*/android/.gradle/
+plugins/*/android/.cxx/
+plugins/*/android/.tauri/
+plugins/*/android/local.properties
+
+# Packaged Windows artifacts
+release/
+
+# Test artifacts
+test-results/
+playwright-report/
+coverage/
+
+# Local tooling and caches
+.lazyweb/
+.codex-vite*.log
+*.log
+node_modules/.tmp/
+
+# Local environment
+.env
+.env.local
+.env.*.local
+
+# Editor / OS files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

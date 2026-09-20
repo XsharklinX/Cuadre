@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Presupuestos: 4x2 de verdad. `maxResizeHeight` impide estirarlo a lo alto —
+  con tres filas fijas, crecer solo dejaria hueco vacio.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="250dp"
+    android:minHeight="110dp"
+    android:minResizeWidth="250dp"
+    android:minResizeHeight="110dp"
+    android:maxResizeHeight="130dp"
+    android:targetCellWidth="4"
+    android:targetCellHeight="2"
+    android:updatePeriodMillis="3600000"
+    android:resizeMode="horizontal"
+    android:widgetCategory="home_screen"
+    android:initialLayout="@layout/widget_budgets"
+    android:previewLayout="@layout/widget_budgets"
+    android:description="@string/widget_budgets_description" />

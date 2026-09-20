@@ -1,0 +1,19 @@
+"$schema" = "schemas/schema.json"
+[default]
+description = "Permite sincronizar el snapshot de datos, programar/cancelar recordatorios locales (WorkManager) y gestionar el backup semanal automatico (elegir carpeta SAF, programar, probar y consultar estado)."
+permissions = [
+    "allow-sync-snapshot",
+    "allow-schedule-reminders",
+    "allow-cancel-reminders",
+    "allow-sync-backup-snapshot",
+    "allow-pick-backup-folder",
+    "allow-schedule-weekly-backup",
+    "allow-cancel-weekly-backup",
+    "allow-run-backup-now",
+    "allow-get-backup-status",
+    "allow-set-system-bars",
+    "allow-set-quick-add-notification",
+    "allow-share-text",
+    "allow-open-file",
+    "allow-pick-image",
+]

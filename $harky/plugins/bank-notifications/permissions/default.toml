@@ -1,0 +1,4 @@
+"$schema" = "schemas/schema.json"
+[default]
+description = "Permite verificar y abrir el acceso a notificaciones del sistema, y recibir eventos de notificaciones capturadas para detectar transacciones bancarias."
+permissions = ["allow-has-access", "allow-open-settings", "allow-register-listener", "allow-remove-listener", "allow-take-pending"]

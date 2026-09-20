@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>$harky - Delete your account and data</title>
+    <meta name="description" content="How to delete your $harky account and the data associated with it." />
+    <meta name="theme-color" content="#0b1220" />
+    <link rel="icon" href="./assets/icon.svg" />
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #060a13;
+        --panel: rgba(15, 23, 42, 0.78);
+        --text: #f8fafc;
+        --muted: #9aa8bd;
+        --line: rgba(148, 163, 184, 0.2);
+        --accent: #3b82f6;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at top left, rgba(59, 130, 246, 0.24), transparent 34rem),
+          radial-gradient(circle at 80% 20%, rgba(34, 197, 94, 0.11), transparent 30rem),
+          linear-gradient(180deg, #080d18 0%, var(--bg) 54%, #05070c 100%);
+        color: var(--text);
+        min-height: 100vh;
+      }
+
+      a { color: var(--accent); }
+
+      .shell {
+        width: min(760px, calc(100% - 40px));
+        margin: 0 auto;
+        padding: 40px 0 60px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-weight: 850;
+        letter-spacing: -0.04em;
+        margin-bottom: 28px;
+      }
+
+      .brand img { width: 36px; height: 36px; border-radius: 11px; }
+      .brand span { color: var(--accent); }
+
+      h1 {
+        font-size: clamp(28px, 5vw, 40px);
+        letter-spacing: -0.04em;
+        margin: 0 0 6px;
+      }
+
+      .updated {
+        color: var(--muted);
+        font-size: 14px;
+        margin: 0 0 32px;
+      }
+
+      .card {
+        border: 1px solid var(--line);
+        background: var(--panel);
+        border-radius: 18px;
+        padding: 22px 24px;
+        margin-bottom: 16px;
+      }
+
+      .card h3 {
+        margin: 0 0 10px;
+        font-size: 16px;
+        letter-spacing: -0.01em;
+      }
+
+      .card p, .card li {
+        margin: 0 0 10px;
+        color: var(--muted);
+        line-height: 1.7;
+        font-size: 14.5px;
+      }
+
+      .card ul { padding-left: 20px; }
+      .card p:last-child, .card li:last-child { margin-bottom: 0; }
+
+      .back {
+        display: inline-block;
+        margin-top: 24px;
+        font-size: 14px;
+        color: var(--muted);
+      }
+
+      .back:hover { color: var(--text); }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <a class="brand" href="./index.html" aria-label="$harky home">
+        <img src="./assets/icon.svg" alt="" />
+        <strong><span>$</span>harky</strong>
+      </a>
+
+      <h1>Delete your account and data</h1>
+      <p class="updated">Last updated: June 10, 2026</p>
+
+      <div class="card">
+        <h3>1. Delete your data from inside the app</h3>
+        <p>Open <strong>$harky</strong>, go to <strong>Settings &rarr; Data &rarr; Delete all data</strong>. This permanently removes, immediately:</p>
+        <ul>
+          <li>All financial data stored on your device (accounts, transactions, categories, budgets, goals and contributions).</li>
+          <li>If you are signed in with Google and have sync enabled, the same data stored in our cloud database (Supabase) linked to your account.</li>
+        </ul>
+        <p>This does not require contacting us and takes effect right away.</p>
+      </div>
+
+      <div class="card">
+        <h3>2. Request full account deletion</h3>
+        <p>If you also want your Google sign-in link and account record removed entirely (not just your financial data), send an email to <a href="mailto:contactosharklin@gmail.com">contactosharklin@gmail.com</a> from the email address associated with your $harky account, with the subject "Delete account".</p>
+        <p>We will process the request within 30 days and confirm by email once it is done.</p>
+      </div>
+
+      <div class="card">
+        <h3>3. What gets deleted</h3>
+        <ul>
+          <li>Your account identifier, name, email and profile photo received from Google sign-in.</li>
+          <li>All financial data (accounts, transactions, categories, budgets, goals, contributions) stored in our cloud database.</li>
+          <li>Any comments or feedback you sent us through the app, where reasonably possible.</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3>4. What may be retained</h3>
+        <p>We may keep minimal records (such as the fact that a deletion request was made and its date) for a limited period, only as needed to comply with legal obligations or to prevent abuse. No financial data is retained for this purpose.</p>
+      </div>
+
+      <a class="back" href="./privacy.html">&larr; Privacy Policy</a>
+    </main>
+  </body>
+</html>

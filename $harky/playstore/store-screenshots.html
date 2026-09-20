@@ -1,0 +1,660 @@
+<title>$harky Finanzas — Capturas Play Store</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  /* ─────────────────────────────────────────────────────────────
+     $harky Finanzas — set de capturas para Google Play
+     Dirección: "aguas profundas" (lema: claras como el agua / marca tiburón).
+     Fondo navy profundo, acento ámbar #ffdd3d, menta ingresos, coral gastos.
+     Los FRAMES son artwork y viven siempre en su mundo oscuro (decisión
+     deliberada); el cromado de la página sí respeta claro/oscuro.
+     ───────────────────────────────────────────────────────────── */
+  :root {
+    --page-bg: #eef1f6;
+    --page-fg: #1a2233;
+    --page-dim: #5a6478;
+    --page-card: #ffffff;
+    --page-line: rgba(20,32,58,.12);
+    --amber: #ffdd3d;
+    --mint: #35d0a2;
+    --coral: #ff6b8a;
+    --cyan: #5bc0ff;
+    --violet: #a78bfa;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --page-bg: #0b0f16;
+      --page-fg: #eef2f8;
+      --page-dim: #97a4bb;
+      --page-card: #131924;
+      --page-line: rgba(255,255,255,.10);
+    }
+  }
+  :root[data-theme="light"] {
+    --page-bg: #eef1f6; --page-fg: #1a2233; --page-dim: #5a6478;
+    --page-card: #ffffff; --page-line: rgba(20,32,58,.12);
+  }
+  :root[data-theme="dark"] {
+    --page-bg: #0b0f16; --page-fg: #eef2f8; --page-dim: #97a4bb;
+    --page-card: #131924; --page-line: rgba(255,255,255,.10);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--page-bg);
+    color: var(--page-fg);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Toolbar ── */
+  .bar {
+    position: sticky; top: 0; z-index: 20;
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    padding: 14px clamp(16px, 4vw, 40px);
+    background: color-mix(in oklab, var(--page-bg) 82%, transparent);
+    backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--page-line);
+  }
+  .bar h1 {
+    font-size: 16px; font-weight: 800; letter-spacing: -.02em; margin: 0;
+    display: flex; align-items: center; gap: 9px;
+  }
+  .bar .fin {
+    width: 22px; height: 22px; display: grid; place-items: center;
+    background: linear-gradient(150deg, #16294d, #0a1220);
+    border-radius: 7px;
+  }
+  .bar .fin svg { width: 14px; height: 14px; }
+  .bar .sub { color: var(--page-dim); font-size: 12.5px; margin-left: 2px; }
+  .spacer { flex: 1; }
+  .toggle {
+    display: inline-flex; background: var(--page-card);
+    border: 1px solid var(--page-line); border-radius: 999px; padding: 3px;
+    box-shadow: 0 1px 2px rgba(0,0,0,.05);
+  }
+  .toggle button {
+    appearance: none; border: 0; background: none; cursor: pointer;
+    font: inherit; font-size: 13px; font-weight: 700; color: var(--page-dim);
+    padding: 6px 15px; border-radius: 999px; transition: .18s;
+  }
+  .toggle button.on { background: #16294d; color: #fff; }
+  :root[data-theme="light"] .toggle button.on { background: #16294d; color:#fff; }
+
+  /* ── Gallery ── */
+  .intro {
+    padding: 26px clamp(16px, 4vw, 40px) 4px;
+    max-width: 720px;
+  }
+  .intro p { color: var(--page-dim); font-size: 14px; line-height: 1.6; margin: 0; }
+  .gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: clamp(18px, 2.4vw, 30px);
+    padding: 24px clamp(16px, 4vw, 40px) 80px;
+    align-items: start;
+  }
+
+  /* ── Frame (marketing panel, 9:16, self-scaling via cqw) ── */
+  .frame {
+    container-type: inline-size;
+    width: 100%; aspect-ratio: 9 / 16;
+    border-radius: 22px; overflow: hidden; position: relative;
+    box-shadow: 0 20px 50px rgba(6,12,24,.28);
+    isolation: isolate;
+  }
+  .stage {
+    position: absolute; inset: 0;
+    font-size: 1cqw; /* base unit: 1em == 1% of frame width */
+    display: flex; flex-direction: column;
+    background:
+      radial-gradient(120% 80% at 50% -10%, var(--glow), transparent 60%),
+      linear-gradient(180deg, #12233f 0%, #0c1830 42%, #081120 100%);
+    color: #eaf1fb;
+    overflow: hidden;
+  }
+  /* ripples behind the phone — the "water" motif, kept faint */
+  .stage::before {
+    content: ""; position: absolute; left: 50%; top: 62%;
+    width: 160em; height: 160em; transform: translate(-50%,-50%);
+    background:
+      radial-gradient(circle, transparent 30%, var(--ripple) 30.4%, transparent 31%) center/34em 34em,
+      radial-gradient(circle, transparent 46%, var(--ripple) 46.3%, transparent 47%) center/60em 60em;
+    opacity: .5; pointer-events: none;
+  }
+  .copy { position: relative; flex: none; padding: 6em 6em 0; text-align: center; }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: .55em;
+    font-size: 2.7em; font-weight: 800; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--accent);
+    padding: 1em 1.9em; border-radius: 999px;
+    background: color-mix(in oklab, var(--accent) 14%, transparent);
+    border: .12em solid color-mix(in oklab, var(--accent) 34%, transparent);
+  }
+  .eyebrow svg { width: 3.2em; height: 3.2em; }
+  .headline {
+    font-size: 5.7em; font-weight: 850; line-height: 1.08; letter-spacing: -.02em;
+    margin: 1.4em 0 0; text-wrap: balance;
+  }
+  .headline .hl { color: var(--accent); }
+  .subtext {
+    font-size: 3.2em; line-height: 1.35; margin: 1.2em auto 0; max-width: 30em;
+    color: #b6c6df;
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+  }
+
+  /* ── Device: fully in flow, height-constrained so it never overlaps copy ── */
+  .device-wrap {
+    position: relative; flex: 1; min-height: 0;
+    display: flex; justify-content: center; align-items: flex-end;
+    padding: 4em 0 0;
+  }
+  .device {
+    position: relative;
+    height: 100%; width: auto; aspect-ratio: 9 / 19.3; max-width: 60%;
+    background: #05060a; border-radius: 6.4em;
+    padding: 1.1em;
+    box-shadow:
+      0 3em 6em rgba(3,8,18,.6),
+      inset 0 0 0 .18em rgba(255,255,255,.09);
+  }
+  .screen {
+    position: relative; width: 100%; height: 100%;
+    background: #101317; border-radius: 5.3em; overflow: hidden;
+    display: flex; flex-direction: column;
+    container-type: inline-size; /* app content scales with the PHONE width */
+  }
+  /* base type for each screen block, relative to the phone width */
+  .status { font-size: 4.4cqw; }
+  .app { font-size: 1.5cqw; }
+  .nav { font-size: 1.5cqw; }
+  .notch {
+    position: absolute; top: 1.8cqw; left: 50%; transform: translateX(-50%);
+    width: 26%; height: 3cqw; background: #05060a; border-radius: 999px; z-index: 6;
+  }
+  /* status bar */
+  .status {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: .5em .8em 0; font-weight: 700; color: #f5f5f5;
+  }
+  .status .ic { display: inline-flex; gap: .5em; align-items: center; }
+  .status svg { width: 1.15em; height: 1.15em; fill: #f5f5f5; }
+
+  /* generic app pieces (unit: em relative to .screen) */
+  .app { flex: 1; min-height: 0; padding: 3.4em 3.6em; display: flex; flex-direction: column; gap: 3.4em; overflow: hidden; }
+  .app-title { font-size: 5.2em; font-weight: 850; letter-spacing: -.02em; }
+  .muted { color: #9fb0c8; }
+  .row-icon {
+    width: 8.8em; height: 8.8em; border-radius: 2.6em; flex: none;
+    display: grid; place-items: center;
+  }
+  .row-icon svg { width: 4.6em; height: 4.6em; }
+  .pill {
+    display: inline-flex; align-items: center; gap: .5em;
+    font-size: 2.9em; font-weight: 700; padding: .8em 1.5em; border-radius: 999px;
+  }
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* brand band (home hero card) */
+  .band {
+    background: linear-gradient(150deg, #16294d 0%, #0e1c34 55%, #0a1220 100%);
+    border: 1px solid rgba(255,255,255,.10); border-radius: 4.6em;
+    padding: 4.4em 4.6em; color: #fff;
+  }
+  .band .lbl { font-size: 3.1em; color: rgba(255,255,255,.72); font-weight: 600; }
+  .band .big { font-size: 10.4em; font-weight: 850; letter-spacing: -.03em; margin-top: .2em; }
+  .band .delta { font-size: 3em; color: #35d0a2; font-weight: 700; margin-top: .5em; display:inline-flex; gap:.4em; align-items:center;}
+
+  .accts { display: flex; gap: 2.4em; }
+  .acct {
+    flex: 1; background: #171b21; border: 1px solid rgba(255,255,255,.08);
+    border-radius: 3.4em; padding: 3em; display: flex; flex-direction: column; gap: 1em;
+  }
+  .acct .an { font-size: 2.9em; color: #9fb0c8; font-weight: 600; }
+  .acct .av { font-size: 4.4em; font-weight: 800; }
+
+  .list { display: flex; flex-direction: column; gap: 2.6em; }
+  .item { display: flex; align-items: center; gap: 3em; }
+  .item .t { flex: 1; min-width: 0; }
+  .item .t b { font-size: 3.5em; font-weight: 750; display: block; }
+  .item .t small { font-size: 2.7em; color: #9fb0c8; }
+  .item .amt { font-size: 3.6em; font-weight: 800; }
+  .amt.exp { color: #ff6b8a; }
+  .amt.inc { color: #35d0a2; }
+
+  .sec-h { font-size: 3em; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #8194b0; }
+
+  /* bottom nav */
+  .nav {
+    display: flex; justify-content: space-around; align-items: center;
+    padding: 2.6em 2em calc(3.4em + env(safe-area-inset-bottom));
+    border-top: 1px solid rgba(255,255,255,.08); background: #0d1015;
+  }
+  .nav .n { width: 5.4em; height: 5.4em; display: grid; place-items: center; color: #6b7a93; }
+  .nav .n svg { width: 5em; height: 5em; }
+  .nav .n.on { color: #ffdd3d; }
+  .fab {
+    width: 8.6em; height: 8.6em; border-radius: 50%; display: grid; place-items: center;
+    background: #ffdd3d; color: #151515; margin-top: -4em;
+    box-shadow: 0 2em 4em rgba(255,221,61,.35);
+  }
+  .fab svg { width: 4.6em; height: 4.6em; }
+
+  /* progress ring + bars */
+  .ring { position: relative; width: 12em; height: 12em; flex: none; }
+  .ring svg { transform: rotate(-90deg); width: 100%; height: 100%; }
+  .ring .rc { fill: none; stroke-width: 2.4; }
+  .ring .val {
+    position: absolute; inset: 0; display: grid; place-items: center;
+    font-size: 3em; font-weight: 850;
+  }
+  .bar-track { height: 2.4em; border-radius: 999px; background: rgba(255,255,255,.10); overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 999px; }
+
+  /* quick chips + keypad */
+  .chips { display: flex; gap: 2.2em; }
+  .chip {
+    flex: 1; background: #171b21; border: 1px solid rgba(255,255,255,.09);
+    border-radius: 3em; padding: 2.4em 2em; display: flex; flex-direction: column; gap: .6em;
+  }
+  .chip b { font-size: 3em; font-weight: 800; }
+  .chip small { font-size: 2.5em; color: #9fb0c8; }
+  .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.8em; margin-top: auto; }
+  .key {
+    background: #171b21; border-radius: 2.4em; text-align: center;
+    padding: 1.35em 0; font-size: 4.2em; font-weight: 800;
+  }
+  .amount-hero { text-align: right; }
+  .amount-hero .lbl { font-size: 3em; color: #9fb0c8; font-weight: 600; }
+  .amount-hero .v { font-size: 9.4em; font-weight: 850; letter-spacing: -.03em; }
+
+  /* calendar */
+  .cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1.2em; }
+  .cal .d {
+    aspect-ratio: 1; min-width: 0; border-radius: 1.6em; background: rgba(255,255,255,.05);
+    display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+    padding: 1.2em .3em .9em; font-size: 2.5em; font-weight: 700;
+  }
+  .cal .d.today { outline: .3em solid #ffdd3d; }
+  .cal .dots { display: flex; gap: .5em; }
+  .cal .dot { width: 1.2em; height: 1.2em; border-radius: 50%; }
+
+  /* diagnostics verdict rows */
+  .diag { display: flex; gap: 2.4em; align-items: flex-start; }
+  .diag .dot { width: 2.2em; height: 2.2em; border-radius: 50%; margin-top: 1em; flex: none; }
+
+  .caption {
+    text-align: center; font-size: 12px; color: var(--page-dim);
+    margin: 10px 2px 0; font-weight: 600;
+  }
+  .footer {
+    padding: 0 clamp(16px,4vw,40px) 60px; color: var(--page-dim);
+    font-size: 12.5px; max-width: 760px; line-height: 1.6;
+  }
+  .footer code { background: color-mix(in oklab, var(--page-fg) 8%, transparent); padding: 1px 6px; border-radius: 5px; font-size: 12px; }
+
+  body.lang-en .es { display: none; }
+  body.lang-es .en { display: none; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .toggle button { transition: background .18s, color .18s; }
+  }
+</style>
+
+<!-- inline icon set -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-fin" viewBox="0 0 24 24"><path fill="#ffdd3d" d="M3 18c6 0 9-2 11-6 1.5-3 2-7 2-9-4 2-9 6-11 11-1 2.5-2 4-2 4Z"/><path fill="#35d0a2" d="M3 18c4 .5 8 .5 12-.5-1 1.2-3 2.5-6 2.5-3 0-5-1-6-2Z"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 4l9 6.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1Z"/></symbol>
+  <symbol id="i-cart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.5 12.5h10L21 7H6"/></symbol>
+  <symbol id="i-fork" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3v6a2 2 0 0 0 4 0V3M7 9v12M17 3c-1.5 1-2.5 3-2.5 5.5S16 21 17 21s2.5-10 2.5-12.5S18.5 4 17 3Z"/></symbol>
+  <symbol id="i-car" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l1.5-4.5A2 2 0 0 1 8.4 6h7.2a2 2 0 0 1 1.9 1.5L19 12M4 12h16v5H4zM7 17v1.5M17 17v1.5"/><circle cx="7.5" cy="14.5" r=".6"/><circle cx="16.5" cy="14.5" r=".6"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h6l-1 8 9-12h-6z"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7-4.5-9.5-9C1 8 2.5 4.5 6 4.5c2 0 3.2 1.2 4 2.3.8-1.1 2-2.3 4-2.3 3.5 0 5 3.5 3.5 6.5C19 15.5 12 20 12 20Z"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 9a6 6 0 1 0-12 0c0 6-2 7-2 7h16s-2-1-2-7M10.5 20a2 2 0 0 0 3 0"/></symbol>
+  <symbol id="i-cam" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"/><circle cx="12" cy="13" r="3.2"/></symbol>
+  <symbol id="i-target" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.8"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></symbol>
+  <symbol id="i-cal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="16" rx="2.5"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/></symbol>
+  <symbol id="i-repeat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9a6 6 0 0 1 10-4l3 3M20 15a6 6 0 0 1-10 4l-3-3M17 5v3h-3M7 19v-3h3"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="10" width="15" height="10" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5 10 17l9-10"/></symbol>
+  <symbol id="i-wallet" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H18a2 2 0 0 1 2 2v1H5.5A2.5 2.5 0 0 1 3 5.5Z"/><path d="M3 6v11a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H5"/><circle cx="16.5" cy="13.5" r="1.3" fill="currentColor"/></symbol>
+  <symbol id="i-arrowup" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></symbol>
+  <symbol id="i-fp" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 4c3.5 0 6 2.6 6 6M6 10a6 6 0 0 1 3-5.2M8.5 11a3.5 3.5 0 0 1 7 0c0 3-.5 5.5-1.3 7.5M12 11v4c0 2-.4 3.7-1 5M15.5 12.5c0 3.5-.7 6-1.7 8.2M6 14c.4 2.5.2 4.5-.6 6.4"/></symbol>
+  <symbol id="i-signal" viewBox="0 0 24 24"><path fill="#f5f5f5" d="M2 20h3v-6H2zM7 20h3V9H7zM12 20h3V4h-3zM17 20h3v-9h-3z"/></symbol>
+  <symbol id="i-wifi" viewBox="0 0 24 24" fill="none" stroke="#f5f5f5" stroke-width="2" stroke-linecap="round"><path d="M2 8.5a15 15 0 0 1 20 0M5 12a10 10 0 0 1 14 0M8 15.5a5 5 0 0 1 8 0"/><circle cx="12" cy="19" r="1" fill="#f5f5f5" stroke="none"/></symbol>
+  <symbol id="i-batt" viewBox="0 0 24 24"><rect x="2" y="8" width="18" height="10" rx="2.5" fill="none" stroke="#f5f5f5" stroke-width="1.6"/><rect x="4" y="10" width="12" height="6" rx="1" fill="#f5f5f5"/><rect x="21" y="10.5" width="1.6" height="5" rx=".8" fill="#f5f5f5"/></symbol>
+</svg>
+
+<div class="bar">
+  <h1><span class="fin"><svg><use href="#i-fin"/></svg></span> $harky Finanzas <span class="sub"><span class="es">· Capturas Play Store</span><span class="en">· Play Store screenshots</span></span></h1>
+  <div class="spacer"></div>
+  <div class="toggle" role="tablist" aria-label="Idioma / Language">
+    <button id="btn-es" class="on" onclick="setLang('es')" role="tab">Español</button>
+    <button id="btn-en" onclick="setLang('en')" role="tab">English</button>
+  </div>
+</div>
+
+<div class="intro">
+  <p>
+    <span class="es">9 capturas verticales, teléfono completo, listas para Google Play. Diseño coherente con la marca (aguas profundas + ámbar). Cambia el idioma arriba para revisar ambos sets antes de exportar.</span>
+    <span class="en">9 vertical screenshots, full device, ready for Google Play. On-brand deep-water + amber look. Switch language above to review both sets before exporting.</span>
+  </p>
+</div>
+
+<div class="gallery" id="gallery"></div>
+
+<div class="footer">
+  <span class="es"><b>Para exportar:</b> cada frame está en proporción 9:16. Captura cada uno a <code>1080×1920</code> px (o <code>1284×2280</code>) — el tamaño que pide Play Store para teléfono. Sube el set en español a la ficha <code>es-419</code> y el de inglés a <code>en-US</code>.</span>
+  <span class="en"><b>To export:</b> every frame is 9:16. Capture each at <code>1080×1920</code> px (or <code>1284×2280</code>) — Play Store's phone size. Upload the Spanish set to the <code>es-419</code> listing and the English set to <code>en-US</code>.</span>
+</div>
+
+<script>
+  const T = (es, en) => `<span class="es">${es}</span><span class="en">${en}</span>`;
+
+  // status bar reused by every screen
+  const status = `
+    <div class="notch"></div>
+    <div class="status">
+      <span class="num">9:41</span>
+      <span class="ic">
+        <svg><use href="#i-signal"/></svg>
+        <svg><use href="#i-wifi"/></svg>
+        <svg><use href="#i-batt"/></svg>
+      </span>
+    </div>`;
+
+  const frame = (accent, glow, ripple, eyebrowIcon, eyebrow, headline, subtext, screen, caption) => `
+    <figure style="margin:0">
+      <div class="frame">
+        <div class="stage" style="--accent:${accent};--glow:${glow};--ripple:${ripple}">
+          <div class="copy">
+            <span class="eyebrow"><svg><use href="#${eyebrowIcon}"/></svg>${eyebrow}</span>
+            <h2 class="headline">${headline}</h2>
+            <p class="subtext">${subtext}</p>
+          </div>
+          <div class="device-wrap">
+            <div class="device"><div class="screen">${status}${screen}</div></div>
+          </div>
+        </div>
+      </div>
+      <figcaption class="caption">${caption}</figcaption>
+    </figure>`;
+
+  // category icon helper
+  const ci = (bg, icon) => `<span class="row-icon" style="background:color-mix(in oklab, ${bg} 22%, transparent);color:${bg}"><svg><use href="#${icon}"/></svg></span>`;
+
+  const bottomNav = (active) => `
+    <div class="nav">
+      <span class="n ${active==='home'?'on':''}"><svg><use href="#i-home"/></svg></span>
+      <span class="n ${active==='chart'?'on':''}"><svg><use href="#i-chart"/></svg></span>
+      <span class="fab"><svg><use href="#i-plus"/></svg></span>
+      <span class="n ${active==='cal'?'on':''}"><svg><use href="#i-cal"/></svg></span>
+      <span class="n ${active==='repeat'?'on':''}"><svg><use href="#i-repeat"/></svg></span>
+    </div>`;
+
+  /* ── 1 · Home / hero ── */
+  const scHome = `
+    <div class="app">
+      <div class="band">
+        <div class="lbl">${T('Balance total','Total balance')}</div>
+        <div class="big num">RD$ 84,250</div>
+        <div class="delta"><svg style="width:1.2em;height:1.2em"><use href="#i-arrowup"/></svg> ${T('+RD$ 6,400 este mes','+RD$ 6,400 this month')}</div>
+      </div>
+      <div class="accts">
+        <div class="acct"><span class="an">${T('Efectivo','Cash')}</span><span class="av num">RD$ 12,800</span></div>
+        <div class="acct"><span class="an">${T('Popular ••4821','Popular ••4821')}</span><span class="av num">RD$ 71,450</span></div>
+      </div>
+      <div class="sec-h">${T('Movimientos','Activity')}</div>
+      <div class="list">
+        <div class="item">${ci('#4dd0c0','i-fork')}<div class="t"><b>${T('Adrian Tropical','Adrian Tropical')}</b><small>${T('Comida · hoy','Food · today')}</small></div><span class="amt exp num">−RD$ 640</span></div>
+        <div class="item">${ci('#ffdd3d','i-cart')}<div class="t"><b>${T('Supermercado Nacional','Nacional Market')}</b><small>${T('Compra · ayer','Groceries · yesterday')}</small></div><span class="amt exp num">−RD$ 3,120</span></div>
+        <div class="item">${ci('#35d0a2','i-wallet')}<div class="t"><b>${T('Nómina','Payroll')}</b><small>${T('Ingreso · 25 jul','Income · Jul 25')}</small></div><span class="amt inc num">+RD$ 42,000</span></div>
+      </div>
+    </div>${bottomNav('home')}`;
+
+  /* ── 2 · Rápidos / add ── */
+  const scAdd = `
+    <div class="app">
+      <div class="app-title">${T('Agregar','Add')}</div>
+      <div class="sec-h">⚡ ${T('Rápidos','Quick')}</div>
+      <div class="chips">
+        <div class="chip"><b>${T('Café','Coffee')}</b><small class="num">RD$ 180</small></div>
+        <div class="chip"><b>${T('Gasolina','Fuel')}</b><small class="num">RD$ 2,000</small></div>
+        <div class="chip"><b>${T('Súper','Groceries')}</b><small>${T('tú pones el monto','you set it')}</small></div>
+      </div>
+      <div class="amount-hero">
+        <div class="lbl">${T('Gasto','Expense')}</div>
+        <div class="v num" style="color:#ff6b8a">RD$ 180</div>
+      </div>
+      <div class="keypad">
+        <div class="key">1</div><div class="key">2</div><div class="key">3</div>
+        <div class="key">4</div><div class="key">5</div><div class="key">6</div>
+        <div class="key">7</div><div class="key">8</div><div class="key">9</div>
+        <div class="key">.</div><div class="key">0</div>
+        <div class="key" style="background:#35d0a2;color:#08201a"><svg style="width:1em;height:1em;vertical-align:-.1em"><use href="#i-check"/></svg></div>
+      </div>
+    </div>`;
+
+  /* ── 3 · Detección desde notificaciones ── */
+  const scDetect = `
+    <div class="app">
+      <div class="app-title">${T('Detección','Detection')}</div>
+      <div class="band" style="padding:3.6em 4em">
+        <div style="display:flex;align-items:center;gap:2.4em">
+          <span class="row-icon" style="background:rgba(91,192,255,.2);color:#5bc0ff"><svg><use href="#i-bell"/></svg></span>
+          <div class="t" style="flex:1"><b style="font-size:3.4em;font-weight:800">${T('Aviso del banco','Bank alert')}</b><br><small class="muted" style="font-size:2.7em">${T('Consumo RD$1,250 · tarjeta ••4821','Purchase RD$1,250 · card ••4821')}</small></div>
+        </div>
+      </div>
+      <div class="sec-h">${T('Sugerido para ti','Suggested for you')}</div>
+      <div class="list">
+        <div class="item">${ci('#ff6b8a','i-cart')}<div class="t"><b>PriceSmart</b><small>${T('Compra · ••4821 → Popular','Purchase · ••4821 → Popular')}</small></div><span class="amt exp num">−RD$ 1,250</span></div>
+      </div>
+      <div style="display:flex;gap:2.4em">
+        <div class="pill" style="flex:1;justify-content:center;background:#35d0a2;color:#08201a"><svg style="width:1.3em;height:1.3em"><use href="#i-plus"/></svg>${T('Agregar','Add')}</div>
+        <div class="pill" style="background:#171b21;color:#9fb0c8">${T('Descartar','Skip')}</div>
+      </div>
+      <div class="sec-h" style="margin-top:1em">${T('Diagnóstico','Diagnostics')}</div>
+      <div class="list">
+        <div class="diag"><span class="dot" style="background:#35d0a2"></span><div class="t"><b style="font-size:2.9em">PriceSmart</b><br><small class="muted" style="font-size:2.5em">${T('Registrado como movimiento','Recorded as a movement')}</small></div></div>
+        <div class="diag"><span class="dot" style="background:#8194b0"></span><div class="t"><b style="font-size:2.9em">Claro</b><br><small class="muted" style="font-size:2.5em">${T('Promoción u oferta','Promotion or offer')}</small></div></div>
+      </div>
+    </div>`;
+
+  /* ── 4 · Escanear recibo ── */
+  const scScan = `
+    <div class="app" style="gap:3em">
+      <div class="app-title">${T('Escanear recibo','Scan receipt')}</div>
+      <div style="position:relative;flex:1;border-radius:4em;overflow:hidden;background:linear-gradient(160deg,#1c232e,#10151c);border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center">
+        <div style="position:absolute;inset:14% 18%;border:.5em dashed rgba(255,221,61,.6);border-radius:3em"></div>
+        <div style="text-align:center">
+          <span class="row-icon" style="width:14em;height:14em;background:rgba(255,221,61,.16);color:#ffdd3d;margin:0 auto"><svg style="width:7em;height:7em"><use href="#i-cam"/></svg></span>
+          <div class="muted" style="font-size:2.9em;margin-top:1.5em">${T('Encuadra el recibo','Frame the receipt')}</div>
+        </div>
+      </div>
+      <div class="band" style="padding:3.4em 4em">
+        <div class="lbl" style="color:rgba(255,255,255,.7)">${T('Detectado','Detected')}</div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:.6em">
+          <span style="font-size:5.2em;font-weight:850" class="num">RD$ 1,845</span>
+          <span class="pill" style="background:rgba(53,208,162,.18);color:#35d0a2"><svg style="width:1.2em;height:1.2em"><use href="#i-check"/></svg>${T('Cuenta ••4821','Card ••4821')}</span>
+        </div>
+      </div>
+    </div>`;
+
+  /* ── 5 · Presupuestos ── */
+  const budRow = (name, icon, color, spent, total, pct, over) => `
+    <div style="display:flex;flex-direction:column;gap:1.2em">
+      <div class="item">${ci(color,icon)}<div class="t"><b>${name}</b><small class="num">RD$ ${spent} / ${total}</small></div><span class="pill" style="background:${over?'rgba(255,107,138,.18)':'rgba(255,255,255,.08)'};color:${over?'#ff6b8a':'#9fb0c8'}">${pct}%</span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${Math.min(pct,100)}%;background:${over?'#ff6b8a':color}"></div></div>
+    </div>`;
+  const scBudget = `
+    <div class="app">
+      <div class="app-title">${T('Presupuestos','Budgets')}</div>
+      <div class="band" style="display:flex;align-items:center;gap:4em;padding:4em">
+        <div class="ring">
+          <svg viewBox="0 0 36 36"><circle class="rc" cx="18" cy="18" r="15.5" stroke="rgba(255,255,255,.12)"/><circle class="rc" cx="18" cy="18" r="15.5" stroke="#ffdd3d" stroke-dasharray="97" stroke-dashoffset="30" stroke-linecap="round"/></svg>
+          <span class="val">69%</span>
+        </div>
+        <div><div class="lbl" style="color:rgba(255,255,255,.7)">${T('Gastado en julio','Spent in July')}</div><div style="font-size:5em;font-weight:850" class="num">RD$ 24,600</div><div class="muted" style="font-size:2.8em">${T('de RD$ 35,000','of RD$ 35,000')}</div></div>
+      </div>
+      <div class="list">
+        ${budRow(T('Comida','Food'),'i-fork','#4dd0c0','8,400','9,000',93,false)}
+        ${budRow(T('Transporte','Transport'),'i-car','#5bc0ff','2,100','4,000',53,false)}
+        ${budRow(T('Compras','Shopping'),'i-cart','#ffdd3d','13,200','12,000',110,true)}
+      </div>
+    </div>`;
+
+  /* ── 6 · Metas ── */
+  const goalCard = (name, icon, color, saved, target, pct, chip) => `
+    <div class="band" style="padding:3.6em 4em;display:flex;flex-direction:column;gap:2em">
+      <div class="item">${ci(color,icon)}<div class="t"><b>${name}</b><small class="num">RD$ ${saved} / ${target}</small></div><span style="font-size:3.4em;font-weight:850">${pct}%</span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>
+      ${chip?`<span class="pill" style="align-self:flex-start;background:rgba(53,208,162,.16);color:#35d0a2"><svg style="width:1.2em;height:1.2em"><use href="#i-target"/></svg>${chip}</span>`:''}
+    </div>`;
+  const scGoals = `
+    <div class="app">
+      <div class="app-title">${T('Metas','Goals')}</div>
+      ${goalCard(T('Viaje a Punta Cana','Trip to Punta Cana'),'i-target','#35d0a2','40,000','100,000',40,T('A tu ritmo, enero 2027','On track for Jan 2027'))}
+      ${goalCard(T('Fondo de emergencia','Emergency fund'),'i-wallet','#ffdd3d','78,000','120,000',65,T('A tu ritmo, mayo 2027','On track for May 2027'))}
+      ${goalCard(T('MacBook nueva','New MacBook'),'i-bolt','#a78bfa','15,000','95,000',16,'')}
+    </div>`;
+
+  /* ── 7 · Calendario + próximos cobros ── */
+  const calDay = (n, dots, today) => {
+    const d = dots.map(c=>`<span class="dot" style="background:${c}"></span>`).join('');
+    return `<div class="d ${today?'today':''}"><span>${n}</span><span class="dots">${d}</span></div>`;
+  };
+  let cal = '';
+  const dotmap = {3:['#ff6b8a'],7:['#35d0a2'],10:['#ff6b8a','#5bc0ff'],14:['#5bc0ff'],15:['#ff6b8a'],21:['#35d0a2','#ff6b8a'],25:['#35d0a2'],28:['#5bc0ff']};
+  for (let i=1;i<=28;i++) cal += calDay(i, dotmap[i]||[], i===15);
+  const scCal = `
+    <div class="app">
+      <div class="app-title">${T('Julio','July')} 2026</div>
+      <div class="accts">
+        <div class="acct"><span class="an">${T('Ingresos','Income')}</span><span class="av num" style="color:#35d0a2">RD$ 42,000</span></div>
+        <div class="acct"><span class="an">${T('Gastos','Expenses')}</span><span class="av num" style="color:#ff6b8a">RD$ 24,600</span></div>
+      </div>
+      <div class="cal">${cal}</div>
+      <div class="sec-h">${T('Próximos cobros','Upcoming charges')}</div>
+      <div class="list">
+        <div class="item"><div style="text-align:center;width:8em"><b style="font-size:4em;font-weight:850">28</b><br><small class="muted" style="font-size:2.4em">JUL</small></div>${ci('#e50914','i-repeat')}<div class="t"><b>Netflix</b><small style="color:#5bc0ff">${T('en 3 días','in 3 days')}</small></div><span class="amt exp num">−RD$ 590</span></div>
+        <div class="item"><div style="text-align:center;width:8em"><b style="font-size:4em;font-weight:850">01</b><br><small class="muted" style="font-size:2.4em">AGO</small></div>${ci('#1db954','i-repeat')}<div class="t"><b>Spotify</b><small class="muted">${T('en 7 días','in 7 days')}</small></div><span class="amt exp num">−RD$ 199</span></div>
+      </div>
+    </div>${bottomNav('cal')}`;
+
+  /* ── 8 · Análisis ── */
+  let bars = '';
+  const bh = [40,62,48,80,55,70,90];
+  const bl = ['L','M','X','J','V','S','D'];
+  for (let i=0;i<7;i++) bars += `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:1em;justify-content:flex-end">
+    <div style="width:100%;height:${bh[i]}%;border-radius:1.4em 1.4em .4em .4em;background:${i===6?'#ffdd3d':'linear-gradient(180deg,#35d0a2,#1f8f70)'}"></div>
+    <small class="muted" style="font-size:2.4em">${bl[i]}</small></div>`;
+  const donutSeg = (color, dash, off) => `<circle class="rc" cx="18" cy="18" r="15.5" stroke="${color}" stroke-dasharray="${dash} 97" stroke-dashoffset="${off}"/>`;
+  const scAnalytics = `
+    <div class="app">
+      <div class="app-title">${T('Análisis','Insights')}</div>
+      <div class="band" style="padding:4em">
+        <div class="lbl" style="color:rgba(255,255,255,.7)">${T('Gasto esta semana','Spending this week')}</div>
+        <div style="font-size:5em;font-weight:850;margin:.3em 0 1.2em" class="num">RD$ 9,340</div>
+        <div style="display:flex;gap:1.6em;height:22em;align-items:flex-end">${bars}</div>
+      </div>
+      <div class="sec-h">${T('Por categoría','By category')}</div>
+      <div style="display:flex;align-items:center;gap:4em">
+        <div class="ring" style="width:20em;height:20em">
+          <svg viewBox="0 0 36 36">
+            ${donutSeg('#4dd0c0',38,0)}
+            ${donutSeg('#ffdd3d',26,-38)}
+            ${donutSeg('#5bc0ff',18,-64)}
+            ${donutSeg('#a78bfa',15,-82)}
+          </svg>
+        </div>
+        <div class="list" style="flex:1">
+          <div class="item"><span class="dot" style="width:2.4em;height:2.4em;border-radius:.8em;background:#4dd0c0"></span><div class="t"><b style="font-size:3em">${T('Comida','Food')}</b></div><span class="muted num" style="font-size:3em">39%</span></div>
+          <div class="item"><span class="dot" style="width:2.4em;height:2.4em;border-radius:.8em;background:#ffdd3d"></span><div class="t"><b style="font-size:3em">${T('Compras','Shopping')}</b></div><span class="muted num" style="font-size:3em">27%</span></div>
+          <div class="item"><span class="dot" style="width:2.4em;height:2.4em;border-radius:.8em;background:#5bc0ff"></span><div class="t"><b style="font-size:3em">${T('Transporte','Transport')}</b></div><span class="muted num" style="font-size:3em">19%</span></div>
+        </div>
+      </div>
+    </div>${bottomNav('chart')}`;
+
+  /* ── 9 · Privacidad / seguridad ── */
+  const scLock = `
+    <div class="app" style="align-items:center;justify-content:center;text-align:center;gap:4em">
+      <span class="row-icon" style="width:20em;height:20em;background:rgba(53,208,162,.14);color:#35d0a2"><svg style="width:10em;height:10em"><use href="#i-lock"/></svg></span>
+      <div>
+        <div style="font-size:4.6em;font-weight:850">${T('Todo en tu teléfono','All on your phone')}</div>
+        <div class="muted" style="font-size:3em;margin-top:1em;max-width:22em">${T('Sin cuentas obligatorias. Tus datos nunca salen del dispositivo.','No sign-up required. Your data never leaves the device.')}</div>
+      </div>
+      <div style="display:flex;gap:3em;margin-top:1em">
+        <span class="row-icon" style="width:12em;height:12em;background:#171b21;color:#eef2f8"><svg style="width:6em;height:6em"><use href="#i-fp"/></svg></span>
+        <span class="row-icon" style="width:12em;height:12em;background:#171b21;color:#eef2f8;font-size:1em;font-weight:850"><span style="font-size:5em">••••</span></span>
+      </div>
+      <span class="pill" style="background:rgba(53,208,162,.16);color:#35d0a2"><svg style="width:1.3em;height:1.3em"><use href="#i-check"/></svg>${T('PIN, patrón y huella','PIN, pattern & fingerprint')}</span>
+    </div>`;
+
+  const frames = [
+    ['#ffdd3d','rgba(255,221,61,.18)','rgba(255,221,61,.14)','i-wallet',
+      T('Tu dinero','Your money'),
+      T('Tus finanzas, <span class="hl">claras como el agua</span>','Your finances, <span class="hl">clear as water</span>'),
+      T('Saldo, cuentas y movimientos en una sola vista.','Balance, accounts and activity in one glance.'),
+      scHome, T('1 · Inicio','1 · Home')],
+
+    ['#35d0a2','rgba(53,208,162,.16)','rgba(53,208,162,.12)','i-bolt',
+      T('Rápidos','Quick'),
+      T('Un gasto en <span class="hl">un solo toque</span>','Log an expense in <span class="hl">one tap</span>'),
+      T('Tus gastos de siempre, listos como botones.','Your usual expenses, ready as buttons.'),
+      scAdd, T('2 · Agregar','2 · Add')],
+
+    ['#5bc0ff','rgba(91,192,255,.16)','rgba(91,192,255,.12)','i-bell',
+      T('Automático','Automatic'),
+      T('Lee los <span class="hl">avisos del banco</span> por ti','Reads your <span class="hl">bank alerts</span> for you'),
+      T('Detecta el movimiento y la tarjeta ••4821 solo.','Detects the movement and card ••4821 on its own.'),
+      scDetect, T('3 · Detección','3 · Detection')],
+
+    ['#ff6b8a','rgba(255,107,138,.15)','rgba(255,107,138,.11)','i-cam',
+      T('Recibos','Receipts'),
+      T('Escanea el recibo, <span class="hl">él pone el resto</span>','Scan the receipt, <span class="hl">it fills the rest</span>'),
+      T('Monto, fecha y cuenta por los últimos 4 dígitos.','Amount, date and account from the last 4 digits.'),
+      scScan, T('4 · Escanear','4 · Scan')],
+
+    ['#ffdd3d','rgba(255,221,61,.16)','rgba(255,221,61,.12)','i-chart',
+      T('Presupuestos','Budgets'),
+      T('Presupuestos que <span class="hl">se explican solos</span>','Budgets that <span class="hl">explain themselves</span>'),
+      T('Ve cuánto llevas y qué categoría se pasó.','See how much is left and which category went over.'),
+      scBudget, T('5 · Presupuestos','5 · Budgets')],
+
+    ['#35d0a2','rgba(53,208,162,.16)','rgba(53,208,162,.12)','i-target',
+      T('Metas','Goals'),
+      T('Ponte una meta y mira <span class="hl">cuándo llegas</span>','Set a goal and see <span class="hl">when you\'ll hit it</span>'),
+      T('$harky proyecta la fecha según tu ritmo de ahorro.','$harky projects the date from your saving pace.'),
+      scGoals, T('6 · Metas','6 · Goals')],
+
+    ['#5bc0ff','rgba(91,192,255,.16)','rgba(91,192,255,.12)','i-cal',
+      T('Calendario','Calendar'),
+      T('Mira <span class="hl">lo que viene</span>, no solo lo que pasó','See <span class="hl">what\'s coming</span>, not just what\'s gone'),
+      T('Cobros previstos de tus suscripciones, por día.','Upcoming subscription charges, day by day.'),
+      scCal, T('7 · Calendario','7 · Calendar')],
+
+    ['#a78bfa','rgba(167,139,250,.16)','rgba(167,139,250,.12)','i-chart',
+      T('Análisis','Insights'),
+      T('Entiende <span class="hl">a dónde va tu dinero</span>','Understand <span class="hl">where your money goes</span>'),
+      T('Semana a semana y por categoría, sin hojas de cálculo.','Week by week and by category, no spreadsheets.'),
+      scAnalytics, T('8 · Análisis','8 · Insights')],
+
+    ['#35d0a2','rgba(53,208,162,.14)','rgba(53,208,162,.10)','i-lock',
+      T('Privado','Private'),
+      T('Todo en tu teléfono. <span class="hl">Y solo tuyo</span>','All on your phone. <span class="hl">And only yours</span>'),
+      T('Sin registro obligatorio. Protégelo con huella o PIN.','No forced sign-up. Lock it with fingerprint or PIN.'),
+      scLock, T('9 · Seguridad','9 · Security')],
+  ];
+
+  document.getElementById('gallery').innerHTML = frames.map(f => frame(...f)).join('');
+
+  function setLang(l){
+    document.body.classList.toggle('lang-es', l==='es');
+    document.body.classList.toggle('lang-en', l==='en');
+    document.getElementById('btn-es').classList.toggle('on', l==='es');
+    document.getElementById('btn-en').classList.toggle('on', l==='en');
+  }
+  document.body.classList.add('lang-es');
+</script>

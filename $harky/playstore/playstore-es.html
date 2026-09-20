@@ -1,0 +1,420 @@
+<title>$harky — Capturas para Play Store</title>
+<style>
+  :root {
+    --ink: #05070d;
+    --ink-2: #0a0e17;
+    --panel: #121a2b;
+    --panel-2: #18223698;
+    --line: rgba(233,238,247,.08);
+    --paper: #eef2fb;
+    --muted: #8b97ad;
+    --gold: #ffd23f;
+    --mint: #35d0a2;
+    --blue: #5b9bff;
+    --violet: #a78bfa;
+    --rose: #ff6b8a;
+    --coral: #ff8a6b;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --shadow: 0 30px 70px -20px rgba(0,0,0,.75), 0 8px 24px -12px rgba(0,0,0,.6);
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    background:
+      radial-gradient(1200px 700px at 50% -10%, #0e1526, transparent 60%),
+      var(--ink);
+    color: var(--paper);
+    font-family: var(--sans);
+    margin: 0;
+    padding: 44px 18px 80px;
+    overflow-x: hidden;
+  }
+
+  /* ── Nota de trabajo (no es parte de las capturas) ── */
+  .lead { margin: 0 auto 40px; max-width: 900px; text-align: center; }
+  .lead .wm { align-items: center; display: inline-flex; gap: 10px; margin-bottom: 16px; }
+  .lead .wm svg { border-radius: 26%; height: 34px; width: 34px; }
+  .lead .wm b { font-size: 20px; font-weight: 800; letter-spacing: -.02em; }
+  .lead h1 { font-size: clamp(24px, 5vw, 34px); font-weight: 850; letter-spacing: -.03em; margin: 0 0 10px; text-wrap: balance; }
+  .lead p { color: var(--muted); font-size: 14.5px; line-height: 1.6; margin: 0 auto; max-width: 60ch; }
+  .lead .tip { background: rgba(255,210,63,.08); border: 1px solid rgba(255,210,63,.2); border-radius: 12px; color: #ffe08a; display: inline-block; font-size: 12.5px; font-weight: 650; margin-top: 18px; padding: 9px 15px; }
+
+  /* ── Galería de capturas ── */
+  .gallery {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 30px;
+    justify-content: center;
+    margin: 0 auto;
+    max-width: 1240px;
+  }
+
+  .shot {
+    aspect-ratio: 1080 / 2160;
+    border-radius: 30px;
+    color: var(--paper);
+    isolation: isolate;
+    overflow: hidden;
+    padding: 40px 30px 0;
+    position: relative;
+    width: min(340px, 86vw);
+  }
+  /* Fondo de marca: base navy + aurora del acento de cada captura */
+  .shot::before {
+    background:
+      radial-gradient(90% 55% at 82% 4%, color-mix(in oklab, var(--ac) 42%, transparent), transparent 62%),
+      radial-gradient(70% 40% at 8% 20%, color-mix(in oklab, var(--ac) 16%, transparent), transparent 60%),
+      linear-gradient(180deg, #0c1322, #070b13 70%);
+    content: "";
+    inset: 0;
+    position: absolute;
+    z-index: -2;
+  }
+  .shot::after {
+    background-image: radial-gradient(rgba(255,255,255,.04) 1px, transparent 1px);
+    background-size: 18px 18px;
+    content: "";
+    inset: 0;
+    mask-image: linear-gradient(180deg, #000, transparent 42%);
+    opacity: .5;
+    position: absolute;
+    z-index: -1;
+  }
+
+  .shot-eyebrow {
+    color: var(--ac);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: .22em;
+    text-transform: uppercase;
+  }
+  .shot h2 {
+    font-size: 26px;
+    font-weight: 850;
+    letter-spacing: -.03em;
+    line-height: 1.1;
+    margin: 12px 0 0;
+    text-wrap: balance;
+  }
+  .shot h2 em { color: var(--ac); font-style: normal; }
+  .shot .sub { color: #c7cfdd; font-size: 13.5px; font-weight: 550; line-height: 1.45; margin: 10px 0 0; }
+
+  /* Marca en la esquina */
+  .shot-brand { align-items: center; display: flex; gap: 7px; position: absolute; right: 26px; top: 30px; }
+  .shot-brand svg { border-radius: 26%; height: 26px; width: 26px; }
+  .shot-brand b { font-size: 14px; font-weight: 800; letter-spacing: -.02em; opacity: .92; }
+
+  /* ── Teléfono ── */
+  .phone {
+    background: linear-gradient(160deg, #1c2434, #0c111c);
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 30px 30px 0 0;
+    box-shadow: var(--shadow), var(--shadow, 0 0 0 transparent), 0 -1px 0 rgba(255,255,255,.06) inset, 0 40px 80px -30px color-mix(in oklab, var(--ac) 55%, transparent);
+    margin: 26px auto 0;
+    max-width: 258px;
+    overflow: hidden;
+    padding: 8px 8px 0;
+  }
+  .screen {
+    background: #0a0e16;
+    border-radius: 24px 24px 0 0;
+    height: 430px;
+    overflow: hidden;
+    position: relative;
+  }
+  .screen-inner { padding: 14px 13px; }
+
+  /* App chrome */
+  .app-top { align-items: center; color: var(--paper); display: flex; justify-content: space-between; margin-bottom: 12px; }
+  .app-top .t { font-size: 15px; font-weight: 800; letter-spacing: -.01em; }
+  .app-top .ic { color: var(--muted); display: flex; gap: 9px; }
+  .app-top .ic span { align-items: center; background: rgba(255,255,255,.06); border-radius: 8px; display: grid; height: 24px; place-items: center; width: 24px; }
+  .dot-ic { background: currentColor; border-radius: 2px; height: 11px; opacity: .8; width: 11px; }
+
+  .months { display: flex; gap: 5px; margin-bottom: 14px; }
+  .months span { background: rgba(255,255,255,.05); border-radius: 8px; color: var(--muted); flex: 1; font-size: 10px; font-weight: 750; padding: 6px 0; text-align: center; }
+  .months span.on { background: color-mix(in oklab, var(--ac) 26%, transparent); color: var(--paper); }
+
+  .hero-label { color: var(--muted); font-size: 9.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+  .hero-amt { font-size: 27px; font-weight: 900; letter-spacing: -.045em; margin-top: 3px; }
+  .hero-amt small { font-size: 15px; opacity: .7; }
+  .hero-delta { color: var(--mint); font-size: 11px; font-weight: 750; margin-top: 3px; }
+
+  .fnum { font-variant-numeric: tabular-nums; }
+
+  /* filas de movimientos */
+  .rowlist { display: flex; flex-direction: column; gap: 3px; margin-top: 14px; }
+  .row { align-items: center; display: flex; gap: 10px; padding: 8px 4px; }
+  .row .ci { align-items: center; border-radius: 11px; display: grid; flex-shrink: 0; height: 34px; place-items: center; width: 34px; }
+  .row .ci svg { height: 17px; width: 17px; }
+  .row .m { flex: 1; min-width: 0; }
+  .row .m b { display: block; font-size: 12.5px; font-weight: 750; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .m small { color: var(--muted); font-size: 10px; }
+  .row .a { font-size: 12.5px; font-weight: 850; white-space: nowrap; }
+  .a.pos { color: var(--mint); } .a.neg { color: var(--rose); }
+
+  /* cards pulse (inicio) */
+  .pulse { display: grid; gap: 8px; grid-template-columns: 1fr 1fr; margin-top: 14px; }
+  .pcard { background: rgba(255,255,255,.035); border: 1px solid var(--line); border-radius: 14px; padding: 11px 12px; }
+  .pcard small { color: var(--muted); font-size: 9px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+  .pcard b { display: block; font-size: 17px; font-weight: 900; letter-spacing: -.03em; margin-top: 5px; }
+  .pbar { background: rgba(255,255,255,.1); border-radius: 99px; height: 5px; margin-top: 8px; overflow: hidden; }
+  .pbar i { background: var(--ac); border-radius: 99px; display: block; height: 100%; }
+
+  /* donut (análisis) */
+  .seg { background: rgba(255,255,255,.05); border-radius: 11px; display: flex; margin-bottom: 14px; padding: 3px; }
+  .seg span { border-radius: 8px; color: var(--muted); flex: 1; font-size: 10.5px; font-weight: 750; padding: 6px 0; text-align: center; }
+  .seg span.on { background: var(--paper); color: #0a0e16; }
+  .donut-wrap { display: flex; gap: 16px; align-items: center; margin: 8px 0 6px; }
+  .donut { border-radius: 50%; flex-shrink: 0; height: 118px; position: relative; width: 118px; }
+  .donut::after { background: #0a0e16; border-radius: 50%; content: ""; inset: 20px; position: absolute; }
+  .donut .center { inset: 0; z-index: 1; align-items: center; display: flex; flex-direction: column; justify-content: center; position: absolute; }
+  .donut .center b { font-size: 15px; font-weight: 900; letter-spacing: -.03em; }
+  .donut .center small { color: var(--muted); font-size: 9px; font-weight: 700; }
+  .legend { display: flex; flex: 1; flex-direction: column; gap: 8px; }
+  .legend .li { align-items: center; display: flex; font-size: 11px; gap: 7px; }
+  .legend .li i { border-radius: 3px; height: 9px; width: 9px; }
+  .legend .li span { color: #cfd6e2; flex: 1; }
+  .legend .li b { font-variant-numeric: tabular-nums; }
+
+  /* suscripciones */
+  .sub-hero { background: rgba(255,255,255,.035); border: 1px solid var(--line); border-radius: 16px; margin-bottom: 12px; padding: 13px; }
+  .sub-hero small { color: var(--muted); font-size: 9px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
+  .sub-hero b { display: block; font-size: 22px; font-weight: 900; letter-spacing: -.04em; margin-top: 3px; }
+  .sub-hero .yr { color: var(--muted); font-size: 11px; font-weight: 650; }
+  .tile { align-items: center; border-radius: 11px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.14); color: #fff; display: grid; flex-shrink: 0; height: 34px; place-items: center; width: 34px; }
+  .tile svg { height: 19px; width: 19px; }
+
+  /* metas */
+  .goalsum { align-items: center; background: rgba(255,255,255,.035); border: 1px solid var(--line); border-radius: 16px; display: flex; gap: 13px; margin-bottom: 12px; padding: 13px; }
+  .ring { border-radius: 50%; flex-shrink: 0; height: 56px; position: relative; width: 56px; }
+  .ring::after { background: #0d1220; border-radius: 50%; content: ""; inset: 7px; position: absolute; }
+  .ring b { align-items: center; display: flex; font-size: 13px; font-weight: 900; inset: 0; justify-content: center; position: absolute; z-index: 1; }
+  .goalsum .g { flex: 1; }
+  .goalsum .g b { display: block; font-size: 13px; font-weight: 800; }
+  .goalsum .g small { color: var(--muted); font-size: 10.5px; }
+  .goalcard { background: rgba(255,255,255,.035); border: 1px solid var(--line); border-radius: 16px; margin-bottom: 9px; padding: 12px 13px; }
+  .goalcard .h { align-items: center; display: flex; gap: 10px; }
+  .goalcard .h .gi { align-items: center; border-radius: 10px; display: grid; height: 30px; place-items: center; width: 30px; }
+  .goalcard .h .gi svg { height: 15px; width: 15px; }
+  .goalcard .h b { flex: 1; font-size: 12.5px; font-weight: 800; }
+  .goalcard .h .pc { font-size: 12px; font-weight: 850; }
+  .track { background: rgba(255,255,255,.09); border-radius: 99px; height: 6px; margin: 9px 0 6px; overflow: hidden; }
+  .track i { border-radius: 99px; display: block; height: 100%; }
+  .goalcard .meta { color: var(--muted); display: flex; font-size: 10.5px; font-variant-numeric: tabular-nums; justify-content: space-between; }
+
+  /* cuentas */
+  .nw { margin-bottom: 12px; }
+  .distro { background: rgba(255,255,255,.05); border-radius: 8px; display: flex; height: 12px; margin: 10px 0; overflow: hidden; }
+  .distro i { height: 100%; }
+  .dleg { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-bottom: 12px; }
+  .dleg .li { align-items: center; color: var(--muted); display: flex; font-size: 10px; gap: 5px; }
+  .dleg .li i { border-radius: 2px; height: 8px; width: 8px; }
+  .acct { align-items: center; border-top: 1px solid var(--line); display: flex; gap: 10px; padding: 11px 2px; }
+  .acct .ai { align-items: center; border-radius: 10px; display: grid; height: 32px; place-items: center; width: 32px; }
+  .acct .ai svg { height: 16px; width: 16px; }
+  .acct .n { flex: 1; }
+  .acct .n b { display: block; font-size: 12.5px; font-weight: 750; }
+  .acct .n small { color: var(--muted); font-size: 10px; }
+  .acct .bal { font-size: 12.5px; font-weight: 850; font-variant-numeric: tabular-nums; }
+
+  .glyph { color: #fff; }
+
+  /* ── Feature graphic (banner 1024×500) ── */
+  .feature {
+    align-items: center;
+    aspect-ratio: 1024 / 500;
+    border-radius: 24px;
+    display: flex;
+    gap: 30px;
+    margin: 54px auto 0;
+    max-width: 900px;
+    overflow: hidden;
+    padding: 0 44px;
+    position: relative;
+    width: 100%;
+  }
+  .feature::before {
+    background:
+      radial-gradient(60% 120% at 88% 20%, rgba(255,210,63,.28), transparent 60%),
+      radial-gradient(50% 90% at 10% 90%, rgba(53,208,162,.2), transparent 62%),
+      linear-gradient(120deg, #0c1322, #06090f);
+    content: ""; inset: 0; position: absolute; z-index: -1;
+  }
+  .feature .fcopy { flex: 1; }
+  .feature .fmark { align-items: center; display: flex; gap: 10px; margin-bottom: 16px; }
+  .feature .fmark svg { border-radius: 26%; height: 30px; width: 30px; }
+  .feature .fmark b { font-size: 18px; font-weight: 800; letter-spacing: -.02em; }
+  .feature h3 { font-size: clamp(22px, 4.4vw, 40px); font-weight: 900; letter-spacing: -.035em; line-height: 1.04; margin: 0; text-wrap: balance; }
+  .feature h3 em { color: var(--gold); font-style: normal; }
+  .feature p { color: #c7cfdd; font-size: clamp(12px, 2.2vw, 15px); font-weight: 550; margin: 14px 0 0; max-width: 34ch; }
+  .feature .fchips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+  .feature .fchips span { background: rgba(255,255,255,.07); border: 1px solid var(--line); border-radius: 99px; font-size: clamp(10px,1.9vw,12px); font-weight: 700; padding: 6px 12px; }
+  .feature .fart { flex-shrink: 0; }
+  .feature .fart .coin { align-items: center; background: linear-gradient(150deg, #ffe98a, #f5b70a); border-radius: 30%; box-shadow: 0 20px 50px -12px rgba(255,205,60,.5); display: grid; height: clamp(90px, 18vw, 150px); place-items: center; width: clamp(90px, 18vw, 150px); }
+  .feature .fart .coin svg { height: 56%; width: 56%; }
+
+  .cap { color: var(--muted); font-size: 12px; margin: 10px auto 0; text-align: center; }
+
+  @media (max-width: 520px) {
+    .feature { flex-direction: column; justify-content: center; padding: 30px 22px; text-align: center; aspect-ratio: auto; }
+    .feature p { margin-inline: auto; }
+    .feature .fchips { justify-content: center; }
+    .feature .fart { display: none; }
+  }
+</style>
+
+<div class="lead">
+  <div class="wm">
+    <svg viewBox="0 0 48 48" aria-hidden="true">
+      <rect width="48" height="48" rx="13" fill="#0e1e38"/>
+      <path d="M8 34 24 9 40 25" fill="none" stroke="#ffd23f" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="24" cy="9" r="3.4" fill="#ffd23f"/>
+    </svg>
+    <b>$harky</b>
+  </div>
+  <h1>Capturas para Play Store — rediseñadas</h1>
+  <p>Cinco pantallas con titular, marca y el screen enmarcado — la misma identidad oscura de la app, con acento propio en cada una. Datos de ejemplo.</p>
+  <span class="tip">Para exportar: haz captura de pantalla de cada tarjeta (o clic derecho → guardar). Relación 9:18, lista para subir.</span>
+</div>
+
+<div class="gallery">
+
+  <!-- 1 · INICIO -->
+  <section class="shot" style="--ac: var(--gold)">
+    <div class="shot-brand"><svg viewBox="0 0 48 48"><rect width="48" height="48" rx="13" fill="#0e1e38"/><path d="M8 34 24 9 40 25" fill="none" stroke="#ffd23f" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="24" cy="9" r="3.4" fill="#ffd23f"/></svg><b>$harky</b></div>
+    <span class="shot-eyebrow">Tus finanzas</span>
+    <h2>Todo tu dinero,<br><em>en una sola vista.</em></h2>
+    <p class="sub">Ingresos, gastos y balance del mes, siempre a la mano.</p>
+    <div class="phone"><div class="screen"><div class="screen-inner">
+      <div class="app-top"><span class="t">Inicio</span><span class="ic"><span><i class="dot-ic"></i></span><span><i class="dot-ic"></i></span></span></div>
+      <div class="months"><span>Mar</span><span>Abr</span><span>May</span><span class="on">Jun</span></div>
+      <div class="hero-label">Balance total</div>
+      <div class="hero-amt fnum">RD$ 220,140<small>.35</small></div>
+      <div class="hero-delta">▲ +RD$ 12,400 este mes</div>
+      <div class="pulse">
+        <div class="pcard"><small>Gastos</small><b class="fnum" style="color:var(--rose)">RD$ 58,705</b></div>
+        <div class="pcard"><small>Presupuesto</small><b class="fnum">72%</b><div class="pbar"><i style="width:72%"></i></div></div>
+      </div>
+      <div class="rowlist">
+        <div class="row"><span class="ci" style="background:#35d0a222;color:#35d0a2"><svg class="glyph" viewBox="0 0 24 24" style="color:#35d0a2" fill="currentColor"><path d="M12 2 2 7v2h20V7L12 2zM4 11v7H3v2h18v-2h-1v-7h-2v7h-3v-7h-2v7h-3v-7H6v7H4V11z"/></svg></span><div class="m"><b>Salario</b><small>Trabajo · 14 jun</small></div><div class="a pos fnum">+RD$ 58,700</div></div>
+        <div class="row"><span class="ci" style="background:#5b9bff22;color:#5b9bff"><svg class="glyph" viewBox="0 0 24 24" style="color:#5b9bff" fill="currentColor"><path d="M4 7h16v10H4zM2 5v14h20V5zM6 9h6v2H6z"/></svg></span><div class="m"><b>Factura de agua</b><small>Servicios · 13 jun</small></div><div class="a neg fnum">−RD$ 1,994</div></div>
+        <div class="row"><span class="ci" style="background:#ff6b8a22;color:#ff6b8a"><svg class="glyph" viewBox="0 0 24 24" style="color:#ff6b8a" fill="currentColor"><path d="M7 4h10l1 2h3v2H3V6h3zM5 9h14l-1 11H6z"/></svg></span><div class="m"><b>Supermercado</b><small>Comida · 12 jun</small></div><div class="a neg fnum">−RD$ 3,466</div></div>
+        <div class="row"><span class="ci" style="background:#ffd23f22;color:#ffd23f"><svg class="glyph" viewBox="0 0 24 24" style="color:#ffd23f" fill="currentColor"><path d="M5 11h14l-1.5-5H6.5zM3 13v6h2v-2h14v2h2v-6zM6.5 14.5A1.5 1.5 0 1 1 5 16a1.5 1.5 0 0 1 1.5-1.5z"/></svg></span><div class="m"><b>Combustible</b><small>Transporte · 11 jun</small></div><div class="a neg fnum">−RD$ 1,600</div></div>
+      </div>
+    </div></div></div>
+  </section>
+
+  <!-- 2 · ANÁLISIS -->
+  <section class="shot" style="--ac: var(--blue)">
+    <div class="shot-brand"><svg viewBox="0 0 48 48"><rect width="48" height="48" rx="13" fill="#0e1e38"/><path d="M8 34 24 9 40 25" fill="none" stroke="#ffd23f" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="24" cy="9" r="3.4" fill="#ffd23f"/></svg><b>$harky</b></div>
+    <span class="shot-eyebrow">Análisis</span>
+    <h2>Descubre a dónde<br><em>se va cada peso.</em></h2>
+    <p class="sub">Gráficos claros por categoría, semana, mes y año.</p>
+    <div class="phone"><div class="screen"><div class="screen-inner">
+      <div class="app-top"><span class="t">Análisis</span><span class="ic"><span><i class="dot-ic"></i></span><span><i class="dot-ic"></i></span></span></div>
+      <div class="seg"><span class="on">Resumen</span><span>Informes</span></div>
+      <div class="hero-label">Gastos de junio</div>
+      <div class="donut-wrap">
+        <div class="donut" style="background:conic-gradient(#35d0a2 0 34%, #5b9bff 34% 56%, #a78bfa 56% 72%, #ffd23f 72% 87%, #ff6b8a 87% 100%)">
+          <span class="center"><b class="fnum">RD$58.7k</b><small>Gastado</small></span>
+        </div>
+        <div class="legend">
+          <div class="li"><i style="background:#35d0a2"></i><span>Comida</span><b>34%</b></div>
+          <div class="li"><i style="background:#5b9bff"></i><span>Transporte</span><b>22%</b></div>
+          <div class="li"><i style="background:#a78bfa"></i><span>Servicios</span><b>16%</b></div>
+          <div class="li"><i style="background:#ffd23f"></i><span>Ocio</span><b>15%</b></div>
+          <div class="li"><i style="background:#ff6b8a"></i><span>Otros</span><b>13%</b></div>
+        </div>
+      </div>
+      <div class="pcard" style="margin-top:12px"><small>Vs. mes anterior</small><b class="fnum" style="color:var(--mint);font-size:15px">▼ 8% menos en gastos</b></div>
+      <div class="rowlist" style="margin-top:8px">
+        <div class="row" style="padding:6px 4px"><span class="ci" style="background:#35d0a222"><svg class="glyph" viewBox="0 0 24 24" style="color:#35d0a2" fill="currentColor"><path d="M7 4h10l1 2h3v2H3V6h3zM5 9h14l-1 11H6z"/></svg></span><div class="m"><b>Comida</b></div><div class="a fnum">RD$ 19,960</div></div>
+        <div class="row" style="padding:6px 4px"><span class="ci" style="background:#5b9bff22"><svg class="glyph" viewBox="0 0 24 24" style="color:#5b9bff" fill="currentColor"><path d="M5 11h14l-1.5-5H6.5zM3 13v6h2v-2h14v2h2v-6z"/></svg></span><div class="m"><b>Transporte</b></div><div class="a fnum">RD$ 12,915</div></div>
+      </div>
+    </div></div></div>
+  </section>
+
+  <!-- 3 · SUSCRIPCIONES -->
+  <section class="shot" style="--ac: var(--violet)">
+    <div class="shot-brand"><svg viewBox="0 0 48 48"><rect width="48" height="48" rx="13" fill="#0e1e38"/><path d="M8 34 24 9 40 25" fill="none" stroke="#ffd23f" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="24" cy="9" r="3.4" fill="#ffd23f"/></svg><b>$harky</b></div>
+    <span class="shot-eyebrow">Suscripciones</span>
+    <h2>Tus pagos fijos,<br><em>sin sorpresas.</em></h2>
+    <p class="sub">Netflix, Spotify y más — con su logo y su próximo cobro.</p>
+    <div class="phone"><div class="screen"><div class="screen-inner">
+      <div class="app-top"><span class="t">Suscripciones</span><span class="ic"><span><i class="dot-ic"></i></span></span></div>
+      <div class="sub-hero"><small>Recurrente mensual</small><b class="fnum">RD$ 2,340</b><span class="yr">≈ RD$ 28,080/año · 4 activas</span></div>
+      <div class="rowlist" style="margin-top:0">
+        <div class="row"><span class="tile" style="background:#E50914"><svg viewBox="0 0 24 24" fill="#fff"><path d="m5.398 0 8.348 23.602c2.346.059 4.856.398 4.856.398L10.113 0H5.398zm8.489 0v9.172l4.715 13.33V0h-4.715zM5.398 1.5V24c1.873-.225 2.81-.312 4.715-.398V14.83L5.398 1.5z"/></svg></span><div class="m"><b>Netflix</b><small>Próx. 14 jul · ● Popular</small></div><div class="a neg fnum">−RD$ 499</div></div>
+        <div class="row"><span class="tile" style="background:#1DB954"><svg viewBox="0 0 24 24" fill="#fff"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg></span><div class="m"><b>Spotify</b><small>Próx. 18 jul · ● Popular</small></div><div class="a neg fnum">−RD$ 199</div></div>
+        <div class="row"><span class="tile" style="background:#FF0000"><svg viewBox="0 0 24 24" fill="#fff"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg></span><div class="m"><b>YouTube Premium</b><small>Próx. 22 jul · Banco Popular</small></div><div class="a neg fnum">−RD$ 349</div></div>
+        <div class="row"><span class="tile" style="background:#9B30FF"><svg viewBox="0 0 24 24" fill="#fff"><path d="M7.042 16.896H4.414v-3.754H2.708v3.754H.01L0 7.22h2.708v3.6h1.706v-3.6h2.628zm12.043.046C21.795 16.94 24 14.689 24 11.978a4.89 4.89 0 0 0-4.915-4.92c-2.707-.002-4.09 1.991-4.432 2.795.003-1.207-1.187-2.632-2.58-2.634H7.59v9.674l4.181.001c1.686 0 2.886-1.46 2.888-2.713.385.788 1.72 2.762 4.427 2.76zm-7.665-3.936c.387 0 .692.382.692.817 0 .435-.305.817-.692.817h-1.33v-1.634zm.005-3.633c.387 0 .692.382.692.817 0 .436-.305.818-.692.818h-1.33V9.373z"/></svg></span><div class="m"><b>HBO Max</b><small>Próx. 28 jul · Banco Popular</small></div><div class="a neg fnum">−RD$ 399</div></div>
+      </div>
+    </div></div></div>
+  </section>
+
+  <!-- 4 · METAS -->
+  <section class="shot" style="--ac: var(--mint)">
+    <div class="shot-brand"><svg viewBox="0 0 48 48"><rect width="48" height="48" rx="13" fill="#0e1e38"/><path d="M8 34 24 9 40 25" fill="none" stroke="#ffd23f" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="24" cy="9" r="3.4" fill="#ffd23f"/></svg><b>$harky</b></div>
+    <span class="shot-eyebrow">Metas</span>
+    <h2>Ahorra para lo<br><em>que de verdad importa.</em></h2>
+    <p class="sub">Fija un objetivo y mira tu progreso crecer.</p>
+    <div class="phone"><div class="screen"><div class="screen-inner">
+      <div class="app-top"><span class="t">Metas</span><span class="ic"><span><i class="dot-ic"></i></span></span></div>
+      <div class="goalsum">
+        <div class="ring" style="background:conic-gradient(var(--mint) 62%, rgba(255,255,255,.09) 0)"><b>62%</b></div>
+        <div class="g"><b class="fnum">RD$ 178,500</b><small>de RD$ 280,000 · 3 metas activas</small></div>
+      </div>
+      <div class="goalcard">
+        <div class="h"><span class="gi" style="background:#5b9bff22;color:#5b9bff"><svg class="glyph" viewBox="0 0 24 24" style="color:#5b9bff" fill="currentColor"><path d="M2 16l20-7-8 12-2-4z"/></svg></span><b>Viaje a la playa</b><span class="pc" style="color:#5b9bff">58%</span></div>
+        <div class="track"><i style="width:58%;background:#5b9bff"></i></div>
+        <div class="meta"><span>RD$ 46,500</span><span>Meta RD$ 80,000</span></div>
+      </div>
+      <div class="goalcard">
+        <div class="h"><span class="gi" style="background:#35d0a222;color:#35d0a2"><svg class="glyph" viewBox="0 0 24 24" style="color:#35d0a2" fill="currentColor"><path d="M12 2 4 5v6c0 5 3.4 8.5 8 11 4.6-2.5 8-6 8-11V5z"/></svg></span><b>Fondo de emergencia</b><span class="pc" style="color:#35d0a2">66%</span></div>
+        <div class="track"><i style="width:66%;background:#35d0a2"></i></div>
+        <div class="meta"><span>RD$ 132,000</span><span>Meta RD$ 200,000</span></div>
+      </div>
+      <div class="goalcard">
+        <div class="h"><span class="gi" style="background:#ffd23f22;color:#ffd23f"><svg class="glyph" viewBox="0 0 24 24" style="color:#ffd23f" fill="currentColor"><path d="M4 8h16v11H4zM9 8V6a3 3 0 0 1 6 0v2h-2V6a1 1 0 0 0-2 0v2z"/></svg></span><b>Carro nuevo</b><span class="pc" style="color:#ffd23f">14%</span></div>
+        <div class="track"><i style="width:14%;background:#ffd23f"></i></div>
+        <div class="meta"><span>RD$ 28,000</span><span>Meta RD$ 200,000</span></div>
+      </div>
+    </div></div></div>
+  </section>
+
+  <!-- 5 · CUENTAS -->
+  <section class="shot" style="--ac: var(--coral)">
+    <div class="shot-brand"><svg viewBox="0 0 48 48"><rect width="48" height="48" rx="13" fill="#0e1e38"/><path d="M8 34 24 9 40 25" fill="none" stroke="#ffd23f" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="24" cy="9" r="3.4" fill="#ffd23f"/></svg><b>$harky</b></div>
+    <span class="shot-eyebrow">Cuentas</span>
+    <h2>Todas tus cuentas,<br><em>en un solo lugar.</em></h2>
+    <p class="sub">Banco, ahorros y efectivo — tu patrimonio real, claro.</p>
+    <div class="phone"><div class="screen"><div class="screen-inner">
+      <div class="app-top"><span class="t">Cuentas</span><span class="ic"><span><i class="dot-ic"></i></span><span><i class="dot-ic"></i></span></span></div>
+      <div class="seg"><span class="on">Cuentas</span><span>Metas</span></div>
+      <div class="nw">
+        <div class="hero-label">Patrimonio neto</div>
+        <div class="hero-amt fnum">RD$ 220,140<small>.35</small></div>
+        <div class="distro"><i style="width:46%;background:#35d0a2"></i><i style="width:28%;background:#5b9bff"></i><i style="width:14%;background:#ff6b8a"></i><i style="width:12%;background:#ffd23f"></i></div>
+        <div class="dleg"><span class="li"><i style="background:#35d0a2"></i>Débito</span><span class="li"><i style="background:#5b9bff"></i>Ahorros</span><span class="li"><i style="background:#ff6b8a"></i>Crédito</span><span class="li"><i style="background:#ffd23f"></i>Efectivo</span></div>
+      </div>
+      <div class="acct" style="border-top:none"><span class="ai" style="background:#35d0a222;color:#35d0a2"><svg class="glyph" viewBox="0 0 24 24" style="color:#35d0a2" fill="currentColor"><path d="M3 7h18v10H3zM3 10h18M6 14h4"/></svg></span><div class="n"><b>Banco Popular</b><small>Débito</small></div><div class="bal">RD$ 101,660</div></div>
+      <div class="acct"><span class="ai" style="background:#5b9bff22;color:#5b9bff"><svg class="glyph" viewBox="0 0 24 24" style="color:#5b9bff" fill="currentColor"><path d="M12 3 3 8v2h18V8zM5 11v7H4v2h16v-2h-1v-7h-2v7h-3v-7h-2v7H9v-7z"/></svg></span><div class="n"><b>Ahorros BHD</b><small>Ahorros</small></div><div class="bal">RD$ 61,980</div></div>
+      <div class="acct"><span class="ai" style="background:#ffd23f22;color:#ffd23f"><svg class="glyph" viewBox="0 0 24 24" style="color:#ffd23f" fill="currentColor"><path d="M3 6h18v12H3zM3 10h18M17 14h2"/></svg></span><div class="n"><b>Efectivo</b><small>Billetera</small></div><div class="bal">RD$ 6,500</div></div>
+      <div class="acct"><span class="ai" style="background:#ff6b8a22;color:#ff6b8a"><svg class="glyph" viewBox="0 0 24 24" style="color:#ff6b8a" fill="currentColor"><path d="M3 6h18v12H3zM3 10h18"/></svg></span><div class="n"><b>Tarjeta Visa</b><small>Crédito</small></div><div class="bal" style="color:#ff6b8a">−RD$ 12,300</div></div>
+    </div></div></div>
+  </section>
+
+</div>
+
+<!-- FEATURE GRAPHIC -->
+<div class="feature">
+  <div class="fcopy">
+    <div class="fmark"><svg viewBox="0 0 48 48"><rect width="48" height="48" rx="13" fill="#0e1e38"/><path d="M8 34 24 9 40 25" fill="none" stroke="#ffd23f" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="24" cy="9" r="3.4" fill="#ffd23f"/></svg><b>$harky</b></div>
+    <h3>Controla tu dinero. <em>Sin nube, sin complicaciones.</em></h3>
+    <p>Gastos, presupuestos, metas y suscripciones — todo en tu teléfono, en segundos.</p>
+    <div class="fchips"><span>100% local</span><span>Multi-moneda</span><span>Sin anuncios</span></div>
+  </div>
+  <div class="fart"><div class="coin"><svg viewBox="0 0 48 48"><path d="M8 34 24 9 40 25" fill="none" stroke="#3a2a00" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="24" cy="9" r="3.6" fill="#3a2a00"/></svg></div></div>
+</div>
+<p class="cap">Banner destacado (1024×500) · el mismo lenguaje visual que las capturas.</p>

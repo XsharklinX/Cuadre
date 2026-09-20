@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-set-quick-add-notification"
+description = "Enables the set_quick_add_notification command without any pre-configured scope."
+commands.allow = ["set_quick_add_notification"]
+
+[[permission]]
+identifier = "deny-set-quick-add-notification"
+description = "Denies the set_quick_add_notification command without any pre-configured scope."
+commands.deny = ["set_quick_add_notification"]

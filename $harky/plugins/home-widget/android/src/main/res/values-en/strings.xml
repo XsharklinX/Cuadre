@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_add_expense">− Expense</string>
+    <string name="widget_add_income">+ Income</string>
+    <string name="widget_balance_label">Total balance</string>
+    <string name="widget_budgets_description">Your $harky budget progress</string>
+    <string name="widget_budgets_title">Budgets</string>
+    <string name="widget_converter_base">1 unit in %1$s</string>
+    <string name="widget_converter_description">$harky live exchange rates</string>
+    <string name="widget_converter_title">Converter</string>
+    <string name="widget_converter_updated">Updated %1$s</string>
+    <string name="widget_delta_down">▼ %1$d%% this month</string>
+    <string name="widget_delta_flat">No change this month</string>
+    <string name="widget_delta_up">▲ %1$d%% this month</string>
+    <string name="widget_description">$harky total balance and quick actions</string>
+    <string name="widget_empty_state">Open $harky to sync</string>
+    <string name="widget_net_worth">Net worth</string>
+    <string name="widget_quickadd_description">Shortcut: add an expense</string>
+</resources>

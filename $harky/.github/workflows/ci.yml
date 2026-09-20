@@ -1,0 +1,40 @@
+name: CI
+
+# Puerta de release (roadmap P0): un release no debe poder salir si lint,
+# typecheck, tests o el build web fallan. cargo check corre aparte porque
+# necesita el toolchain de Rust y valida que el lado Tauri compile.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: Lint, typecheck, tests, build web
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test:coverage
+      - run: npm run build
+
+  cargo-check:
+    name: cargo check (Tauri desktop)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - run: cargo check --manifest-path src-tauri/Cargo.toml

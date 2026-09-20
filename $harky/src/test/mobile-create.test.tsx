@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { MobileCreateFlow } from '@/mobile/MobileCreateFlow'
 import { useFinance } from '@/store/finance'
+import { useSettings } from '@/store/settings'
 
 // Stub browser APIs used by the component
 vi.stubGlobal('navigator', { vibrate: vi.fn() })
@@ -12,8 +13,10 @@ vi.mock('@/mobile/MobileDatePicker', () => ({
 }))
 vi.mock('@/mobile/useMobileBackDismiss', () => ({ useMobileBackDismiss: vi.fn() }))
 vi.mock('@/components/ui/Toast', () => ({ toast: vi.fn() }))
+vi.mock('@/components/ui/DialogProvider', () => ({ useDialogs: () => ({ confirm: vi.fn() }) }))
 
 function seedStore() {
+  useSettings.setState({ language: 'en' })
   useFinance.setState({
     accounts: [
       { id: 'acc_cash', name: 'Cash', short: 'Cash', type: 'cash', color: '#f59e0b', balance: 500, last4: null },
@@ -33,14 +36,15 @@ describe('MobileCreateFlow', () => {
 
   it('starts with no account selected', () => {
     render(<MobileCreateFlow mkey="2026-06" onSaved={vi.fn()} />)
-    // The account pill should show the generic label, not a specific account name
-    expect(screen.getByText(/^account$/i)).toBeTruthy()
+    const accountPill = screen.getByRole('button', { name: /^account$/i })
+    expect(accountPill).toBeTruthy()
+    expect(accountPill.className).toContain('unset')
   })
 
-  it('save button is disabled when no account is selected', () => {
+  it('save button is not disabled when no account is selected', () => {
     render(<MobileCreateFlow mkey="2026-06" onSaved={vi.fn()} />)
     const saveBtn = screen.getByRole('button', { name: /save/i })
-    expect(saveBtn).toBeDisabled()
+    expect(saveBtn).not.toBeDisabled()
   })
 
   it('save button is enabled after entering amount and selecting account and category', async () => {
@@ -57,7 +61,7 @@ describe('MobileCreateFlow', () => {
     if (catBtn) fireEvent.click(catBtn)
 
     // Open account picker and select Cash
-    const accountPill = screen.getByText(/^account$/i).closest('button')
+    const accountPill = screen.getByRole('button', { name: /^account$/i })
     if (accountPill) {
       fireEvent.click(accountPill)
       const cashOpt = screen.queryByText('Cash')

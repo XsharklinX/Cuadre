@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Balance 2x2 — la version compacta y por defecto.
+
+  Muestra UNA idea: cuanto tienes, y como cambio este mes. El diseno anterior
+  metia 45 elementos (titulo, dos botones, dos tarjetas de cuenta, barras de
+  ingreso/gasto y una fila de presupuesto) en un widget declarado 2x2: ese
+  contenido pide ~4x4 reales, y por eso se comia media pantalla.
+
+  La variante ancha (4x2), con cuentas y acciones, esta en widget_balance_wide.xml
+  y se elige por tamano en SharkyBalanceWidgetProvider.
+-->
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_surface"
+    android:paddingStart="14dp"
+    android:paddingEnd="14dp"
+    android:paddingTop="13dp"
+    android:paddingBottom="13dp">
+
+    <!--
+      Acento de marca: 3dp de azul, en vez de gastar una fila en el titulo.
+      Es un ImageView, NO un <View>: RemoteViews solo admite vistas anotadas
+      con @RemoteView (ver el filtro en RemoteViews.java), y ni View ni Space
+      lo estan — usarlos revienta el widget al inflarlo (aparece en negro con
+      el boton "Fix").
+    -->
+    <ImageView
+        android:id="@+id/widget_accent"
+        android:layout_width="3dp"
+        android:layout_height="match_parent"
+        android:layout_alignParentStart="true"
+        android:layout_marginEnd="11dp"
+        android:background="@drawable/widget_accent"
+        android:contentDescription="@null" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_toEndOf="@id/widget_accent"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/widget_balance_label"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:includeFontPadding="false"
+            android:letterSpacing="0.11"
+            android:maxLines="1"
+            android:text="@string/widget_balance_label"
+            android:textAllCaps="true"
+            android:textColor="#6E7688"
+            android:textSize="9sp"
+            android:textStyle="bold" />
+
+        <!--
+          Empuja la cifra abajo: el numero es el heroe, no el encabezado.
+          FrameLayout vacio (no <Space>, que no es @RemoteView) usado como
+          espaciador con weight.
+        -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <TextView
+            android:id="@+id/widget_balance"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:text="--"
+            android:textColor="#F2F5FB"
+            android:textSize="24sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/widget_delta"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:ellipsize="end"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:textColor="#6E7688"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+    </LinearLayout>
+
+</RelativeLayout>

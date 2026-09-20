@@ -1,0 +1,344 @@
+@layer components {
+  /* ── Listas / Notas ─────────────────────────────────────────── */
+  .mnote-root {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 14px 16px calc(28px + env(safe-area-inset-bottom));
+  }
+  .mnote-list { display: flex; flex-direction: column; gap: 10px; }
+
+  .mnote-chip {
+    align-items: center;
+    border-radius: 12px;
+    display: flex;
+    flex-shrink: 0;
+    height: 38px;
+    justify-content: center;
+    width: 38px;
+  }
+
+  /* Buscador de listas — mismo patrón que el resto de la app. */
+  .mnote-search {
+    align-items: center;
+    background: var(--m-surface);
+    border: 1px solid var(--m-border);
+    border-radius: 13px;
+    color: var(--m-muted);
+    display: flex;
+    gap: 9px;
+    padding: 0 12px;
+  }
+  .mnote-search input { background: transparent; border: 0; color: var(--m-text); flex: 1; font-family: inherit; font-size: 14px; min-height: 44px; outline: 0; }
+  .mnote-search button { color: var(--m-muted); display: flex; }
+
+  /* Filtros rápidos */
+  .mnote-filters { display: flex; gap: 7px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+  .mnote-filters::-webkit-scrollbar { display: none; }
+  .mnote-filters button {
+    background: var(--m-surface);
+    border: 1px solid var(--m-border);
+    border-radius: 999px;
+    color: var(--m-muted);
+    flex: none;
+    font-size: 12.5px;
+    font-weight: 700;
+    padding: 6px 13px;
+  }
+  .mnote-filters button.on { background: var(--m-primary); border-color: transparent; color: var(--m-primary-text); }
+  .mnote-noresults { color: var(--m-muted); font-size: 13px; padding: 30px 0; text-align: center; }
+
+  .mnote-card {
+    background: var(--m-surface);
+    border: 1px solid var(--m-border);
+    border-radius: 18px;
+    color: var(--m-text);
+    overflow: hidden;
+    padding: 14px 14px 14px 17px;
+    position: relative;
+    text-align: left;
+    width: 100%;
+    transition: transform .14s ease, background .14s ease;
+  }
+  .mnote-card:active { transform: scale(.99); background: color-mix(in oklab, var(--m-text) 4%, var(--m-surface)); }
+  /* Franja de color a la izquierda — distingue la lista de un vistazo. */
+  .mnote-card-strip { bottom: 0; left: 0; position: absolute; top: 0; width: 4px; }
+  .mnote-card.pinned { border-color: color-mix(in oklab, var(--m-primary) 40%, var(--m-border)); }
+  .mnote-pin-star { color: var(--m-primary); flex: none; }
+  .mnote-card-body b { align-items: center; display: flex; gap: 5px; }
+  /* Anillo de progreso (checklists sin precios) */
+  .mnote-card-ring { flex: none; height: 38px; position: relative; width: 38px; }
+  .mnote-card-ring em { color: var(--m-text); font-size: 11px; font-style: normal; font-variant-numeric: tabular-nums; font-weight: 850; left: 50%; position: absolute; top: 50%; transform: translate(-50%, -50%); }
+  .mnote-card-top { align-items: center; display: flex; gap: 12px; }
+  .mnote-card-body { flex: 1; min-width: 0; }
+  .mnote-card-body b { display: block; font-size: 15px; font-weight: 750; letter-spacing: -.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mnote-card-body small { color: var(--m-muted); font-size: 11.5px; font-weight: 600; }
+  .mnote-card-tot { flex-shrink: 0; font-size: 15px; font-weight: 850; font-variant-numeric: tabular-nums; text-align: right; }
+  .mnote-card-tot small { color: var(--m-muted); display: block; font-size: 9.5px; font-weight: 600; }
+  .mnote-bar { background: color-mix(in oklab, var(--m-text) 8%, transparent); border-radius: 4px; height: 6px; margin-top: 12px; overflow: hidden; position: relative; }
+  .mnote-bar i { border-radius: 4px; bottom: 0; left: 0; position: absolute; top: 0; transition: width .25s cubic-bezier(.2,.8,.2,1); }
+  .mnote-card-meta { color: var(--m-muted); display: flex; font-size: 10.5px; font-weight: 650; justify-content: space-between; margin-top: 7px; font-variant-numeric: tabular-nums; }
+
+  /* Hoja de acciones al mantener pulsado una lista */
+  .mnote-actionsheet {
+    background: var(--m-bg);
+    border-radius: 22px 22px 0 0;
+    padding: 8px 10px calc(12px + env(safe-area-inset-bottom));
+  }
+  .mnote-actionsheet header { align-items: center; display: flex; gap: 12px; padding: 12px 12px 10px; }
+  .mnote-actionsheet header b { font-size: 15px; font-weight: 800; }
+  .mnote-actionsheet header small { color: var(--m-muted); display: block; font-size: 12px; }
+  .mnote-actionsheet-acts { display: grid; gap: 3px; }
+  .mnote-actionsheet-acts button {
+    align-items: center;
+    background: var(--m-surface);
+    border: 0;
+    border-radius: 12px;
+    color: var(--m-text);
+    display: flex;
+    font-family: inherit;
+    font-size: 14.5px;
+    font-weight: 650;
+    gap: 13px;
+    padding: 13px 15px;
+    text-align: left;
+    width: 100%;
+  }
+  .mnote-actionsheet-acts button:active { background: color-mix(in oklab, var(--m-text) 6%, var(--m-surface)); }
+  .mnote-actionsheet-acts button.danger { color: var(--m-expense); }
+
+  /* Vista previa de ítems dentro de la tarjeta — reconocer sin abrir. */
+  .mnote-card-prev { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .mnote-card-prev span {
+    background: color-mix(in oklab, var(--m-text) 6%, transparent);
+    border-radius: 7px; color: var(--m-muted); font-size: 11.5px; padding: 3px 8px;
+    max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .mnote-card-prev span.done { opacity: .5; text-decoration: line-through; }
+  .mnote-card-prev span.more { font-weight: 750; }
+  .mnote-card-prev span.note-body { background: none; color: var(--m-muted); font-style: italic; padding: 0; white-space: normal; }
+
+  /* Fila de crear: primaria (lista) + botón secundario (nota de texto). */
+  .mnote-new-row { align-items: stretch; display: flex; gap: 8px; }
+  .mnote-new-row .mnote-new { flex: 1; }
+  .mnote-new-note {
+    align-items: center; background: transparent;
+    border: 1.5px dashed color-mix(in oklab, var(--accent) 45%, var(--m-border));
+    border-radius: 15px; color: var(--accent); display: flex; flex: none;
+    justify-content: center; min-height: 52px; width: 52px;
+  }
+  .mnote-new-note:active { background: color-mix(in oklab, var(--accent) 8%, transparent); }
+  .mnote-empty-alt { background: none; border: 0; color: var(--m-muted); font-size: 13px; font-weight: 650; padding: 6px; text-decoration: underline; }
+
+  .mnote-new {
+    align-items: center;
+    background: transparent;
+    border: 1.5px dashed color-mix(in oklab, var(--accent) 45%, var(--m-border));
+    border-radius: 15px;
+    color: var(--accent);
+    display: flex;
+    font-size: 14.5px;
+    font-weight: 750;
+    gap: 8px;
+    justify-content: center;
+    min-height: 52px;
+    width: 100%;
+  }
+  .mnote-new:active { background: color-mix(in oklab, var(--accent) 8%, transparent); }
+
+  .mnote-archived-toggle {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    color: var(--m-muted);
+    display: flex;
+    font-size: 13px;
+    font-weight: 700;
+    gap: 8px;
+    margin-top: 4px;
+    min-height: 40px;
+    padding: 0 6px;
+    width: 100%;
+  }
+  .mnote-list-archived { margin-top: 8px; opacity: .72; }
+
+  .mnote-empty { align-items: center; display: flex; flex-direction: column; gap: 9px; padding: 54px 20px; text-align: center; }
+  .mnote-empty-icon {
+    align-items: center; background: color-mix(in oklab, var(--m-text) 6%, transparent);
+    border-radius: 50%; color: var(--m-muted); display: flex; height: 64px; justify-content: center; margin-bottom: 4px; width: 64px;
+  }
+  .mnote-empty strong { font-size: 17px; font-weight: 800; }
+  .mnote-empty p { color: var(--m-muted); font-size: 13.5px; line-height: 1.5; margin: 0; max-width: 34ch; }
+  .mnote-empty-btn {
+    align-items: center; background: var(--accent); border: 0; border-radius: 13px; color: #06121c;
+    display: flex; font-size: 14.5px; font-weight: 800; gap: 8px; justify-content: center; margin-top: 8px; min-height: 48px; padding: 0 22px;
+  }
+
+  /* Type picker */
+  .mnote-typepicker > header, .mnote-detail > header, .mnote-itemeditor > header, .mnote-picker > header {
+    align-items: center; border-bottom: 1px solid var(--m-border); display: flex; gap: 10px; justify-content: space-between; padding: 16px 18px 13px;
+  }
+  .mnote-typepicker > header span, .mnote-itemeditor > header span, .mnote-picker > header span { font-size: 17px; font-weight: 800; letter-spacing: -.02em; }
+  .mnote-typepicker > header button, .mnote-detail > header > button, .mnote-itemeditor > header button, .mnote-picker > header button {
+    align-items: center; background: color-mix(in oklab, var(--m-text) 8%, transparent); border: 0; border-radius: 50%;
+    color: var(--m-text); display: flex; flex-shrink: 0; height: 40px; justify-content: center; width: 40px;
+  }
+  .mnote-type-list { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px calc(20px + env(safe-area-inset-bottom)); }
+  .mnote-type-row {
+    align-items: center; background: color-mix(in oklab, var(--m-text) 4%, transparent); border: 1px solid var(--m-border);
+    border-radius: 16px; color: var(--m-text); display: flex; gap: 13px; padding: 13px; text-align: left; width: 100%;
+  }
+  .mnote-type-row:active { background: color-mix(in oklab, var(--m-text) 8%, transparent); }
+  .mnote-type-text { flex: 1; min-width: 0; }
+  .mnote-type-text b { display: block; font-size: 15px; font-weight: 750; }
+  .mnote-type-text small { color: var(--m-muted); font-size: 12px; }
+  .mnote-chevron { color: var(--m-muted); transform: rotate(90deg); flex-shrink: 0; }
+
+  /* Detail sheet */
+  .mnote-detail { display: flex; flex-direction: column; max-height: calc(calc(100dvh / var(--fs, 1)) - 70px - env(safe-area-inset-top)); }
+  .mnote-title-input {
+    background: transparent; border: 0; color: var(--m-text); flex: 1; font-family: inherit;
+    font-size: 18px; font-weight: 800; letter-spacing: -.02em; min-width: 0; outline: none; padding: 0;
+  }
+  .mnote-title-input::placeholder { color: var(--m-muted); }
+  .mnote-detail-body { display: flex; flex-direction: column; gap: 14px; overflow-y: auto; padding: 16px 18px 8px; }
+
+  .mnote-textarea {
+    background: color-mix(in oklab, var(--m-text) 4%, transparent); border: 1px solid var(--m-border); border-radius: 14px;
+    color: var(--m-text); font-family: inherit; font-size: 15px; line-height: 1.55; min-height: 220px; outline: none; padding: 14px; resize: none; width: 100%;
+  }
+
+  .mnote-items { display: flex; flex-direction: column; }
+  .mnote-items-empty { color: var(--m-muted); font-size: 13px; margin: 4px 2px 0; }
+  .mnote-item { align-items: center; display: flex; gap: 12px; padding: 9px 2px; }
+  .mnote-item + .mnote-item { border-top: 1px solid color-mix(in oklab, var(--m-text) 6%, transparent); }
+  .mnote-cbox {
+    align-items: center; background: transparent; border: 2px solid color-mix(in oklab, var(--m-text) 26%, transparent);
+    border-radius: 7px; color: #06121c; display: flex; flex-shrink: 0; height: 22px; justify-content: center; width: 22px;
+  }
+  .mnote-cbox.on { background: var(--m-income); border-color: var(--m-income); }
+  .mnote-item-text { align-items: baseline; background: transparent; border: 0; color: var(--m-text); display: flex; flex: 1; gap: 10px; justify-content: space-between; min-width: 0; padding: 0; text-align: left; }
+  .mnote-item-name { font-size: 14.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mnote-item.done .mnote-item-name { color: var(--m-muted); text-decoration: line-through; }
+  .mnote-item-price { color: var(--m-text); flex-shrink: 0; font-size: 13px; font-weight: 750; font-variant-numeric: tabular-nums; }
+  .mnote-item.done .mnote-item-price { color: var(--m-muted); }
+  .mnote-item-star { color: #ffdd3d; margin-right: 4px; vertical-align: -2px; }
+
+  .mnote-additem { align-items: center; display: flex; gap: 9px; }
+  .mnote-additem input {
+    background: color-mix(in oklab, var(--m-text) 4%, transparent); border: 1px solid var(--m-border); border-radius: 13px;
+    color: var(--m-text); flex: 1; font-family: inherit; font-size: 14.5px; min-height: 46px; outline: none; padding: 0 14px;
+  }
+  .mnote-additem input:focus { border-color: color-mix(in oklab, var(--accent) 55%, var(--m-border)); }
+  .mnote-additem button {
+    align-items: center; background: var(--accent); border: 0; border-radius: 13px; color: #06121c; display: flex;
+    flex-shrink: 0; height: 46px; justify-content: center; width: 46px;
+  }
+  .mnote-additem button:disabled { background: color-mix(in oklab, var(--m-text) 10%, transparent); color: var(--m-muted); }
+
+  .mnote-totbar { background: linear-gradient(160deg, color-mix(in oklab, var(--accent) 8%, var(--m-surface)), var(--m-surface)); border: 1px solid var(--m-border); border-radius: 16px; padding: 13px 14px; }
+  .mnote-totrow { align-items: baseline; display: flex; font-size: 12.5px; justify-content: space-between; }
+  .mnote-totrow + .mnote-totrow { margin-top: 7px; }
+  .mnote-totrow span { color: var(--m-muted); font-weight: 600; }
+  .mnote-totrow b { font-variant-numeric: tabular-nums; font-weight: 800; }
+  .mnote-totrow.big span { color: var(--m-text); font-size: 13.5px; font-weight: 700; }
+  .mnote-totrow.big b { font-size: 19px; }
+
+  .mnote-warn {
+    align-items: center; background: color-mix(in oklab, #f59e0b 14%, transparent); border: 1px solid color-mix(in oklab, #f59e0b 30%, transparent);
+    border-radius: 13px; color: #f59e0b; display: flex; font-size: 12px; font-weight: 650; gap: 9px; line-height: 1.4; padding: 10px 12px;
+  }
+  .mnote-warn svg { flex-shrink: 0; }
+
+  /* ── Meta enlazada (Fase 2) ── */
+  .mnote-goal {
+    background: var(--m-surface);
+    border: 1px solid var(--m-border);
+    border-radius: 14px;
+    padding: 13px 14px;
+  }
+  .mnote-goal-head { align-items: center; display: flex; gap: 11px; margin-bottom: 11px; }
+  .mnote-goal-title { display: flex; flex: 1; flex-direction: column; gap: 1px; min-width: 0; }
+  .mnote-goal-title b { font-size: 14px; font-weight: 750; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mnote-goal-title small { color: var(--m-muted); font-size: 11px; font-weight: 600; }
+  .mnote-goal-unlink {
+    align-items: center; background: color-mix(in oklab, var(--m-text) 8%, transparent); border: 0; border-radius: 50%;
+    color: var(--m-muted); display: flex; flex-shrink: 0; height: 28px; justify-content: center; width: 28px;
+  }
+  .mnote-goal-bar { background: #0e131c; border-radius: 6px; height: 9px; overflow: hidden; position: relative; }
+  .mnote-goal-bar i { background: linear-gradient(90deg, #a78bfa, #5bc0ff); border-radius: 6px; bottom: 0; left: 0; position: absolute; top: 0; transition: width .3s cubic-bezier(.2,.8,.2,1); }
+  .mnote-goal-meta { color: var(--m-muted); display: flex; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; justify-content: space-between; margin-top: 8px; }
+  .mnote-goal-hint { color: var(--m-text); font-size: 12.5px; font-weight: 650; margin: 8px 0 0; text-align: center; }
+
+  /* ── Acciones secundarias (duplicar / archivar) ── */
+  .mnote-secondary-actions { display: flex; gap: 9px; padding: 4px 18px 2px; }
+  .mnote-secondary-actions button {
+    align-items: center; background: color-mix(in oklab, var(--m-text) 6%, transparent); border: 0; border-radius: 12px;
+    color: var(--m-text); display: flex; flex: 1; font-size: 13px; font-weight: 700; gap: 7px; justify-content: center; min-height: 44px;
+  }
+  .mnote-secondary-actions button:active { background: color-mix(in oklab, var(--m-text) 10%, transparent); }
+
+  /* ── Toggle imprescindible en el editor de ítem ── */
+  .mnote-important-toggle {
+    align-items: center; background: color-mix(in oklab, var(--m-text) 4%, transparent); border: 1px solid var(--m-border);
+    border-radius: 13px; color: var(--m-muted); display: flex; gap: 10px; min-height: 52px; padding: 0 14px; width: 100%;
+  }
+  .mnote-important-toggle.on { border-color: color-mix(in oklab, #ffdd3d 55%, var(--m-border)); color: var(--m-text); }
+  .mnote-important-toggle.on svg { color: #ffdd3d; }
+  .mnote-important-toggle > span:nth-child(2) { flex: 1; font-size: 14.5px; font-weight: 650; text-align: left; }
+  .mnote-important-check {
+    align-items: center; background: transparent; border: 2px solid color-mix(in oklab, var(--m-text) 26%, transparent);
+    border-radius: 7px; color: #06121c; display: flex; height: 22px; justify-content: center; width: 22px;
+  }
+  .mnote-important-check.on { background: #ffdd3d; border-color: #ffdd3d; }
+
+  .mnote-config { background: var(--m-surface); border: 1px solid var(--m-border); border-radius: 14px; overflow: hidden; }
+  .mnote-config-row { align-items: center; background: transparent; border: 0; color: var(--m-text); display: flex; justify-content: space-between; min-height: 48px; padding: 10px 14px; width: 100%; }
+  .mnote-config-row + .mnote-config-row { border-top: 1px solid var(--m-border); }
+  .mnote-config-k { align-items: center; color: var(--m-muted); display: flex; font-size: 13.5px; font-weight: 650; gap: 8px; }
+  .mnote-config-v { align-items: center; color: var(--m-text); display: flex; font-size: 13.5px; font-weight: 700; gap: 5px; }
+
+  .mnote-actions { display: flex; gap: 9px; padding: 12px 18px 6px; }
+  .mnote-btn-primary, .mnote-btn-ghost {
+    align-items: center; border-radius: 13px; display: flex; flex: 1; font-size: 13.5px; font-weight: 800; gap: 7px; justify-content: center; min-height: 50px; padding: 0 10px;
+  }
+  .mnote-btn-primary { background: var(--m-income); border: 0; color: #06121c; }
+  .mnote-btn-ghost { background: transparent; border: 1px solid var(--m-border); color: var(--m-text); flex: 0 0 auto; padding: 0 18px; }
+
+  .mnote-delete { align-items: center; background: transparent; border: 0; color: var(--m-expense); display: flex; font-size: 13px; font-weight: 700; gap: 7px; justify-content: center; min-height: 44px; padding-bottom: calc(6px + env(safe-area-inset-bottom)); width: 100%; }
+  .mnote-confirm-del { padding: 8px 18px calc(14px + env(safe-area-inset-bottom)); text-align: center; }
+  .mnote-confirm-del > span { color: var(--m-text); display: block; font-size: 13.5px; font-weight: 650; margin-bottom: 10px; }
+  .mnote-confirm-del > div { display: flex; gap: 10px; }
+  .mnote-confirm-del button { border: 0; border-radius: 12px; flex: 1; font-size: 14px; font-weight: 750; min-height: 46px; }
+  .mnote-confirm-del button:first-child { background: color-mix(in oklab, var(--m-text) 8%, transparent); color: var(--m-text); }
+  .mnote-confirm-del button.danger { background: var(--m-expense); color: #2a0910; }
+
+  /* Item editor */
+  .mnote-itemeditor-body { display: flex; flex-direction: column; gap: 14px; padding: 16px 18px; }
+  .mnote-input {
+    background: color-mix(in oklab, var(--m-text) 4%, transparent); border: 1px solid var(--m-border); border-radius: 13px;
+    color: var(--m-text); font-family: inherit; font-size: 16px; font-weight: 600; min-height: 50px; outline: none; padding: 0 14px; width: 100%;
+  }
+  .mnote-input:focus { border-color: color-mix(in oklab, var(--accent) 55%, var(--m-border)); }
+  .mnote-price-row { display: flex; gap: 10px; }
+  .mnote-price-btn { align-items: flex-start; background: color-mix(in oklab, var(--m-text) 4%, transparent); border: 1px solid var(--m-border); border-radius: 13px; color: var(--m-text); display: flex; flex: 1; flex-direction: column; gap: 3px; min-height: 58px; padding: 10px 14px; }
+  .mnote-price-btn span { color: var(--m-muted); font-size: 11.5px; font-weight: 650; }
+  .mnote-price-btn b { font-size: 17px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .mnote-qty { display: flex; flex-direction: column; gap: 4px; }
+  .mnote-qty > span { color: var(--m-muted); font-size: 11.5px; font-weight: 650; padding-left: 2px; }
+  .mnote-qty-stepper { align-items: center; background: color-mix(in oklab, var(--m-text) 4%, transparent); border: 1px solid var(--m-border); border-radius: 13px; display: flex; gap: 4px; height: 58px; }
+  .mnote-qty-stepper button { background: transparent; border: 0; color: var(--m-text); font-size: 22px; font-weight: 700; height: 100%; width: 42px; }
+  .mnote-qty-stepper b { font-size: 17px; font-variant-numeric: tabular-nums; min-width: 26px; text-align: center; }
+  .mnote-line-hint { color: var(--m-muted); font-size: 12.5px; margin: 0; text-align: center; }
+  .mnote-line-hint b { color: var(--m-text); font-variant-numeric: tabular-nums; }
+  .mnote-itemeditor-actions { display: flex; gap: 10px; padding: 6px 18px calc(16px + env(safe-area-inset-bottom)); }
+  .mnote-item-del { align-items: center; background: color-mix(in oklab, var(--m-expense) 14%, transparent); border: 0; border-radius: 12px; color: var(--m-expense); display: flex; font-size: 14px; font-weight: 750; gap: 6px; justify-content: center; min-height: 48px; padding: 0 18px; }
+  .mnote-item-save { background: var(--accent); border: 0; border-radius: 12px; color: #06121c; flex: 1; font-size: 15px; font-weight: 800; min-height: 48px; }
+
+  /* Picker */
+  .mnote-picker-list { display: flex; flex-direction: column; gap: 6px; max-height: 60vh; overflow-y: auto; padding: 12px 16px calc(20px + env(safe-area-inset-bottom)); }
+  .mnote-picker-row { align-items: center; background: transparent; border: 0; border-radius: 13px; color: var(--m-text); display: flex; gap: 12px; padding: 9px 10px; text-align: left; width: 100%; }
+  .mnote-picker-row b { flex: 1; font-size: 14.5px; font-weight: 650; }
+  .mnote-picker-row.on { background: color-mix(in oklab, var(--m-text) 7%, transparent); }
+  .mnote-picker-row:active { background: color-mix(in oklab, var(--m-text) 5%, transparent); }
+}

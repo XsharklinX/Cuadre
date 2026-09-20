@@ -1,0 +1,274 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Presupuestos 4x2 - tres filas, no cuatro.
+
+  Cambios frente al diseno anterior:
+   - Fuera la linea "RD$ 400.00 / RD$ 250.02" bajo cada nombre: el % ya lo dice,
+     y era la que forzaba el crecimiento a lo alto.
+   - El % pasa a la derecha del nombre, en la misma linea.
+   - El color de la barra ahora SIGNIFICA estado (ok / warn / over). Antes todas
+     eran amarillas: un presupuesto al 160% se veia igual que uno al 32%.
+   - Orden por urgencia (lo mas pasado de limite, arriba) - lo resuelve el JS.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_budgets_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_surface"
+    android:orientation="vertical"
+    android:paddingStart="14dp"
+    android:paddingEnd="14dp"
+    android:paddingTop="13dp"
+    android:paddingBottom="13dp">
+
+    <TextView
+        android:id="@+id/widget_budgets_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:includeFontPadding="false"
+        android:letterSpacing="0.11"
+        android:maxLines="1"
+        android:text="@string/widget_budgets_title"
+        android:textAllCaps="true"
+        android:textColor="#6E7688"
+        android:textSize="9sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/widget_budgets_empty"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:text="@string/widget_empty_state"
+        android:textColor="#6E7688"
+        android:textSize="11sp"
+        android:visibility="gone" />
+
+    <!-- Fila 1 -->
+    <LinearLayout
+        android:id="@+id/widget_budget_row_1"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:baselineAligned="true"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/widget_budget_name_1"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:textColor="#E4E9F3"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/widget_budget_pct_1"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:includeFontPadding="false"
+                android:textColor="#6E7688"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!--
+          Tres barras apiladas, una por estado. Se muestra solo la que aplica.
+          RemoteViews no permite cambiar el progressDrawable en caliente
+          (setProgressDrawable no es @RemotableViewMethod) y setColorStateList
+          es API 31+; la app soporta desde API 24. Apilar es la via portable.
+        -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp">
+
+            <ProgressBar
+                android:id="@+id/widget_budget_bar_ok_1"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="4dp"
+                android:max="100"
+                android:progressDrawable="@drawable/widget_bar_ok" />
+
+            <ProgressBar
+                android:id="@+id/widget_budget_bar_warn_1"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="4dp"
+                android:max="100"
+                android:progressDrawable="@drawable/widget_bar_warn"
+                android:visibility="gone" />
+
+            <ProgressBar
+                android:id="@+id/widget_budget_bar_over_1"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="4dp"
+                android:max="100"
+                android:progressDrawable="@drawable/widget_bar_over"
+                android:visibility="gone" />
+        </FrameLayout>
+    </LinearLayout>
+
+    <!-- Fila 2 -->
+    <LinearLayout
+        android:id="@+id/widget_budget_row_2"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="9dp"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:baselineAligned="true"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/widget_budget_name_2"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:textColor="#E4E9F3"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/widget_budget_pct_2"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:includeFontPadding="false"
+                android:textColor="#6E7688"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!--
+          Tres barras apiladas, una por estado. Se muestra solo la que aplica.
+          RemoteViews no permite cambiar el progressDrawable en caliente
+          (setProgressDrawable no es @RemotableViewMethod) y setColorStateList
+          es API 31+; la app soporta desde API 24. Apilar es la via portable.
+        -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp">
+
+            <ProgressBar
+                android:id="@+id/widget_budget_bar_ok_2"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="4dp"
+                android:max="100"
+                android:progressDrawable="@drawable/widget_bar_ok" />
+
+            <ProgressBar
+                android:id="@+id/widget_budget_bar_warn_2"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="4dp"
+                android:max="100"
+                android:progressDrawable="@drawable/widget_bar_warn"
+                android:visibility="gone" />
+
+            <ProgressBar
+                android:id="@+id/widget_budget_bar_over_2"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="4dp"
+                android:max="100"
+                android:progressDrawable="@drawable/widget_bar_over"
+                android:visibility="gone" />
+        </FrameLayout>
+    </LinearLayout>
+
+    <!-- Fila 3 -->
+    <LinearLayout
+        android:id="@+id/widget_budget_row_3"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="9dp"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:baselineAligned="true"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/widget_budget_name_3"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:textColor="#E4E9F3"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/widget_budget_pct_3"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:includeFontPadding="false"
+                android:textColor="#6E7688"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!--
+          Tres barras apiladas, una por estado. Se muestra solo la que aplica.
+          RemoteViews no permite cambiar el progressDrawable en caliente
+          (setProgressDrawable no es @RemotableViewMethod) y setColorStateList
+          es API 31+; la app soporta desde API 24. Apilar es la via portable.
+        -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp">
+
+            <ProgressBar
+                android:id="@+id/widget_budget_bar_ok_3"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="4dp"
+                android:max="100"
+                android:progressDrawable="@drawable/widget_bar_ok" />
+
+            <ProgressBar
+                android:id="@+id/widget_budget_bar_warn_3"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="4dp"
+                android:max="100"
+                android:progressDrawable="@drawable/widget_bar_warn"
+                android:visibility="gone" />
+
+            <ProgressBar
+                android:id="@+id/widget_budget_bar_over_3"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="4dp"
+                android:max="100"
+                android:progressDrawable="@drawable/widget_bar_over"
+                android:visibility="gone" />
+        </FrameLayout>
+    </LinearLayout>
+
+</LinearLayout>

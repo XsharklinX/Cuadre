@@ -1,0 +1,602 @@
+/* ═══════════════════════════════════════════════════════════
+   CUENTAS
+   ═══════════════════════════════════════════════════════════
+
+   Esta pantalla tenía 1016 líneas de TSX sostenidas por 171 de CSS propio:
+   el resto lo tomaba prestado de Perfil (`mpr-`), Reportes (`mrep-`), la
+   hoja de divisas (`mcur-`) y Ajustes (`mset-`). Por eso nada alineaba ni
+   respiraba igual — no era un problema de gusto, era que no tenía lenguaje
+   propio.
+
+   Ahora todo vive bajo `sacc-` y la pantalla se sostiene sola.
+
+   LA DECISIÓN DE FONDO: una cuenta de efectivo y una tarjeta de crédito no
+   son la misma clase de objeto. Una tiene un número; la otra tiene dos
+   saldos, un límite, un ciclo, una fecha de pago y un interés. Darles la
+   misma fila obliga a la tarjeta a caber donde no cabe, y es lo que hacía
+   que la fila cargara ocho elementos.
+
+   Por eso hay DOS REGISTROS: filas compactas para el dinero que tienes,
+   tarjetas completas para el dinero que debes.
+   ═══════════════════════════════════════════════════════════ */
+
+.sacc-root {
+  display: grid;
+  gap: 20px;
+  padding: 4px 0 24px;
+}
+
+/* ── Patrimonio ────────────────────────────────────────────
+   Una sola cifra manda. El reparto activo/deuda va debajo, en una barra
+   que se lee de un vistazo, y los dos montos se nombran en texto: el color
+   nunca es el único portador del dato. */
+.sacc-hero {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+.sacc-hero-label {
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.sacc-hero-value {
+  color: var(--text);
+  display: block;
+  font-size: 32px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 850;
+  letter-spacing: -.02em;
+  line-height: 1;
+  margin-top: -4px;
+}
+.sacc-hero-value.negative { color: var(--expense); }
+
+.sacc-hero-bar {
+  background: var(--expense);
+  border-radius: 999px;
+  display: flex;
+  height: 8px;
+  overflow: hidden;
+}
+.sacc-hero-bar > i {
+  background: var(--income);
+  display: block;
+  height: 100%;
+  transition: width .3s ease;
+}
+
+.sacc-hero-split { display: flex; gap: 20px; }
+.sacc-hero-stat { display: grid; gap: 2px; }
+.sacc-hero-stat small {
+  align-items: center;
+  color: var(--text-dim);
+  display: flex;
+  font-size: 11.5px;
+  font-weight: 700;
+  gap: 5px;
+}
+.sacc-hero-stat small::before {
+  border-radius: 50%;
+  content: '';
+  height: 7px;
+  width: 7px;
+}
+.sacc-hero-stat.asset small::before { background: var(--income); }
+.sacc-hero-stat.debt  small::before { background: var(--expense); }
+.sacc-hero-stat strong {
+  color: var(--text);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+
+/* ── Próximo pago ──────────────────────────────────────────
+   Con dos o tres tarjetas, "¿cuánto debo y cuándo?" es LA pregunta. Antes
+   esa respuesta estaba enterrada dentro de la ficha de cada tarjeta, así
+   que había que abrirlas una por una para armarla mentalmente. */
+.sacc-next {
+  align-items: center;
+  background: color-mix(in oklab, var(--warn) 12%, transparent);
+  border-radius: 14px;
+  display: flex;
+  gap: 12px;
+  padding: 12px 14px;
+}
+.sacc-next.calm { background: var(--surface); border: 1px solid var(--border); }
+.sacc-next-ico { color: var(--warn); flex-shrink: 0; }
+.sacc-next.calm .sacc-next-ico { color: var(--text-dim); }
+.sacc-next-body { display: grid; flex: 1; gap: 1px; min-width: 0; }
+.sacc-next-body b { color: var(--text); font-size: 14px; font-weight: 800; }
+.sacc-next-body small { color: var(--text-dim); font-size: 12px; line-height: 16px; }
+.sacc-next-amount {
+  color: var(--text);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+/* ── Encabezado de sección ─────────────────────────────── */
+.sacc-section {
+  align-items: baseline;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 0 2px;
+}
+.sacc-section-title {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 850;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.sacc-section-total {
+  color: var(--text-dim);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 750;
+}
+.sacc-block { display: grid; gap: 10px; }
+
+/* ── REGISTRO 1: dinero que tienes ─────────────────────────
+   Un saldo es un número. No necesita una tarjeta, ni un sparkline de 20px
+   que a ese tamaño no se lee: eso era ruido compitiendo con la cifra. */
+.sacc-rows {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  display: grid;
+  overflow: hidden;
+}
+.sacc-row {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  display: flex;
+  gap: 12px;
+  min-height: 60px;
+  padding: 10px 14px;
+  text-align: left;
+  width: 100%;
+}
+.sacc-row + .sacc-row { border-top: 1px solid var(--border); }
+.sacc-row:active { background: var(--surface-2); }
+.sacc-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.sacc-row-ico {
+  border-radius: 12px;
+  display: grid;
+  flex-shrink: 0;
+  height: 38px;
+  place-items: center;
+  width: 38px;
+}
+.sacc-row-info { display: grid; flex: 1; gap: 2px; min-width: 0; }
+.sacc-row-name {
+  align-items: center;
+  color: var(--text);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 15px;
+  font-weight: 750;
+  gap: 6px;
+  line-height: 20px;
+}
+.sacc-row-meta {
+  color: var(--text-dim);
+  font-size: 12.5px;
+  line-height: 16px;
+}
+.sacc-row-amount {
+  color: var(--text);
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.sacc-badge {
+  background: var(--track);
+  border-radius: 999px;
+  color: var(--text-dim);
+  font-size: 9.5px;
+  font-weight: 850;
+  letter-spacing: .04em;
+  padding: 1px 6px;
+  text-transform: uppercase;
+}
+
+/* ── REGISTRO 2: tarjetas de crédito ───────────────────────
+   Tarjeta completa, no fila. Lleva un RAIL lateral en el color de la
+   cuenta en vez de pintar toda la tarjeta de ese color: un color elegido
+   por el usuario no garantiza contraste, y como fondo dejaría ilegible la
+   mitad de los casos. */
+.sacc-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--rail, var(--accent));
+  border-radius: 14px;
+  cursor: pointer;
+  display: grid;
+  gap: 12px;
+  padding: 14px 14px 14px 13px;
+  text-align: left;
+  width: 100%;
+}
+.sacc-card:active { background: var(--surface-2); }
+.sacc-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.sacc-card-head { align-items: flex-start; display: flex; gap: 12px; justify-content: space-between; }
+.sacc-card-id { display: grid; gap: 2px; min-width: 0; }
+.sacc-card-name {
+  align-items: center;
+  color: var(--text);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 15px;
+  font-weight: 800;
+  gap: 6px;
+  line-height: 20px;
+}
+.sacc-card-bank { color: var(--text-dim); font-size: 12.5px; line-height: 16px; }
+.sacc-card-chip {
+  border-radius: 10px;
+  display: grid;
+  flex-shrink: 0;
+  height: 34px;
+  place-items: center;
+  width: 34px;
+}
+
+/* Los dos saldos, a peso IGUAL. Una tarjeta dominicana arrastra dos deudas
+   reales que se pagan por separado; jerarquizar una sobre la otra inventa
+   una diferencia que no existe. */
+.sacc-card-balances { display: grid; gap: 8px; grid-template-columns: 1fr 1fr; }
+.sacc-card-balances.single { grid-template-columns: 1fr; }
+.sacc-bal {
+  background: var(--surface-2);
+  border-radius: 11px;
+  display: grid;
+  gap: 2px;
+  padding: 9px 11px;
+}
+.sacc-bal-label {
+  align-items: center;
+  color: var(--text-dim);
+  display: flex;
+  font-size: 10.5px;
+  font-weight: 800;
+  gap: 4px;
+  letter-spacing: .06em;
+}
+.sacc-bal-value {
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 850;
+  letter-spacing: -.01em;
+}
+/* Violeta, no el rojo de gasto: gastar en efectivo mueve dinero que tienes,
+   gastar con tarjeta crea deuda. La app necesita enseñar esa diferencia. */
+.sacc-bal-value.owed { color: var(--credit-debt, #b98cff); }
+.sacc-bal-value.clear { color: var(--text-dim); }
+
+/* Utilización */
+.sacc-util { display: grid; gap: 5px; }
+.sacc-util-head { align-items: baseline; display: flex; justify-content: space-between; gap: 8px; }
+.sacc-util-label { color: var(--text-dim); font-size: 12px; font-weight: 650; }
+.sacc-util-value {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.sacc-util-track { background: var(--track); border-radius: 999px; height: 5px; overflow: hidden; }
+.sacc-util-fill { border-radius: 999px; height: 100%; transition: width .25s ease; }
+/* Umbrales de riesgo CREDITICIO, no estéticos: pasar del 30% ya golpea el
+   score, mucho antes de acercarse al límite. */
+.sacc-util-fill.ok    { background: var(--income); }
+.sacc-util-fill.watch { background: var(--warn); }
+.sacc-util-fill.high  { background: var(--expense); }
+.sacc-util-value.ok    { color: var(--text-dim); }
+.sacc-util-value.watch { color: var(--warn); }
+.sacc-util-value.high  { color: var(--expense); }
+
+/* Ciclo: sin corte, pago y mínimo, un saldo de tarjeta es un número sin
+   consecuencia. Un dato ausente es '—', nunca 0. */
+.sacc-cycle {
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 0;
+  padding-top: 11px;
+}
+.sacc-cycle > div { display: grid; gap: 1px; min-width: 0; }
+.sacc-cycle dt {
+  color: var(--text-dim);
+  font-size: 9.5px;
+  font-weight: 850;
+  letter-spacing: .07em;
+}
+.sacc-cycle dd {
+  color: var(--text);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  margin: 0;
+}
+/* Ámbar, no rojo: rojo es dinero que ya salió, no una fecha que se acerca. */
+.sacc-cycle dd.soon { color: var(--warn); }
+
+.sacc-card-warn {
+  align-items: flex-start;
+  color: var(--warn);
+  display: flex;
+  font-size: 11.5px;
+  font-weight: 700;
+  gap: 6px;
+  line-height: 15px;
+}
+.sacc-card-warn svg { flex-shrink: 0; margin-top: 1px; }
+
+/* ── Añadir y vacío ────────────────────────────────────── */
+.sacc-add {
+  align-items: center;
+  background: transparent;
+  border: 1px dashed var(--border);
+  border-radius: 14px;
+  color: var(--text-dim);
+  cursor: pointer;
+  display: flex;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 750;
+  gap: 8px;
+  justify-content: center;
+  min-height: 52px;
+  width: 100%;
+}
+.sacc-add:active { background: var(--surface-2); }
+.sacc-add:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.sacc-empty {
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  padding: 48px 24px;
+  text-align: center;
+}
+.sacc-empty-ico { color: var(--text-dim); opacity: .4; }
+.sacc-empty h3 { color: var(--text); font-size: 17px; font-weight: 800; margin: 0; }
+.sacc-empty p { color: var(--text-dim); font-size: 13.5px; line-height: 19px; margin: 0; max-width: 32ch; }
+.sacc-empty button {
+  background: var(--accent);
+  border: 0;
+  border-radius: 14px;
+  color: #08201c;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 850;
+  margin-top: 4px;
+  min-height: 48px;
+  padding: 0 24px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sacc-hero-bar > i, .sacc-util-fill { transition-duration: 0ms; }
+}
+
+/* Distintivo de red (Visa, Mastercard…). Geometría propia y nombre en texto,
+   nunca los logotipos de las marcas: son marcas registradas. */
+.netmark { align-items: center; display: inline-flex; flex-shrink: 0; }
+.netmark-word {
+  font-weight: 900;
+  letter-spacing: .02em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+/* En la fila compacta, la red va junto al saldo: identifica la cuenta antes
+   de que el ojo llegue al nombre. */
+.sacc-row-right { align-items: center; display: flex; gap: 10px; }
+
+/* En la tarjeta, la red OCUPA el lugar del icono genérico cuando se conoce:
+   es lo que está impreso en el plástico y lo que el ojo busca primero. */
+.sacc-card-net {
+  align-items: center;
+  background: var(--surface-2);
+  border-radius: 8px;
+  display: grid;
+  flex-shrink: 0;
+  min-height: 34px;
+  padding: 0 9px;
+  place-items: center;
+}
+
+.sacc-locked-note {
+  align-items: flex-start;
+  color: var(--text-dim);
+  display: flex;
+  font-size: 12.5px;
+  gap: 7px;
+  line-height: 17px;
+  margin: 0;
+}
+.sacc-locked-note svg { flex-shrink: 0; margin-top: 2px; }
+
+/* ── Selector de banco ─────────────────────────────────────
+   Se elige de la lista, nunca se escribe: con texto libre el id no coincide
+   y las comisiones automáticas dejan de aplicarse sin que nada lo indique. */
+.mbank-sheet {
+  background: var(--surface);
+  border-radius: 20px 20px 0 0;
+  display: grid;
+  gap: 12px;
+  grid-template-rows: auto auto 1fr auto;
+  max-height: 86vh;
+  padding: 14px 16px calc(20px + env(safe-area-inset-bottom, 0px));
+  width: 100%;
+}
+.mbank-header { align-items: center; display: flex; justify-content: space-between; }
+.mbank-header > span { color: var(--text); font-size: 16px; font-weight: 850; }
+.mbank-header > button {
+  background: var(--track); border: 0; border-radius: 999px; color: var(--text-dim);
+  display: grid; flex-shrink: 0; height: 32px; place-items: center; width: 32px;
+}
+
+.mbank-search {
+  align-items: center;
+  background: var(--surface-2);
+  border-radius: 12px;
+  color: var(--text-dim);
+  display: flex;
+  gap: 9px;
+  padding: 0 12px;
+}
+.mbank-search input {
+  background: transparent; border: 0; color: var(--text); flex: 1;
+  font-family: inherit; font-size: 15px; min-height: 46px; min-width: 0; outline: none;
+}
+.mbank-search input::placeholder { color: var(--text-dim); }
+.mbank-clear {
+  background: var(--track); border: 0; border-radius: 999px; color: var(--text-dim);
+  display: grid; flex-shrink: 0; height: 22px; place-items: center; width: 22px;
+}
+
+.mbank-list { display: grid; gap: 2px; overflow-y: auto; }
+.mbank-group { display: grid; gap: 2px; }
+.mbank-group-title {
+  color: var(--text-dim);
+  font-size: 10.5px;
+  font-weight: 850;
+  letter-spacing: .07em;
+  margin: 10px 0 2px;
+  text-transform: uppercase;
+}
+.mbank-row {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 12px;
+  cursor: pointer;
+  display: flex;
+  gap: 11px;
+  min-height: 56px;
+  padding: 8px 10px;
+  text-align: left;
+  width: 100%;
+}
+.mbank-row:active { background: var(--surface-2); }
+.mbank-row.on { background: color-mix(in oklab, var(--accent) 12%, transparent); }
+.mbank-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* Inicial en vez de logo: los logotipos bancarios son marcas registradas, y
+   además harían falta ~60 imágenes que engordarían la app sin aportar nada
+   que la inicial no resuelva. */
+.mbank-initial {
+  background: var(--surface-2);
+  border-radius: 10px;
+  color: var(--text-dim);
+  display: grid;
+  flex-shrink: 0;
+  font-size: 15px;
+  font-weight: 850;
+  height: 36px;
+  place-items: center;
+  width: 36px;
+}
+.mbank-initial.none { color: var(--text-dim); }
+.mbank-info { display: grid; flex: 1; gap: 1px; min-width: 0; }
+.mbank-info strong { color: var(--text); font-size: 14.5px; font-weight: 750; }
+.mbank-info small { color: var(--text-dim); font-size: 11.5px; line-height: 15px; }
+.mbank-empty { color: var(--text-dim); font-size: 13px; padding: 24px 8px; text-align: center; }
+.mbank-count { color: var(--text-dim); font-size: 11px; margin: 0; text-align: center; }
+
+/* ── Acciones de la ficha ──────────────────────────────────
+   Arriba, no al fondo. "Conciliar" vivía después de la lista de actividad y
+   "Pagar tarjeta" estaba a tres toques detrás de un "Transferir" genérico. */
+.sacc-actions { display: flex; gap: 8px; margin-bottom: 14px; }
+.sacc-action {
+  align-items: center;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  flex: 1;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 750;
+  gap: 6px;
+  justify-content: center;
+  min-height: 44px;
+}
+.sacc-action.primary {
+  background: var(--accent);
+  border-color: transparent;
+  color: #08201c;
+  font-weight: 850;
+}
+.sacc-action:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ── Pagar tarjeta ─────────────────────────────────────── */
+.sacc-pay-sheet {
+  background: var(--surface);
+  border-radius: 20px 20px 0 0;
+  display: grid;
+  gap: 12px;
+  max-height: 86vh;
+  overflow-y: auto;
+  padding: 14px 16px calc(22px + env(safe-area-inset-bottom, 0px));
+  width: 100%;
+}
+.sacc-pay-owed {
+  background: var(--surface-2);
+  border-radius: 14px;
+  display: grid;
+  gap: 2px;
+  padding: 14px;
+}
+.sacc-pay-owed small { color: var(--text-dim); font-size: 11.5px; font-weight: 750; letter-spacing: .05em; text-transform: uppercase; }
+.sacc-pay-owed strong {
+  color: var(--expense);
+  font-size: 26px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 850;
+  letter-spacing: -.02em;
+}
+.sacc-pay-owed span { color: var(--text-dim); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.sacc-pay-sources { display: grid; gap: 2px; }
+
+/* Atajos por el monto que la gente de verdad paga. Teclear el total exacto de
+   memoria es el paso que hace que se posponga el pago. */
+.sacc-pay-quick { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.sacc-pay-quick button {
+  background: var(--accent);
+  border: 0;
+  border-radius: 12px;
+  color: #08201c;
+  flex: 1;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 850;
+  min-height: 46px;
+  min-width: 96px;
+}
+.sacc-pay-quick button.ghost {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-weight: 750;
+}
+.sacc-pay-quick button[disabled] { cursor: not-allowed; opacity: .45; }
+.sacc-pay-quick button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

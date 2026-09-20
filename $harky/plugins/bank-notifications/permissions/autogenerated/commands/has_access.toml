@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-has-access"
+description = "Enables the has_access command without any pre-configured scope."
+commands.allow = ["has_access"]
+
+[[permission]]
+identifier = "deny-has-access"
+description = "Denies the has_access command without any pre-configured scope."
+commands.deny = ["has_access"]

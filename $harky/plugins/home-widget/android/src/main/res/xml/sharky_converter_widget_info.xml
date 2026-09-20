@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Conversor: baja de 3x3 a 2x2. Son tres cifras; pedia 3x3 solo porque cada una
+  vivia en su propia tarjeta con borde y bandera.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="110dp"
+    android:minHeight="110dp"
+    android:minResizeWidth="110dp"
+    android:minResizeHeight="110dp"
+    android:targetCellWidth="2"
+    android:targetCellHeight="2"
+    android:updatePeriodMillis="3600000"
+    android:resizeMode="horizontal"
+    android:widgetCategory="home_screen"
+    android:initialLayout="@layout/widget_converter"
+    android:previewLayout="@layout/widget_converter"
+    android:description="@string/widget_converter_description" />

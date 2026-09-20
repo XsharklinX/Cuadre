@@ -1,0 +1,29 @@
+include ':app'
+
+// El directorio del proyecto se llama "$harky", con un dolar literal.
+//
+// `tauri.settings.gradle` lo genera tauri-build escribiendo las rutas de los
+// plugins con el formato Debug de Rust ({:?}), que produce comillas DOBLES:
+//
+//     project(':tauri-plugin-x').projectDir = new File("E:\\Programacion\\$harky\\plugins\\x\\android")
+//
+// Rust no escapa el `$` porque ahi no significa nada, pero en Groovy una cadena
+// entre comillas dobles es una GString y `$harky` se interpreta como variable.
+// Sin esta linea el build muere en la evaluacion de settings con:
+//
+//     Could not get unknown property 'harky' for settings 'android'
+//
+// Definir la propiedad con su propio nombre como valor hace que la
+// interpolacion devuelva exactamente el texto original ($harky) y la ruta se
+// reconstruya bien. Tiene que ir ANTES del apply.
+//
+// No se puede arreglar editando tauri.settings.gradle: ese archivo se regenera
+// en cada compilacion de Rust (tauri-build/src/mobile.rs), asi que cualquier
+// parche ahi se pierde.
+//
+// Solo aplica porque los plugins viven dentro del repo (plugins/): antes
+// estaban en carpetas hermanas sin `$` en la ruta y el bug no se notaba. Si
+// algun dia se renombra la carpeta a una sin `$`, esta linea queda inerte.
+ext.harky = '$harky'
+
+apply from: 'tauri.settings.gradle'

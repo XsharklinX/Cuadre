@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Pantalla de cámara en vivo para escanear recibos. Fase 1: preview + captura.
+  Fase 2: OCR por frame en vivo (ImageAnalysis + ML Kit). Fase 3: `overlayView`
+  dibuja el recuadro azul sobre el monto detectado (y uno verde sobre la
+  tarjeta, si aparece). Fase 5: `manualHintLabel` sugiere el botón manual si
+  no se detecta nada en unos segundos.
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#000000">
+
+    <androidx.camera.view.PreviewView
+        android:id="@+id/previewView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <com.sharky.finanzas.mlkitocr.ScannerOverlayView
+        android:id="@+id/overlayView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <TextView
+        android:id="@+id/permissionMessage"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:gravity="center"
+        android:padding="32dp"
+        android:textColor="#FFFFFF"
+        android:textSize="15sp"
+        android:visibility="gone" />
+
+    <FrameLayout
+        android:id="@+id/topBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:padding="8dp">
+
+        <ImageButton
+            android:id="@+id/closeButton"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_gravity="start"
+            android:background="@drawable/scanner_round_button_bg"
+            android:contentDescription="@null"
+            android:padding="12dp"
+            android:src="@android:drawable/ic_menu_close_clear_cancel"
+            app:tint="#FFFFFF" />
+
+        <ImageButton
+            android:id="@+id/flashButton"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_gravity="end"
+            android:background="@drawable/scanner_round_button_bg"
+            android:contentDescription="@null"
+            android:padding="12dp"
+            android:src="@drawable/ic_scanner_flash_off"
+            app:tint="#FFFFFF" />
+    </FrameLayout>
+
+    <!-- Fase 5: si no se detecta nada en unos segundos, sugiere el botón
+         manual — nunca deja al usuario sin salida si el recuadro azul no
+         aparece (recibo dañado, letra muy chica, dispositivo lento). -->
+    <TextView
+        android:id="@+id/manualHintLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="110dp"
+        android:background="@drawable/scanner_round_button_bg"
+        android:paddingLeft="14dp"
+        android:paddingTop="8dp"
+        android:paddingRight="14dp"
+        android:paddingBottom="8dp"
+        android:textColor="#FFFFFF"
+        android:textSize="13sp"
+        android:visibility="gone" />
+
+    <FrameLayout
+        android:id="@+id/bottomBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:padding="24dp">
+
+        <ImageButton
+            android:id="@+id/captureButton"
+            android:layout_width="72dp"
+            android:layout_height="72dp"
+            android:layout_gravity="center"
+            android:background="@drawable/scanner_capture_button_bg"
+            android:contentDescription="@null" />
+    </FrameLayout>
+
+    <ProgressBar
+        android:id="@+id/captureProgress"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_gravity="center"
+        android:indeterminateTint="#FFFFFF"
+        android:visibility="gone" />
+
+</FrameLayout>

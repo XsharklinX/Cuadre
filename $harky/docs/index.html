@@ -1,0 +1,805 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>$harky — Finanzas personales para República Dominicana</title>
+    <meta
+      name="description"
+      content="$harky es una app de finanzas personales para Android, web y Windows: divide gastos entre categorías, cuentas en cualquier moneda, presupuestos con rollover, flujo de caja proyectado, importación bancaria dominicana y todo funcionando sin conexión."
+    />
+    <meta name="theme-color" content="#0b1220" />
+    <meta property="og:title" content="$harky — Finanzas personales para República Dominicana" />
+    <meta property="og:description" content="Registra, divide y proyecta tus finanzas desde una app local-first para Android, web y Windows." />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="./assets/screens/inicio.png" />
+    <link rel="icon" href="./assets/icon.svg" />
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #060a13;
+        --panel: rgba(15, 23, 42, 0.78);
+        --panel-strong: #101827;
+        --text: #f8fafc;
+        --muted: #9aa8bd;
+        --line: rgba(148, 163, 184, 0.2);
+        --accent: #3b82f6;
+        --accent-2: #22c55e;
+        --accent-3: #a78bfa;
+        --danger: #fb7185;
+        --shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at top left, rgba(59, 130, 246, 0.24), transparent 34rem),
+          radial-gradient(circle at 80% 20%, rgba(34, 197, 94, 0.11), transparent 30rem),
+          linear-gradient(180deg, #080d18 0%, var(--bg) 54%, #05070c 100%);
+        color: var(--text);
+        min-height: 100vh;
+      }
+
+      a { color: inherit; text-decoration: none; }
+      img { max-width: 100%; display: block; }
+
+      .ico { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+      .shell { width: min(1160px, calc(100% - 40px)); margin: 0 auto; }
+
+      .nav { display: flex; align-items: center; justify-content: space-between; padding: 22px 0; }
+
+      .brand { display: flex; align-items: center; gap: 12px; font-weight: 850; letter-spacing: -0.04em; font-size: 17px; }
+      .brand img { width: 40px; height: 40px; border-radius: 12px; box-shadow: 0 14px 34px rgba(59, 130, 246, 0.24); }
+      .brand span { color: var(--accent); }
+
+      .nav-links { display: flex; align-items: center; gap: 20px; color: var(--muted); font-size: 14px; }
+      .nav-links a:hover { color: var(--text); }
+
+      .hero {
+        display: grid;
+        grid-template-columns: 1.05fr 0.95fr;
+        gap: 48px;
+        align-items: center;
+        padding: 50px 0 60px;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border: 1px solid rgba(59, 130, 246, 0.28);
+        background: rgba(59, 130, 246, 0.1);
+        color: #bfdbfe;
+        border-radius: 999px;
+        padding: 8px 12px;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      h1 { margin: 20px 0 18px; font-size: clamp(38px, 6vw, 64px); line-height: 1.02; letter-spacing: -0.045em; }
+      h1 em { color: var(--accent); font-style: normal; }
+
+      .hero p { max-width: 540px; color: var(--muted); font-size: 17px; line-height: 1.7; margin: 0; }
+
+      .actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 26px; }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        justify-content: center;
+        min-height: 46px;
+        padding: 0 18px;
+        border-radius: 14px;
+        font-weight: 800;
+        font-size: 14px;
+        border: 1px solid transparent;
+      }
+
+      .btn.primary { background: linear-gradient(135deg, #3b82f6, #2563eb); box-shadow: 0 18px 46px rgba(37, 99, 235, 0.35); }
+      .btn.secondary { background: rgba(15, 23, 42, 0.78); border-color: var(--line); color: #dbeafe; }
+
+      .lang-toggle { cursor: pointer; font-family: inherit; min-height: 38px; padding: 0 14px; font-size: 13px; gap: 6px; }
+      .lang-toggle .lang-opt { opacity: 0.45; transition: opacity 0.15s; }
+      .lang-toggle .lang-opt.active { opacity: 1; color: var(--accent); }
+
+      .play-badge img { height: 54px; display: block; }
+
+      .platform-row { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 28px; color: #cbd5e1; font-size: 13px; }
+      .platform-row span { display: inline-flex; align-items: center; gap: 7px; font-weight: 650; }
+      .platform-row .ico { width: 16px; height: 16px; color: var(--accent); }
+
+      /* --- Real phone screenshot --- */
+      .phone-stage { display: flex; justify-content: center; position: relative; }
+
+      .phone-stage::before {
+        content: "";
+        position: absolute;
+        inset: 4% 12%;
+        border-radius: 50%;
+        background: rgba(59, 130, 246, 0.22);
+        filter: blur(70px);
+        z-index: 0;
+      }
+
+      .phone {
+        position: relative;
+        width: min(272px, 74vw);
+        border-radius: 38px;
+        padding: 12px;
+        background: linear-gradient(160deg, #1b2436, #0a0e16 60%);
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        box-shadow: var(--shadow);
+        z-index: 1;
+      }
+
+      .phone-screen {
+        position: relative;
+        border-radius: 27px;
+        overflow: hidden;
+        border: 1px solid rgba(148, 163, 184, 0.12);
+        aspect-ratio: 9 / 19.5;
+      }
+
+      .phone-screen img { width: 100%; height: 100%; object-fit: cover; object-position: top center; }
+
+      .phone-notch {
+        position: absolute;
+        top: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 76px;
+        height: 16px;
+        border-radius: 999px;
+        background: #050810;
+        z-index: 2;
+      }
+
+      .section { padding: 50px 0; }
+      .section-head { max-width: 680px; margin-bottom: 30px; }
+
+      h2 { margin: 0 0 12px; font-size: clamp(28px, 3.6vw, 40px); letter-spacing: -0.045em; }
+      .section-head p { margin: 0; color: var(--muted); line-height: 1.7; font-size: 15.5px; }
+
+      /* --- Featured cards --- */
+      .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+
+      .feature {
+        border: 1px solid var(--line);
+        background: var(--panel);
+        border-radius: 22px;
+        padding: 22px;
+        box-shadow: 0 18px 60px rgba(0, 0, 0, 0.18);
+      }
+
+      .feature strong { display: block; font-size: 16.5px; margin-bottom: 8px; letter-spacing: -0.01em; }
+      .feature p { margin: 0; color: var(--muted); line-height: 1.6; font-size: 13.8px; }
+
+      .feature .icon {
+        display: grid;
+        place-items: center;
+        width: 42px;
+        height: 42px;
+        margin-bottom: 16px;
+        border-radius: 14px;
+        background: rgba(59, 130, 246, 0.14);
+        color: #bfdbfe;
+      }
+
+      .feature.new { border-color: rgba(34, 197, 94, 0.35); }
+      .feature.new .icon { background: rgba(34, 197, 94, 0.16); color: #bbf7d0; }
+      .new-tag {
+        display: inline-block;
+        font-size: 10.5px;
+        font-weight: 900;
+        letter-spacing: 0.06em;
+        color: #bbf7d0;
+        background: rgba(34, 197, 94, 0.14);
+        border: 1px solid rgba(34, 197, 94, 0.28);
+        border-radius: 999px;
+        padding: 2px 8px;
+        margin-bottom: 10px;
+      }
+
+      /* --- Extra features tag cloud --- */
+      .tag-cloud { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px; }
+      .tag-cloud span {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        border: 1px solid var(--line);
+        background: rgba(15, 23, 42, 0.6);
+        border-radius: 999px;
+        padding: 8px 14px;
+        font-size: 13px;
+        color: #dbeafe;
+      }
+      .tag-cloud .ico { width: 15px; height: 15px; color: var(--muted); }
+
+      /* --- Screens gallery --- */
+      .screens-scroll {
+        display: flex;
+        gap: 16px;
+        overflow-x: auto;
+        padding: 6px 6px 18px;
+        scroll-snap-type: x mandatory;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      .screen-item { flex: 0 0 auto; scroll-snap-align: start; text-align: center; }
+
+      .screen-item .frame {
+        width: 192px;
+        border-radius: 24px;
+        padding: 8px;
+        background: linear-gradient(160deg, #1b2436, #0a0e16 60%);
+        border: 1px solid rgba(148, 163, 184, 0.16);
+        box-shadow: 0 14px 40px rgba(0, 0, 0, 0.25);
+      }
+
+      .screen-item .frame-screen { border-radius: 18px; overflow: hidden; aspect-ratio: 9 / 19.5; }
+      .screen-item .frame-screen img { width: 100%; height: 100%; object-fit: cover; object-position: top center; }
+      .screen-item small { display: block; margin-top: 10px; color: var(--muted); font-size: 12.5px; font-weight: 650; }
+
+      /* --- Release notes --- */
+      .release-list { display: grid; gap: 14px; }
+
+      .release-card {
+        border: 1px solid var(--line);
+        background: var(--panel);
+        border-radius: 22px;
+        padding: 20px 22px;
+        display: grid;
+        grid-template-columns: 108px 1fr;
+        gap: 18px;
+        align-items: start;
+        box-shadow: 0 18px 60px rgba(0, 0, 0, 0.18);
+      }
+
+      .release-card .tag-version { font-size: 12px; font-weight: 850; letter-spacing: 0.04em; color: #93c5fd; text-transform: uppercase; }
+      .release-card .tag-date { display: block; color: var(--muted); font-size: 11.5px; margin-top: 3px; }
+      .release-card strong { display: block; font-size: 16px; margin-bottom: 6px; }
+      .release-card ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 13.8px; line-height: 1.65; }
+      .release-card li + li { margin-top: 2px; }
+
+      /* --- Download / stack --- */
+      .download-grid { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 16px; align-items: stretch; }
+      .download-card, .legal-card { border: 1px solid var(--line); background: var(--panel); border-radius: 22px; padding: 22px; box-shadow: 0 18px 60px rgba(0, 0, 0, 0.18); }
+      .download-card strong, .legal-card strong { display: block; font-size: 17px; margin-bottom: 8px; }
+      .download-card p, .legal-card p { margin: 0; color: var(--muted); line-height: 1.65; font-size: 14px; }
+      .download-card { display: flex; flex-direction: column; }
+      .download-card .btn, .download-card .play-badge { margin-top: 18px; }
+      .download-card .play-badge { display: inline-flex; }
+      .download-card .platforms { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+      .download-card .platforms span { font-size: 12.5px; color: #cbd5e1; border: 1px solid var(--line); border-radius: 999px; padding: 5px 11px; }
+
+      .status {
+        display: inline-flex; gap: 8px; align-items: center; color: #bbf7d0;
+        background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.2);
+        border-radius: 999px; padding: 6px 10px; font-size: 12px; font-weight: 800; margin-bottom: 14px;
+      }
+
+      .legal-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+      .legal-card { transition: border-color 0.15s, transform 0.15s; }
+      .legal-card:hover { border-color: rgba(59, 130, 246, 0.4); transform: translateY(-2px); }
+      .legal-card span.arrow { color: var(--accent); font-weight: 900; }
+
+      .footer {
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        padding: 26px 0 34px;
+        font-size: 14px;
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+
+      .footer a:hover { color: var(--text); }
+
+      code { color: #dbeafe; background: rgba(148, 163, 184, 0.12); border: 1px solid rgba(148, 163, 184, 0.16); border-radius: 8px; padding: 2px 6px; }
+
+      @media (max-width: 900px) {
+        .hero, .features, .legal-grid { grid-template-columns: 1fr; }
+        .download-grid { grid-template-columns: 1fr; }
+        .legal-grid { grid-template-columns: repeat(2, 1fr); }
+        .nav-links { display: none; }
+        .release-card { grid-template-columns: 1fr; }
+      }
+
+      @media (max-width: 560px) {
+        .shell { width: min(100% - 24px, 1160px); }
+        .hero { padding-top: 26px; }
+        .legal-grid { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Sprite de íconos — todos referenciados con <use> -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+      <defs>
+        <symbol id="ic-wallet" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h13a1 1 0 0 1 1 1v3M3 7v10a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-4M3 7l4-4h9" /><rect x="15" y="11" width="7" height="6" rx="1.4" /><circle cx="18.4" cy="14" r="0.6" fill="currentColor" stroke="none" /></symbol>
+        <symbol id="ic-split" viewBox="0 0 24 24"><path d="M6 3v7c0 2 1.5 3 3.5 3H15M6 3l-2 2M6 3l2 2M15 13l2-2M15 13l-2-2M18 5a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM6 8a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z" /></symbol>
+        <symbol id="ic-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none" /></symbol>
+        <symbol id="ic-exchange" viewBox="0 0 24 24"><path d="M4 8h13M17 8l-3.5-3.5M17 8l-3.5 3.5M20 16H7M7 16l3.5-3.5M7 16l3.5 3.5" /></symbol>
+        <symbol id="ic-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.2" /><path d="M3.5 9.5h17M8 3v4M16 3v4" /><path d="m8.2 15 2.4 2.4L15.8 12" /></symbol>
+        <symbol id="ic-sparkle" viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2 2M16 16l2 2M18 6l-2 2M8 16l-2 2" /><circle cx="12" cy="12" r="2.6" /></symbol>
+        <symbol id="ic-camera" viewBox="0 0 24 24"><path d="M4 8h3l1.6-2.4h6.8L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z" /><circle cx="12" cy="13" r="3.6" /></symbol>
+        <symbol id="ic-bell" viewBox="0 0 24 24"><path d="M6 10a6 6 0 1 1 12 0c0 4 1.5 5.5 1.5 5.5H4.5S6 14 6 10Z" /><path d="M10 19a2 2 0 0 0 4 0" /></symbol>
+        <symbol id="ic-upload" viewBox="0 0 24 24"><path d="M12 15V4M8 8l4-4 4 4" /><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" /></symbol>
+        <symbol id="ic-file" viewBox="0 0 24 24"><path d="M7 3h7l4 4v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" /><path d="M14 3v4h4" /><path d="M9 13h6M9 16.5h6" /></symbol>
+        <symbol id="ic-shield" viewBox="0 0 24 24"><path d="M12 3.5 19 6.5v5c0 5-3 8-7 9-4-1-7-4-7-9v-5Z" /><path d="m9 12 2.2 2.2L15.5 10" /></symbol>
+        <symbol id="ic-zap" viewBox="0 0 24 24"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z" /></symbol>
+        <symbol id="ic-cloud" viewBox="0 0 24 24"><path d="M7 18a4.5 4.5 0 0 1-1-8.9A5.5 5.5 0 0 1 16.3 7 4 4 0 0 1 17 15H7Z" /></symbol>
+        <symbol id="ic-trend-down" viewBox="0 0 24 24"><path d="M3 7 10 14l4-4 7 7" /><path d="M15 17h6v-6" /></symbol>
+        <symbol id="ic-repeat" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 13-6l2 2M20 4v4h-4" /><path d="M20 12a8 8 0 0 1-13 6l-2-2M4 20v-4h4" /></symbol>
+        <symbol id="ic-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m20 20-4.4-4.4" /></symbol>
+        <symbol id="ic-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c2.6 2.6 4 5.7 4 9s-1.4 6.4-4 9c-2.6-2.6-4-5.7-4-9s1.4-6.4 4-9Z" /></symbol>
+        <symbol id="ic-android" viewBox="0 0 24 24"><path d="M5 9h14v9a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V9Z" /><path d="M5 9a7 7 0 0 1 14 0M9 5l-1-2M15 5l1-2M9 13v3M15 13v3" /></symbol>
+        <symbol id="ic-globe2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2" /><path d="M3 8h18M8 21h8M12 18v3" /></symbol>
+        <symbol id="ic-windows" viewBox="0 0 24 24"><path d="M3 6.5 11 5.4v6.4H3V6.5ZM12 5.3l9-1.3v7.8h-9V5.3ZM3 12.9h8v6.4L3 18.2v-5.3ZM12 12.9h9v7.8l-9-1.3v-6.5Z" /></symbol>
+      </defs>
+    </svg>
+
+    <header class="shell nav">
+      <a class="brand" href="#top" aria-label="$harky inicio" data-i18n-aria="brandHomeAria">
+        <img src="./assets/icon.svg" alt="" />
+        <strong><span>$</span>harky</strong>
+      </a>
+      <nav class="nav-links" aria-label="Navegacion" data-i18n-aria="navLabel">
+        <a href="#features" data-i18n="navFeatures">Funciones</a>
+        <a href="#screens" data-i18n="navScreens">Capturas</a>
+        <a href="#novedades" data-i18n="navNews">Novedades</a>
+        <a href="#download" data-i18n="navDownload">Descargar</a>
+        <a href="#legal" data-i18n="navLegal">Legal</a>
+        <a href="https://github.com/XsharklinX/Sharky-Coin" rel="noreferrer">GitHub</a>
+      </nav>
+      <button id="langToggle" class="btn secondary lang-toggle" type="button" aria-label="Cambiar idioma / Switch language" data-i18n-aria="langToggleAria">
+        <span class="lang-opt" data-lang-opt="es">ES</span>
+        <span aria-hidden="true">/</span>
+        <span class="lang-opt" data-lang-opt="en">EN</span>
+      </button>
+    </header>
+
+    <main id="top">
+      <section class="shell hero">
+        <div>
+          <span class="eyebrow" data-i18n="heroEyebrow">Android · Web · Windows — funciona sin conexión</span>
+          <h1 data-i18n="heroTitle">Tus finanzas, <em>claras</em> y bajo tu control.</h1>
+          <p data-i18n="heroBody">
+            $harky registra tus movimientos, divide un gasto entre varias categorías,
+            proyecta tu saldo día por día y entiende los bancos dominicanos — todo
+            desde tu teléfono, sin depender de internet ni de una hoja de cálculo.
+          </p>
+          <div class="actions">
+            <a class="play-badge" href="https://play.google.com/store/apps/details?id=com.sharky.miapp" rel="noreferrer" aria-label="Disponible en Google Play" data-i18n-aria="playBadgeAria">
+              <img src="https://play.google.com/intl/en_us/badges/static/images/badges/es-419_badge_web_generic.png" alt="Disponible en Google Play" data-i18n-alt="playBadgeAlt" />
+            </a>
+            <a class="btn secondary" href="https://github.com/XsharklinX/Sharky-Coin" rel="noreferrer" data-i18n="viewCode">Ver el código</a>
+          </div>
+          <div class="platform-row">
+            <span><svg class="ico"><use href="#ic-android" /></svg><span data-i18n="platformAndroid">Android nativo</span></span>
+            <span><svg class="ico"><use href="#ic-globe2" /></svg><span data-i18n="platformPwa">Web instalable (PWA)</span></span>
+            <span><svg class="ico"><use href="#ic-windows" /></svg><span data-i18n="platformWindows">Windows</span></span>
+          </div>
+        </div>
+
+        <div class="phone-stage">
+          <div class="phone" aria-label="Vista previa de $harky" data-i18n-aria="phonePreviewAria">
+            <div class="phone-notch"></div>
+            <div class="phone-screen">
+              <img src="./assets/screens/inicio.png" alt="Pantalla de inicio de $harky con movimientos del mes" data-i18n-alt="heroScreenAlt" loading="eager" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="shell section" id="features">
+        <div class="section-head">
+          <h2 data-i18n="featuresTitle">Lo importante en una sola app.</h2>
+          <p data-i18n="featuresBody">
+            La prioridad es que entiendas qué pasa con tu dinero y puedas actuar
+            al momento, sin pelear con hojas de cálculo ni formularios largos.
+          </p>
+        </div>
+
+        <div class="features">
+          <article class="feature new">
+            <span class="new-tag">v1.7.3</span>
+            <span class="icon"><svg class="ico"><use href="#ic-split" /></svg></span>
+            <strong data-i18n="featSplitTitle">Divide un gasto entre categorías</strong>
+            <p data-i18n="featSplitBody">El súper de la semana no es solo "comida": repártelo entre comida, limpieza y lo que haga falta, sin forzar el registro en una sola categoría.</p>
+          </article>
+          <article class="feature new">
+            <span class="new-tag">v1.7.3</span>
+            <span class="icon"><svg class="ico"><use href="#ic-exchange" /></svg></span>
+            <strong data-i18n="featMultiCurrencyTitle">Cuentas en la moneda que uses</strong>
+            <p data-i18n="featMultiCurrencyBody">Una cuenta en dólares mientras el resto está en pesos — cada cuenta tiene su propia divisa y los totales se convierten solos con tasas en vivo. Incluye calculadora de conversión integrada.</p>
+          </article>
+          <article class="feature new">
+            <span class="new-tag">v1.7.3</span>
+            <span class="icon"><svg class="ico"><use href="#ic-calendar" /></svg></span>
+            <strong data-i18n="featCashflowTitle">¿Me alcanza hasta fin de mes?</strong>
+            <p data-i18n="featCashflowBody">Un calendario de flujo de caja combina tus recurrencias, suscripciones y aportes a metas para proyectar tu saldo día por día, con aviso si vas a quedar en negativo.</p>
+          </article>
+          <article class="feature">
+            <span class="icon"><svg class="ico"><use href="#ic-target" /></svg></span>
+            <strong data-i18n="featBudgetsTitle">Presupuestos que no se resetean a lo tonto</strong>
+            <p data-i18n="featBudgetsBody">Presupuesto mensual por categoría con rollover: el sobrante de un mes pasa al siguiente. Metas de ahorro con aportes automáticos desde tus cuentas.</p>
+          </article>
+          <article class="feature">
+            <span class="icon"><svg class="ico"><use href="#ic-sparkle" /></svg></span>
+            <strong data-i18n="featIntelTitle">Inteligencia financiera con acciones</strong>
+            <p data-i18n="featIntelBody">$harky detecta anomalías y patrones de gasto, y cada hallazgo trae un botón para actuar al instante — no solo un reporte bonito que archivas.</p>
+          </article>
+          <article class="feature">
+            <span class="icon"><svg class="ico"><use href="#ic-camera" /></svg></span>
+            <strong data-i18n="featScanTitle">Recibos y notificaciones bancarias</strong>
+            <p data-i18n="featScanBody">Toma una foto de un recibo y el monto se reconoce solo. En Android, la app también lee las notificaciones de tu banco y registra el movimiento sin que toques nada.</p>
+          </article>
+          <article class="feature">
+            <span class="icon"><svg class="ico"><use href="#ic-upload" /></svg></span>
+            <strong data-i18n="featCsvTitle">Importación bancaria dominicana</strong>
+            <p data-i18n="featCsvBody">CSV de Banco Popular, BHD, Banreservas y Scotiabank, con detección de columnas, vista previa y sin duplicados.</p>
+          </article>
+          <article class="feature">
+            <span class="icon"><svg class="ico"><use href="#ic-file" /></svg></span>
+            <strong data-i18n="featReportsTitle">Reportes que se pueden compartir</strong>
+            <p data-i18n="featReportsBody">PDF mensual, Excel con hojas por categoría y cuenta, CSV y capturas PNG de tus gráficas — listos para enviar, no solo para mirar.</p>
+          </article>
+          <article class="feature">
+            <span class="icon"><svg class="ico"><use href="#ic-shield" /></svg></span>
+            <strong data-i18n="featPrivacyTitle">Seguridad sin fricción</strong>
+            <p data-i18n="featPrivacyBody">PIN, patrón o huella cifrados en el Keystore de Android. La app no te lo exige de entrada — te deja usarla primero y luego te lo sugiere.</p>
+          </article>
+        </div>
+
+        <div class="tag-cloud" aria-label="Más funciones">
+          <span><svg class="ico"><use href="#ic-wallet" /></svg><span data-i18n="tagAccounts">Cuentas de efectivo, débito, ahorro y crédito</span></span>
+          <span><svg class="ico"><use href="#ic-trend-down" /></svg><span data-i18n="tagDebt">Simulador de deudas (avalanche/snowball)</span></span>
+          <span><svg class="ico"><use href="#ic-repeat" /></svg><span data-i18n="tagSubs">Suscripciones y pagos recurrentes</span></span>
+          <span><svg class="ico"><use href="#ic-zap" /></svg><span data-i18n="tagShortcuts">Accesos directos desde el ícono</span></span>
+          <span><svg class="ico"><use href="#ic-search" /></svg><span data-i18n="tagSearch">Búsqueda global instantánea</span></span>
+          <span><svg class="ico"><use href="#ic-cloud" /></svg><span data-i18n="tagSync">Backup automático y sync opcional</span></span>
+          <span><svg class="ico"><use href="#ic-bell" /></svg><span data-i18n="tagWidget">Widget de balance en pantalla de inicio</span></span>
+          <span><svg class="ico"><use href="#ic-globe" /></svg><span data-i18n="tagLang">Español e inglés</span></span>
+        </div>
+      </section>
+
+      <section class="shell section" id="screens">
+        <div class="section-head">
+          <h2 data-i18n="screensTitle">Así se ve.</h2>
+          <p data-i18n="screensBody">Sin capturas de relleno — esto es exactamente lo que abres cada vez que revisas tus finanzas.</p>
+        </div>
+        <div class="screens-scroll">
+          <div class="screen-item">
+            <div class="frame"><div class="frame-screen"><img src="./assets/screens/inicio.png" alt="Inicio" loading="lazy" /></div></div>
+            <small data-i18n="screenInicio">Inicio</small>
+          </div>
+          <div class="screen-item">
+            <div class="frame"><div class="frame-screen"><img src="./assets/screens/analisis.png" alt="Análisis" loading="lazy" /></div></div>
+            <small data-i18n="screenAnalisis">Análisis</small>
+          </div>
+          <div class="screen-item">
+            <div class="frame"><div class="frame-screen"><img src="./assets/screens/cuentas.png" alt="Cuentas" loading="lazy" /></div></div>
+            <small data-i18n="screenCuentas">Cuentas</small>
+          </div>
+          <div class="screen-item">
+            <div class="frame"><div class="frame-screen"><img src="./assets/screens/metas.png" alt="Metas" loading="lazy" /></div></div>
+            <small data-i18n="screenMetas">Metas</small>
+          </div>
+          <div class="screen-item">
+            <div class="frame"><div class="frame-screen"><img src="./assets/screens/perfil.png" alt="Perfil" loading="lazy" /></div></div>
+            <small data-i18n="screenPerfil">Perfil</small>
+          </div>
+        </div>
+      </section>
+
+      <section class="shell section" id="novedades">
+        <div class="section-head">
+          <h2 data-i18n="newsTitle">Lo último que mejoramos.</h2>
+          <p data-i18n="newsBody">$harky se actualiza con frecuencia, sobre todo en las funciones del día a día.</p>
+        </div>
+        <div class="release-list">
+          <article class="release-card">
+            <div><span class="tag-version">v1.7.3</span><span class="tag-date" data-i18n="dateJul2026">Julio 2026</span></div>
+            <div>
+              <strong data-i18n="relV173Title">Divide, convierte y proyecta</strong>
+              <ul>
+                <li data-i18n="relV173Item1">Divide un gasto entre varias categorías al registrarlo.</li>
+                <li data-i18n="relV173Item2">Cuentas con su propia divisa y calculadora de conversión con tasas en vivo.</li>
+                <li data-i18n="relV173Item3">Calendario de flujo de caja proyectado a 30 y 60 días.</li>
+                <li data-i18n="relV173Item4">Cada anomalía o tendencia detectada ahora trae un botón de acción directa.</li>
+              </ul>
+            </div>
+          </article>
+          <article class="release-card">
+            <div><span class="tag-version">v1.7.1</span><span class="tag-date" data-i18n="dateJun2026">Junio 2026</span></div>
+            <div>
+              <strong data-i18n="relV171Title">Backup semanal y corrección de zona horaria</strong>
+              <ul>
+                <li data-i18n="relV171Item1">Backup automático semanal a una carpeta dedicada en tu teléfono.</li>
+                <li data-i18n="relV171Item2">Corregido: los movimientos después de las 8pm ya no se registraban en el día siguiente.</li>
+                <li data-i18n="relV171Item3">Modo claro pulido en toda la app.</li>
+              </ul>
+            </div>
+          </article>
+          <article class="release-card">
+            <div><span class="tag-version">v1.7.0</span><span class="tag-date" data-i18n="dateJun2026b">Junio 2026</span></div>
+            <div>
+              <strong data-i18n="relV170Title">App completamente bilingüe y nuevas herramientas</strong>
+              <ul>
+                <li data-i18n="relV170Item1">$harky ahora funciona en español e inglés por completo.</li>
+                <li data-i18n="relV170Item2">Calculadora de deudas, calendario financiero, reportes anuales y búsqueda global.</li>
+              </ul>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="shell section" id="download">
+        <div class="section-head">
+          <h2 data-i18n="downloadTitle">Descarga $harky.</h2>
+          <p data-i18n="downloadBody">Disponible en Google Play, como web instalable, o compilado desde el código para Windows.</p>
+        </div>
+        <div class="download-grid">
+          <article class="download-card">
+            <span class="status" data-i18n="statusRecommended">Recomendado</span>
+            <strong>Google Play</strong>
+            <p data-i18n="downloadPlayBody">Instala $harky desde la Play Store y mantente al día con las últimas mejoras y correcciones de seguridad.</p>
+            <a class="play-badge" href="https://play.google.com/store/apps/details?id=com.sharky.miapp" rel="noreferrer" aria-label="Disponible en Google Play" data-i18n-aria="playBadgeAria">
+              <img src="https://play.google.com/intl/en_us/badges/static/images/badges/es-419_badge_web_generic.png" alt="Disponible en Google Play" data-i18n-alt="playBadgeAlt" />
+            </a>
+            <div class="platforms">
+              <span data-i18n="platformNoteWeb">También disponible como web instalable</span>
+              <span data-i18n="platformNoteWindows">y para Windows</span>
+            </div>
+          </article>
+          <article class="download-card">
+            <span class="status" data-i18n="statusOpenSource">Código abierto</span>
+            <strong data-i18n="downloadRepoTitle">Repositorio en GitHub</strong>
+            <p data-i18n="downloadRepoBody">El código fuente de $harky es público. Revísalo, reporta un problema o sigue el desarrollo desde GitHub.</p>
+            <a class="btn secondary" href="https://github.com/XsharklinX/Sharky-Coin" rel="noreferrer" data-i18n="viewRepo">Ver repositorio</a>
+          </article>
+        </div>
+      </section>
+
+      <section class="shell section" id="legal">
+        <div class="section-head">
+          <h2 data-i18n="legalTitle">Legal y soporte.</h2>
+          <p data-i18n="legalBody">Información sobre cómo manejamos tus datos y cómo contactarnos.</p>
+        </div>
+        <div class="legal-grid">
+          <a class="legal-card" href="./privacy.html">
+            <strong><span data-i18n="legalPrivacyTitle">Política de privacidad</span> <span class="arrow">→</span></strong>
+            <p data-i18n="legalPrivacyBody">Qué datos recolectamos, cómo los usamos y con quién los compartimos.</p>
+          </a>
+          <a class="legal-card" href="./terms.html">
+            <strong><span data-i18n="legalTermsTitle">Términos de uso</span> <span class="arrow">→</span></strong>
+            <p data-i18n="legalTermsBody">Las condiciones para usar $harky y la app de Android.</p>
+          </a>
+          <a class="legal-card" href="./delete-account.html">
+            <strong><span data-i18n="legalDeleteTitle">Eliminar mi cuenta</span> <span class="arrow">→</span></strong>
+            <p data-i18n="legalDeleteBody">Cómo borrar tus datos locales, tu cuenta y tu información en la nube.</p>
+          </a>
+          <a class="legal-card" href="mailto:contactosharklin@gmail.com">
+            <strong><span data-i18n="legalSupportTitle">Soporte</span> <span class="arrow">→</span></strong>
+            <p data-i18n="legalSupportBody">¿Dudas, errores o sugerencias? Escríbenos a contactosharklin@gmail.com.</p>
+          </a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="shell footer">
+      <span data-i18n="footerTagline">$harky · Finanzas personales</span>
+      <span>
+        <a href="./privacy.html" data-i18n="footerPrivacy">Privacidad</a> · <a href="./terms.html" data-i18n="footerTerms">Términos</a> · <a href="./delete-account.html" data-i18n="footerDelete">Eliminar cuenta</a>
+      </span>
+      <span>contactosharklin@gmail.com</span>
+    </footer>
+
+    <script>
+      (function () {
+        var I18N = {
+          brandHomeAria: { es: '$harky inicio', en: '$harky home' },
+          navLabel: { es: 'Navegacion', en: 'Navigation' },
+          navFeatures: { es: 'Funciones', en: 'Features' },
+          navScreens: { es: 'Capturas', en: 'Screens' },
+          navNews: { es: 'Novedades', en: "What's new" },
+          navDownload: { es: 'Descargar', en: 'Download' },
+          navLegal: { es: 'Legal', en: 'Legal' },
+          langToggleAria: { es: 'Cambiar idioma a inglés', en: 'Switch language to Spanish' },
+
+          heroEyebrow: { es: 'Android · Web · Windows — funciona sin conexión', en: 'Android · Web · Windows — works offline' },
+          heroTitle: { es: 'Tus finanzas, <em>claras</em> y bajo tu control.', en: 'Your finances, <em>clear</em> and under your control.' },
+          heroBody: {
+            es: '$harky registra tus movimientos, divide un gasto entre varias categorías, proyecta tu saldo día por día y entiende los bancos dominicanos — todo desde tu teléfono, sin depender de internet ni de una hoja de cálculo.',
+            en: '$harky logs your transactions, splits an expense across several categories, projects your balance day by day, and understands Dominican banks — all from your phone, with no internet or spreadsheet required.',
+          },
+          playBadgeAria: { es: 'Disponible en Google Play', en: 'Get it on Google Play' },
+          playBadgeAlt: { es: 'Disponible en Google Play', en: 'Get it on Google Play' },
+          viewCode: { es: 'Ver el código', en: 'View the code' },
+          platformAndroid: { es: 'Android nativo', en: 'Native Android' },
+          platformPwa: { es: 'Web instalable (PWA)', en: 'Installable web app' },
+          platformWindows: { es: 'Windows', en: 'Windows' },
+          phonePreviewAria: { es: 'Vista previa de $harky', en: '$harky preview' },
+          heroScreenAlt: { es: 'Pantalla de inicio de $harky con movimientos del mes', en: '$harky home screen with this month\'s transactions' },
+
+          featuresTitle: { es: 'Lo importante en una sola app.', en: 'Everything that matters, in one app.' },
+          featuresBody: {
+            es: 'La prioridad es que entiendas qué pasa con tu dinero y puedas actuar al momento, sin pelear con hojas de cálculo ni formularios largos.',
+            en: 'The priority is that you understand what is happening with your money and can act right away, without fighting spreadsheets or long forms.',
+          },
+
+          featSplitTitle: { es: 'Divide un gasto entre categorías', en: 'Split an expense across categories' },
+          featSplitBody: {
+            es: 'El súper de la semana no es solo "comida": repártelo entre comida, limpieza y lo que haga falta, sin forzar el registro en una sola categoría.',
+            en: 'The weekly groceries aren\'t just "food": split it between food, cleaning supplies and whatever else, without forcing it into a single category.',
+          },
+          featMultiCurrencyTitle: { es: 'Cuentas en la moneda que uses', en: 'Accounts in whatever currency you use' },
+          featMultiCurrencyBody: {
+            es: 'Una cuenta en dólares mientras el resto está en pesos — cada cuenta tiene su propia divisa y los totales se convierten solos con tasas en vivo. Incluye calculadora de conversión integrada.',
+            en: 'An account in dollars while the rest is in pesos — each account has its own currency and totals convert automatically with live rates. Includes a built-in conversion calculator.',
+          },
+          featCashflowTitle: { es: '¿Me alcanza hasta fin de mes?', en: 'Will I make it to the end of the month?' },
+          featCashflowBody: {
+            es: 'Un calendario de flujo de caja combina tus recurrencias, suscripciones y aportes a metas para proyectar tu saldo día por día, con aviso si vas a quedar en negativo.',
+            en: 'A cash flow calendar combines your recurring transactions, subscriptions and goal contributions to project your balance day by day, warning you if you\'re about to go negative.',
+          },
+          featBudgetsTitle: { es: 'Presupuestos que no se resetean a lo tonto', en: 'Budgets that don\'t reset carelessly' },
+          featBudgetsBody: {
+            es: 'Presupuesto mensual por categoría con rollover: el sobrante de un mes pasa al siguiente. Metas de ahorro con aportes automáticos desde tus cuentas.',
+            en: 'Monthly budget per category with rollover: what\'s left over one month carries into the next. Savings goals with automatic contributions from your accounts.',
+          },
+          featIntelTitle: { es: 'Inteligencia financiera con acciones', en: 'Financial intelligence with actions' },
+          featIntelBody: {
+            es: '$harky detecta anomalías y patrones de gasto, y cada hallazgo trae un botón para actuar al instante — no solo un reporte bonito que archivas.',
+            en: '$harky detects spending anomalies and patterns, and every finding comes with a button to act on it instantly — not just a pretty report you file away.',
+          },
+          featScanTitle: { es: 'Recibos y notificaciones bancarias', en: 'Receipts and bank notifications' },
+          featScanBody: {
+            es: 'Toma una foto de un recibo y el monto se reconoce solo. En Android, la app también lee las notificaciones de tu banco y registra el movimiento sin que toques nada.',
+            en: 'Take a photo of a receipt and the amount is recognized automatically. On Android, the app can also read your bank notifications and log the transaction without you touching anything.',
+          },
+          featCsvTitle: { es: 'Importación bancaria dominicana', en: 'Dominican bank import' },
+          featCsvBody: {
+            es: 'CSV de Banco Popular, BHD, Banreservas y Scotiabank, con detección de columnas, vista previa y sin duplicados.',
+            en: 'CSV from Banco Popular, BHD, Banreservas and Scotiabank, with column detection, preview and no duplicates.',
+          },
+          featReportsTitle: { es: 'Reportes que se pueden compartir', en: 'Reports you can actually share' },
+          featReportsBody: {
+            es: 'PDF mensual, Excel con hojas por categoría y cuenta, CSV y capturas PNG de tus gráficas — listos para enviar, no solo para mirar.',
+            en: 'Monthly PDF, Excel with sheets per category and account, CSV, and PNG captures of your charts — ready to send, not just to look at.',
+          },
+          featPrivacyTitle: { es: 'Seguridad sin fricción', en: 'Security without friction' },
+          featPrivacyBody: {
+            es: 'PIN, patrón o huella cifrados en el Keystore de Android. La app no te lo exige de entrada — te deja usarla primero y luego te lo sugiere.',
+            en: 'PIN, pattern or fingerprint encrypted in the Android Keystore. The app doesn\'t demand it upfront — it lets you use it first, then suggests it.',
+          },
+
+          tagAccounts: { es: 'Cuentas de efectivo, débito, ahorro y crédito', en: 'Cash, debit, savings and credit accounts' },
+          tagDebt: { es: 'Simulador de deudas (avalanche/snowball)', en: 'Debt simulator (avalanche/snowball)' },
+          tagSubs: { es: 'Suscripciones y pagos recurrentes', en: 'Subscriptions and recurring payments' },
+          tagShortcuts: { es: 'Accesos directos desde el ícono', en: 'Shortcuts from the app icon' },
+          tagSearch: { es: 'Búsqueda global instantánea', en: 'Instant global search' },
+          tagSync: { es: 'Backup automático y sync opcional', en: 'Automatic backup and optional sync' },
+          tagWidget: { es: 'Widget de balance en pantalla de inicio', en: 'Balance widget on your home screen' },
+          tagLang: { es: 'Español e inglés', en: 'Spanish and English' },
+
+          screensTitle: { es: 'Así se ve.', en: 'This is what it looks like.' },
+          screensBody: {
+            es: 'Sin capturas de relleno — esto es exactamente lo que abres cada vez que revisas tus finanzas.',
+            en: 'No filler screenshots — this is exactly what you open every time you check your finances.',
+          },
+          screenInicio: { es: 'Inicio', en: 'Home' },
+          screenAnalisis: { es: 'Análisis', en: 'Analytics' },
+          screenCuentas: { es: 'Cuentas', en: 'Accounts' },
+          screenMetas: { es: 'Metas', en: 'Goals' },
+          screenPerfil: { es: 'Perfil', en: 'Profile' },
+
+          newsTitle: { es: 'Lo último que mejoramos.', en: 'What we just improved.' },
+          newsBody: { es: '$harky se actualiza con frecuencia, sobre todo en las funciones del día a día.', en: '$harky is updated frequently, especially around everyday features.' },
+          dateJul2026: { es: 'Julio 2026', en: 'July 2026' },
+          dateJun2026: { es: 'Junio 2026', en: 'June 2026' },
+          dateJun2026b: { es: 'Junio 2026', en: 'June 2026' },
+
+          relV173Title: { es: 'Divide, convierte y proyecta', en: 'Split, convert and project' },
+          relV173Item1: { es: 'Divide un gasto entre varias categorías al registrarlo.', en: 'Split an expense across several categories when logging it.' },
+          relV173Item2: { es: 'Cuentas con su propia divisa y calculadora de conversión con tasas en vivo.', en: 'Accounts with their own currency and a conversion calculator with live rates.' },
+          relV173Item3: { es: 'Calendario de flujo de caja proyectado a 30 y 60 días.', en: 'Cash flow calendar projected 30 and 60 days out.' },
+          relV173Item4: { es: 'Cada anomalía o tendencia detectada ahora trae un botón de acción directa.', en: 'Every detected anomaly or trend now comes with a direct action button.' },
+
+          relV171Title: { es: 'Backup semanal y corrección de zona horaria', en: 'Weekly backup and timezone fix' },
+          relV171Item1: { es: 'Backup automático semanal a una carpeta dedicada en tu teléfono.', en: 'Automatic weekly backup to a dedicated folder on your phone.' },
+          relV171Item2: { es: 'Corregido: los movimientos después de las 8pm ya no se registraban en el día siguiente.', en: 'Fixed: transactions after 8pm were no longer being logged on the next day.' },
+          relV171Item3: { es: 'Modo claro pulido en toda la app.', en: 'Light mode polished across the whole app.' },
+
+          relV170Title: { es: 'App completamente bilingüe y nuevas herramientas', en: 'Fully bilingual app and new tools' },
+          relV170Item1: { es: '$harky ahora funciona en español e inglés por completo.', en: '$harky now works fully in Spanish and English.' },
+          relV170Item2: { es: 'Calculadora de deudas, calendario financiero, reportes anuales y búsqueda global.', en: 'Debt calculator, financial calendar, annual reports and global search.' },
+
+          downloadTitle: { es: 'Descarga $harky.', en: 'Download $harky.' },
+          downloadBody: {
+            es: 'Disponible en Google Play, como web instalable, o compilado desde el código para Windows.',
+            en: 'Available on Google Play, as an installable web app, or built from source for Windows.',
+          },
+          statusRecommended: { es: 'Recomendado', en: 'Recommended' },
+          downloadPlayBody: {
+            es: 'Instala $harky desde la Play Store y mantente al día con las últimas mejoras y correcciones de seguridad.',
+            en: 'Install $harky from the Play Store and stay up to date with the latest improvements and security fixes.',
+          },
+          platformNoteWeb: { es: 'También disponible como web instalable', en: 'Also available as an installable web app' },
+          platformNoteWindows: { es: 'y para Windows', en: 'and for Windows' },
+          statusOpenSource: { es: 'Código abierto', en: 'Open source' },
+          downloadRepoTitle: { es: 'Repositorio en GitHub', en: 'GitHub repository' },
+          downloadRepoBody: {
+            es: 'El código fuente de $harky es público. Revísalo, reporta un problema o sigue el desarrollo desde GitHub.',
+            en: '$harky\'s source code is public. Review it, report an issue, or follow development on GitHub.',
+          },
+          viewRepo: { es: 'Ver repositorio', en: 'View repository' },
+
+          legalTitle: { es: 'Legal y soporte.', en: 'Legal and support.' },
+          legalBody: { es: 'Información sobre cómo manejamos tus datos y cómo contactarnos.', en: 'Information about how we handle your data and how to contact us.' },
+          legalPrivacyTitle: { es: 'Política de privacidad', en: 'Privacy policy' },
+          legalPrivacyBody: { es: 'Qué datos recolectamos, cómo los usamos y con quién los compartimos.', en: 'What data we collect, how we use it and who we share it with.' },
+          legalTermsTitle: { es: 'Términos de uso', en: 'Terms of use' },
+          legalTermsBody: { es: 'Las condiciones para usar $harky y la app de Android.', en: 'The conditions for using $harky and the Android app.' },
+          legalDeleteTitle: { es: 'Eliminar mi cuenta', en: 'Delete my account' },
+          legalDeleteBody: { es: 'Cómo borrar tus datos locales, tu cuenta y tu información en la nube.', en: 'How to delete your local data, your account and your cloud information.' },
+          legalSupportTitle: { es: 'Soporte', en: 'Support' },
+          legalSupportBody: { es: '¿Dudas, errores o sugerencias? Escríbenos a contactosharklin@gmail.com.', en: 'Questions, bugs or suggestions? Write to us at contactosharklin@gmail.com.' },
+
+          footerTagline: { es: '$harky · Finanzas personales', en: '$harky · Personal finance' },
+          footerPrivacy: { es: 'Privacidad', en: 'Privacy' },
+          footerTerms: { es: 'Términos', en: 'Terms' },
+          footerDelete: { es: 'Eliminar cuenta', en: 'Delete account' },
+        }
+
+        var HTML_KEYS = { heroTitle: true }
+        var STORAGE_KEY = 'sharky-landing-lang'
+
+        function detectDefaultLang() {
+          var saved = localStorage.getItem(STORAGE_KEY)
+          if (saved === 'es' || saved === 'en') return saved
+          return navigator.language && navigator.language.toLowerCase().startsWith('en') ? 'en' : 'es'
+        }
+
+        function applyLang(lang) {
+          document.documentElement.lang = lang
+          document.querySelectorAll('[data-i18n]').forEach(function (el) {
+            var key = el.getAttribute('data-i18n')
+            var entry = I18N[key]
+            if (!entry) return
+            if (HTML_KEYS[key]) el.innerHTML = entry[lang]
+            else el.textContent = entry[lang]
+          })
+          document.querySelectorAll('[data-i18n-aria]').forEach(function (el) {
+            var entry = I18N[el.getAttribute('data-i18n-aria')]
+            if (entry) el.setAttribute('aria-label', entry[lang])
+          })
+          document.querySelectorAll('[data-i18n-alt]').forEach(function (el) {
+            var entry = I18N[el.getAttribute('data-i18n-alt')]
+            if (entry) el.setAttribute('alt', entry[lang])
+          })
+          document.querySelectorAll('[data-lang-opt]').forEach(function (el) {
+            el.classList.toggle('active', el.getAttribute('data-lang-opt') === lang)
+          })
+          localStorage.setItem(STORAGE_KEY, lang)
+        }
+
+        var toggle = document.getElementById('langToggle')
+        var currentLang = detectDefaultLang()
+        applyLang(currentLang)
+        toggle.addEventListener('click', function () {
+          currentLang = currentLang === 'es' ? 'en' : 'es'
+          applyLang(currentLang)
+        })
+      })()
+    </script>
+  </body>
+</html>

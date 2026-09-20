@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Acceso rápido 1x1 — se lee como un icono de app más, no como un widget.
+
+  Por qué el cuadrado va con tamaño FIJO dentro de una raíz transparente y no
+  con match_parent: la celda 1x1 de la mayoría de launchers NO es cuadrada
+  (reserva alto para la etiqueta), así que un fondo a match_parent adoptaba la
+  forma de la celda y se veía como un rectángulo alto al lado de los iconos
+  cuadrados del resto de apps. Con un cuadrado fijo centrado, el widget se ve
+  igual sea cual sea la proporción de la celda.
+
+  El "+" va solo, sin palabra debajo: los iconos de apps llevan su etiqueta
+  FUERA (la pinta el launcher), así que meter texto dentro del cuadrado era
+  justo lo que lo delataba como widget y de paso lo dejaba apretado.
+
+  IMPORTANTE: la raíz conserva el id `widget_quickadd_root` — el provider
+  (SharkyQuickAddWidgetProvider) le engancha ahí el PendingIntent del toque, y
+  al ocupar toda la celda el área tocable sigue siendo la celda entera, no solo
+  el cuadrado visible. RemoteViews solo admite vistas @RemoteView: nada de
+  <View>/<Space>.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_quickadd_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:gravity="center"
+    android:orientation="vertical">
+
+    <TextView
+        android:layout_width="58dp"
+        android:layout_height="58dp"
+        android:background="@drawable/widget_quickadd_bg"
+        android:gravity="center"
+        android:includeFontPadding="false"
+        android:text="+"
+        android:textColor="#FFFFFF"
+        android:textSize="30sp"
+        android:textStyle="bold" />
+
+</LinearLayout>

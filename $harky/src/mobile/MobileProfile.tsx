@@ -1,306 +1,359 @@
-import { useEffect, useState } from 'react'
+import { useMemo, useRef, useState, type ChangeEvent } from 'react'
+import { APP_VERSION } from '@/data/release'
+import { MobileDataHealth } from './MobileDataHealth'
+import { MobileWhatsNew } from './MobileWhatsNew'
 import { Icon } from '@/components/ui/Icon'
 import { toast } from '@/components/ui/Toast'
-import { fmtCompact } from '@/data/helpers'
+import { projectCashflow } from '@/data/cashflowProjection'
+import { accountBalanceInBase, accountCurrency, availableBalanceInBase, localToday, visibleAccounts } from '@/data/helpers'
+import { useFmt } from '@/hooks/useFmt'
+import { useT, type LangKey } from '@/i18n'
+import { AvatarCropper } from '@/components/AvatarCropper'
+import { canPickImageNative, pickImageNative } from '@/lib/nativeFiles'
+import { monthsLabel, simulatePayoff, useDebt } from '@/store/debt'
 import { useFinance } from '@/store/finance'
 import { useSettings } from '@/store/settings'
-import { playAccountsSound } from '@/lib/sound'
-import { useMobileBackDismiss } from './useMobileBackDismiss'
-import type { Account, AccountType, OverdraftPolicy, ViewId, ViewProps } from '@/types'
+import type { Account, IconName, ViewId } from '@/types'
 
-const COLORS = ['#ffdd3d','#35d0a2','#5bc0ff','#a78bfa','#ff6b8a','#f59e0b']
-
-const EMPTY_ACCOUNT: Omit<Account, 'id'> = {
-  name: '', short: '', type: 'debit', color: COLORS[1], balance: 0, last4: null,
+// Mismo horizonte que la pestaña "Mes" de MobileCashflow — último día del mes
+// actual. Se duplica aquí (en vez de importar el componente, que arrastra
+// recharts) porque `projectCashflow` en sí es puro y liviano.
+function endOfMonth(today: string): string {
+  const d = new Date(`${today}T00:00:00`)
+  d.setMonth(d.getMonth() + 1, 0)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
-const TYPE_META: Record<AccountType, { label: string; icon: Parameters<typeof Icon>[0]['name'] }> = {
-  cash:    { label: 'Efectivo', icon: 'wallet' },
-  debit:   { label: 'Débito',  icon: 'cards'  },
-  savings: { label: 'Ahorros', icon: 'piggy'  },
-  credit:  { label: 'Crédito', icon: 'cards'  },
-}
-
+// El complemento exacto del menú rápido de Movimientos (☰): ese se quedó con
+// las 4 acciones de uso diario (Presupuestos, Metas, Listas, Conversor). Esta
+// sección se llama "Explorar" (no "Herramientas" — tener el mismo nombre en
+// dos lugares con contenido distinto confundía) y usa mosaicos de color, no
+// filas de texto, para no verse como una copia de ese menú.
+const EXPLORE_CARDS: { view: ViewId; icon: IconName; color: string; labelKey: LangKey }[] = [
+  { view: 'subscriptions', icon: 'repeat',   color: '#5bc0ff', labelKey: 'subscriptions' },
+  { view: 'calendar',     icon: 'calendar',  color: '#f59e0b', labelKey: 'calendarLabel' },
+]
 
 export function MobileProfile({
   userName,
-  onSettings,
   goto,
-  createRequest,
 }: {
   userName?: string
-  onSettings: () => void
   goto: (view: ViewId) => void
-  createRequest?: ViewProps['createRequest']
 }) {
-  const { displayName, setDisplayName } = useSettings()
-  const { accounts, currency, addAccount, updateAccount, deleteAccount } = useFinance()
+  const { displayName, setDisplayName, profilePhoto, setProfilePhoto } = useSettings()
+  const { accounts, transactions, goals, currency } = useFinance()
+  const debtStore = useDebt()
+  const fmtVal = useFmt()
+  const t = useT()
+  const photoInputRef = useRef<HTMLInputElement>(null)
 
-  const [editingName,    setEditingName]    = useState(false)
-  const [nameInput,      setNameInput]      = useState(displayName || userName || '')
-  const [editingAccount, setEditingAccount] = useState<Account | 'new' | null>(null)
-
-  useMobileBackDismiss(!!editingAccount, () => setEditingAccount(null))
-
-  useEffect(() => { playAccountsSound() }, [])
-
-  useEffect(() => {
-    if (createRequest?.target === 'account') setEditingAccount('new')
-  }, [createRequest])
+  const [editingName, setEditingName] = useState(false)
+  const [nameInput, setNameInput] = useState(displayName || userName || '')
+  const [photoMenuOpen, setPhotoMenuOpen] = useState(false)
+  const [healthOpen, setHealthOpen] = useState(false)
+  // El auto-mostrado tras actualizar vive en App (`useWhatsNew`): aqui el
+  // Perfil solo ofrece el acceso manual al historial.
+  const [newsOpen, setNewsOpen] = useState(false)
+  const [cropSource, setCropSource] = useState<File | string | null>(null)
 
   const effectiveName = displayName || userName || ''
-  const initial       = effectiveName ? effectiveName.slice(0, 1).toUpperCase() : '$'
+  const initial = effectiveName ? effectiveName.slice(0, 1).toUpperCase() : '$'
+
+  const handlePhotoChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (file) setCropSource(file)
+  }
+
+  // En Android se usa el selector nativo (menú de galerías); si no está
+  // disponible o falla, cae en silencio al <input type="file"> de siempre —
+  // avisar del fallo Y abrir otro selector a continuación solo confunde,
+  // porque el usuario igual acaba eligiendo su foto.
+  const openPhotoPicker = async () => {
+    if (canPickImageNative()) {
+      try {
+        const dataUrl = await pickImageNative({ chooserTitle: t('choosePhotoWith'), browseLabel: t('browseFilesLabel') })
+        if (dataUrl) setCropSource(dataUrl)
+        return
+      } catch {
+        // sin selector nativo — sigue al input de abajo
+      }
+    }
+    photoInputRef.current?.click()
+  }
+
+  const handleAvatarClick = () => {
+    if (profilePhoto) {
+      setPhotoMenuOpen(v => !v)
+    } else {
+      void openPhotoPicker()
+    }
+  }
 
   const saveName = () => {
     const trimmed = nameInput.trim()
     setDisplayName(trimmed)
     setEditingName(false)
-    if (trimmed) toast(`Nombre actualizado a "${trimmed}"`, { icon: 'check', type: 'ok' })
+    if (trimmed) toast(t('nameUpdatedTo').replace('{name}', trimmed), { icon: 'check', type: 'ok' })
   }
 
-  const saveAccount = (fields: Omit<Account, 'id'>) => {
-    if (!fields.name.trim() || !fields.short.trim()) {
-      toast('Completa el nombre y la etiqueta.', { icon: 'alert' })
-      return
-    }
-    const clean = { ...fields, name: fields.name.trim(), short: fields.short.trim(), last4: fields.last4?.trim() || null }
-    if (editingAccount === 'new') addAccount(clean)
-    else if (editingAccount) updateAccount(editingAccount.id, clean)
-    toast(editingAccount === 'new' ? 'Cuenta creada' : 'Cuenta actualizada', { icon: 'cards', type: 'ok' })
-    setEditingAccount(null)
-  }
+  const activeAccounts = visibleAccounts(accounts)
+  // "Balance total" = dinero disponible (sin crédito); la deuda de tarjetas se
+  // muestra aparte en `debtBalance` más abajo.
+  const totalBalance = availableBalanceInBase(accounts, currency)
+  const bankingAccounts = activeAccounts.filter(account => account.type === 'debit' || account.type === 'savings')
+  const creditAccounts = activeAccounts.filter(account => account.type === 'credit')
+  const debtBalance = Math.abs(creditAccounts.reduce((sum, account) => sum + Math.min(0, accountBalanceInBase(account, currency)), 0))
+  const topAccounts = [...activeAccounts].sort((a, b) => Math.abs(b.balance) - Math.abs(a.balance)).slice(0, 3)
 
-  const deleteAcc = (account: Account) => {
-    try {
-      deleteAccount(account.id)
-      toast('Cuenta eliminada', { icon: 'trash', type: 'ok' })
-      setEditingAccount(null)
-    } catch (error) {
-      toast(error instanceof Error ? error.message : 'No se pudo eliminar la cuenta.', { icon: 'alert' })
-    }
-  }
+  // Deudas y Flujo de Caja eran herramientas huérfanas (solo alcanzables desde
+  // el menú de Movimientos, y encima aparecían dentro de "Cuentas" por un bug
+  // de ruteo). Ahora viven aquí como tarjetas con datos reales — se ve de un
+  // vistazo si hay algo que atender, no hay que entrar a averiguarlo.
+  const debtSummary = useMemo(() => {
+    if (debtStore.debts.length === 0) return null
+    const totalDebt = debtStore.debts.reduce((sum, d) => sum + d.balance, 0)
+    const payoff = simulatePayoff(debtStore.debts, debtStore.extraPayment, 'avalanche')
+    return { totalDebt, months: payoff.months }
+  }, [debtStore.debts, debtStore.extraPayment])
 
-  const totalBalance = accounts.reduce((s, a) => s + a.balance, 0)
+  const today = localToday()
+  const cashflow = useMemo(
+    () => projectCashflow(transactions, accounts, goals, endOfMonth(today), today, currency),
+    [transactions, accounts, goals, today, currency],
+  )
 
   return (
     <div className="mpr-root">
-
-      {/* ── Avatar / Name ── */}
       <div className="mpr-hero">
-        <div className="mpr-avatar">{initial}</div>
+        <div className="mpr-hero-glow" aria-hidden="true" />
+        <div className="mpr-avatar-wrap">
+          <button
+            className="mpr-avatar mpr-avatar-btn"
+            onClick={handleAvatarClick}
+            aria-label={profilePhoto ? t('changePhotoLabel') : t('addPhotoLabel')}
+          >
+            {profilePhoto ? <img src={profilePhoto} alt="" className="mpr-avatar-img" /> : initial}
+          </button>
+          {photoMenuOpen && (
+            <>
+              <button
+                className="mpr-photo-menu-backdrop"
+                aria-label={t('close')}
+                onClick={() => setPhotoMenuOpen(false)}
+              />
+              <div className="mpr-photo-menu" role="menu">
+                <button
+                  role="menuitem"
+                  onClick={() => { setPhotoMenuOpen(false); void openPhotoPicker() }}
+                >
+                  <Icon name="camera" size={14} /> {t('changePhotoLabel')}
+                </button>
+                <button
+                  role="menuitem"
+                  className="mpr-photo-menu-danger"
+                  onClick={() => {
+                    setPhotoMenuOpen(false)
+                    setProfilePhoto(null)
+                    toast(t('photoRemovedToast'), { icon: 'trash' })
+                  }}
+                >
+                  <Icon name="trash" size={14} /> {t('removePhotoLabel')}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+        <input
+          ref={photoInputRef}
+          type="file"
+          accept="image/*"
+          style={{ display: 'none' }}
+          onChange={handlePhotoChange}
+        />
+        {cropSource && (
+          <AvatarCropper
+            file={cropSource}
+            onCancel={() => setCropSource(null)}
+            onDone={dataUrl => {
+              setProfilePhoto(dataUrl)
+              setCropSource(null)
+              toast(t('photoUpdatedToast'), { icon: 'check', type: 'ok' })
+            }}
+          />
+        )}
+
         {editingName ? (
           <div className="mpr-name-editor">
             <input
               type="text"
               value={nameInput}
-              placeholder="Tu nombre"
+              placeholder={t('yourNamePlaceholder')}
               autoCapitalize="words"
               enterKeyHint="done"
               onChange={e => setNameInput(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') saveName() }}
             />
             <div className="mpr-name-actions">
-              <button onClick={() => setEditingName(false)}>Cancelar</button>
-              <button className="primary" onClick={saveName}>Guardar</button>
+              <button onClick={() => setEditingName(false)}>{t('cancel')}</button>
+              <button className="primary" onClick={saveName}>{t('save')}</button>
             </div>
           </div>
         ) : (
-          <>
-            <h2>{effectiveName || 'Mi cuenta'}</h2>
-            <button className="mpr-edit-name-btn" onClick={() => { setNameInput(effectiveName); setEditingName(true) }}>
-              <Icon name="edit" size={13} />
-              {effectiveName ? 'Editar nombre' : 'Agregar nombre'}
+          <div className="mpr-hero-identity">
+            <h2>{effectiveName || t('myAccountLabel')}</h2>
+            <button
+              className="mpr-edit-name-btn"
+              onClick={() => {
+                setNameInput(effectiveName)
+                setEditingName(true)
+              }}
+              aria-label={effectiveName ? t('editNameLabel') : t('addNameLabel')}
+            >
+              <Icon name="edit" size={12} />
             </button>
-          </>
+          </div>
         )}
+        <div className="mpr-hero-balance">
+          <small>{t('totalBalance')}</small>
+          <strong>{fmtVal(totalBalance, currency)}</strong>
+        </div>
 
-        <div className="mpr-balance-badge">
-          <span>Balance total</span>
-          <strong>{fmtCompact(totalBalance, currency)}</strong>
+        <div className="mpr-stats-grid">
+          <div className="mpr-stat-card">
+            <small>{t('accounts')}</small>
+            <strong>{activeAccounts.length}</strong>
+          </div>
+          <div className="mpr-stat-card">
+            <small>{t('bankAccountsGroupLabel')}</small>
+            <strong>{bankingAccounts.length}</strong>
+          </div>
+          <div className="mpr-stat-card">
+            <small>{t('creditCardsGroupLabel')}</small>
+            <strong>{creditAccounts.length}</strong>
+          </div>
         </div>
       </div>
 
-      {/* ── Accounts ── */}
-      <div className="mpr-section">
-        <div className="mpr-section-header">
-          <span>Cuentas</span>
-          <button className="mpr-add-btn" onClick={() => setEditingAccount('new')}>
-            <Icon name="plus" size={15} /> Agregar
+      <div className="mpr-kpi-grid">
+        <button className="mpr-kpi-card" style={{ '--kpi-color': '#6366f1' } as React.CSSProperties} onClick={() => goto('debt')}>
+          <span className="mpr-kpi-icon"><Icon name="dollar" size={18} /></span>
+          <span className="mpr-kpi-label">{t('debtsLabel')}</span>
+          <strong className="mpr-kpi-value">{debtSummary ? fmtVal(debtSummary.totalDebt, currency) : '—'}</strong>
+          <small className="mpr-kpi-sub">{debtSummary ? monthsLabel(debtSummary.months, t) : t('debtQuickDesc')}</small>
+        </button>
+        <button className="mpr-kpi-card" style={{ '--kpi-color': '#38bdf8' } as React.CSSProperties} onClick={() => goto('cashflow')}>
+          <span className="mpr-kpi-icon"><Icon name="trend" size={18} /></span>
+          <span className="mpr-kpi-label">{t('cashflowTitle')}</span>
+          <strong className={`mpr-kpi-value${cashflow.endBalance < 0 ? ' text-expense' : ''}`}>
+            {fmtVal(cashflow.endBalance, currency)}
+          </strong>
+          <small className="mpr-kpi-sub">{t('cashflowEndOfMonth')}</small>
+        </button>
+      </div>
+
+      {/* Confianza y novedades: dos cosas que el usuario busca en el Perfil,
+          no en Ajustes. "Salud de datos" estaba enterrada en Ajustes > Datos y
+          "Novedades" no existia aunque el historial de versiones si. */}
+      <div className="mpr-card mpr-trust">
+        <button className="mpr-trust-row" onClick={() => setHealthOpen(true)}>
+          <span className="mpr-trust-icon health"><Icon name="shield" size={18} /></span>
+          <div className="mpr-trust-info">
+            <b>{t('dataHealthTitle')}</b>
+            <small>{t('dataHealthRowHint')}</small>
+          </div>
+          <Icon name="arrowUp" size={13} className="mpr-inline-link-chevron" />
+        </button>
+        <button className="mpr-trust-row" onClick={() => setNewsOpen(true)}>
+          <span className="mpr-trust-icon news"><Icon name="star" size={18} /></span>
+          <div className="mpr-trust-info">
+            <b>{t('whatsNewTitle')}</b>
+            <small>{t('whatsNewRowHint').replace('{v}', APP_VERSION)}</small>
+          </div>
+          <Icon name="arrowUp" size={13} className="mpr-inline-link-chevron" />
+        </button>
+      </div>
+
+      {healthOpen && <MobileDataHealth onClose={() => setHealthOpen(false)} />}
+      {newsOpen && <MobileWhatsNew onClose={() => setNewsOpen(false)} />}
+
+      <div className="mpr-card">
+        <div className="mpr-card-header">
+          <span>{t('accounts')}</span>
+          <button className="mpr-inline-link" onClick={() => goto('accounts')}>
+            {t('accounts')}
+            <Icon name="arrowUp" size={13} className="mpr-inline-link-chevron" />
           </button>
         </div>
 
-        {accounts.length === 0 ? (
-          <div className="mpr-empty">
-            <Icon name="cards" size={28} style={{ opacity: .25 }} />
-            <p>Sin cuentas aún</p>
-            <button onClick={() => setEditingAccount('new')}>Crear cuenta</button>
-          </div>
+        {topAccounts.length ? (
+          <>
+            <div className="mpr-account-list">
+              {topAccounts.map(account => (
+                <button key={account.id} className="mpr-account-row" onClick={() => goto('accounts')}>
+                  <span className="mpr-account-icon" style={{ background: `${account.color}22`, color: account.color }}>
+                    <Icon name={accountIcon(account)} size={18} />
+                  </span>
+                  <div className="mpr-account-info">
+                    <b>{account.short || account.name}</b>
+                    <small>{accountMeta(account, t)}</small>
+                  </div>
+                  <strong>{fmtVal(account.balance, accountCurrency(account, currency))}</strong>
+                </button>
+              ))}
+            </div>
+            <div className="mpr-account-summary">
+              <div>
+                <small>{t('bankAccountsGroupLabel')}</small>
+                <strong>{fmtVal(bankingAccounts.reduce((sum, account) => sum + accountBalanceInBase(account, currency), 0), currency)}</strong>
+              </div>
+              <div>
+                <small>{t('debtsLabel')}</small>
+                <strong>{fmtVal(debtBalance, currency)}</strong>
+              </div>
+            </div>
+          </>
         ) : (
-          <div className="mpr-account-list">
-            {accounts.map(a => (
-              <button key={a.id} className="mpr-account-row" onClick={() => setEditingAccount(a)}>
-                <span className="mpr-account-icon" style={{ background: a.color + '22', color: a.color }}>
-                  <Icon name={TYPE_META[a.type].icon} size={20} />
-                </span>
-                <div className="mpr-account-info">
-                  <b>{a.name}</b>
-                  <small>{TYPE_META[a.type].label}{a.last4 ? ` · ·· ${a.last4}` : ''}</small>
-                </div>
-                <strong className={a.balance < 0 ? 'text-expense' : ''}>
-                  {fmtCompact(a.balance, currency)}
-                </strong>
-                <Icon name="arrowUp" size={14} style={{ transform: 'rotate(90deg)', color: 'var(--m-muted)', flexShrink: 0 }} />
-              </button>
-            ))}
+          <div className="mpr-empty">
+            <p>{t('noAccountsShort')}</p>
+            <button onClick={() => goto('accounts')}>{t('createAccount')}</button>
           </div>
         )}
       </div>
 
-      {/* ── Quick links ── */}
-      <div className="mpr-section">
-        <div className="mpr-section-header"><span>Accesos rápidos</span></div>
-        <div className="mpr-link-list">
-          <button onClick={onSettings}><Icon name="settings" size={20} />Configuración y backup<Icon name="arrowUp" size={13} style={{ transform: 'rotate(90deg)', marginLeft: 'auto', color: 'var(--m-muted)' }} /></button>
-          <button onClick={() => goto('subscriptions')}><Icon name="repeat" size={20} />Suscripciones<Icon name="arrowUp" size={13} style={{ transform: 'rotate(90deg)', marginLeft: 'auto', color: 'var(--m-muted)' }} /></button>
-          <button onClick={() => goto('annual')}><Icon name="chart" size={20} />Informe anual<Icon name="arrowUp" size={13} style={{ transform: 'rotate(90deg)', marginLeft: 'auto', color: 'var(--m-muted)' }} /></button>
-          <button onClick={() => goto('goals')}><Icon name="target" size={20} />Metas<Icon name="arrowUp" size={13} style={{ transform: 'rotate(90deg)', marginLeft: 'auto', color: 'var(--m-muted)' }} /></button>
-          <button onClick={() => goto('calendar')}><Icon name="calendar" size={20} />Calendario<Icon name="arrowUp" size={13} style={{ transform: 'rotate(90deg)', marginLeft: 'auto', color: 'var(--m-muted)' }} /></button>
+      <div className="mpr-card">
+        <div className="mpr-card-header">
+          <span>{t('exploreSection')}</span>
+        </div>
+        <div className="mpr-explore-grid">
+          {EXPLORE_CARDS.map(card => (
+            <button key={card.view} className="mpr-explore-tile" style={{ '--tile-color': card.color } as React.CSSProperties} onClick={() => goto(card.view)}>
+              <span className="mpr-explore-icon"><Icon name={card.icon} size={20} /></span>
+              <b>{t(card.labelKey)}</b>
+            </button>
+          ))}
         </div>
       </div>
-
-      {/* ── Account editor sheet ── */}
-      {editingAccount !== null && (
-        <AccountEditorSheet
-          account={editingAccount === 'new' ? undefined : editingAccount}
-          onClose={() => setEditingAccount(null)}
-          onSave={saveAccount}
-          onDelete={editingAccount !== 'new' ? deleteAcc : undefined}
-        />
-      )}
     </div>
   )
 }
 
-function AccountEditorSheet({
-  account,
-  onClose,
-  onSave,
-  onDelete,
-}: {
-  account?: Account
-  onClose: () => void
-  onSave: (fields: Omit<Account, 'id'>) => void
-  onDelete?: (account: Account) => void
-}) {
-  const [fields, setFields] = useState<Omit<Account, 'id'>>(account ?? EMPTY_ACCOUNT)
-  const [confirmDel, setConfirmDel] = useState(false)
-  const patch = <K extends keyof typeof fields>(key: K, val: typeof fields[K]) =>
-    setFields(cur => ({ ...cur, [key]: val }))
+function accountIcon(account: Account): IconName {
+  if (account.type === 'savings') return 'piggy'
+  if (account.type === 'cash') return 'wallet'
+  return 'cards'
+}
 
-  useMobileBackDismiss(true, onClose)
+function accountMeta(account: Account, t: ReturnType<typeof useT>) {
+  const typeLabel = account.type === 'cash'
+    ? t('cash')
+    : account.type === 'debit'
+      ? t('debit')
+      : account.type === 'savings'
+        ? t('savings')
+        : t('credit')
 
-  return (
-    <div className="mobile-detail-sheet" role="dialog" aria-modal="true" onClick={onClose}>
-      <section className="mpr-editor-sheet" onClick={e => e.stopPropagation()}>
-        <header>
-          <span>{account ? 'Editar cuenta' : 'Nueva cuenta'}</span>
-          <button onClick={onClose}><Icon name="close" size={18} /></button>
-        </header>
-
-        <div className="mpr-editor-body">
-          <label className="mpr-field">
-            <span>Nombre</span>
-            <input className="mpr-input" value={fields.name} placeholder="Ej. Banco Principal" onChange={e => patch('name', e.target.value)} />
-          </label>
-
-          <div className="mpr-field-row">
-            <label className="mpr-field" style={{ flex: 1 }}>
-              <span>Etiqueta</span>
-              <input className="mpr-input" value={fields.short} placeholder="Débito" onChange={e => patch('short', e.target.value)} />
-            </label>
-            <label className="mpr-field" style={{ flex: 1 }}>
-              <span>Tipo</span>
-              <select className="mpr-input" value={fields.type} onChange={e => patch('type', e.target.value as AccountType)}>
-                <option value="cash">Efectivo</option>
-                <option value="debit">Débito</option>
-                <option value="savings">Ahorros</option>
-                <option value="credit">Crédito</option>
-              </select>
-            </label>
-          </div>
-
-          <div className="mpr-field-row">
-            <label className="mpr-field" style={{ flex: 1 }}>
-              <span>Balance</span>
-              <input className="mpr-input" type="number" value={fields.balance} onChange={e => patch('balance', Number(e.target.value))} />
-            </label>
-            <label className="mpr-field" style={{ flex: 1 }}>
-              <span>Últimos 4 dígitos</span>
-              <input className="mpr-input" maxLength={4} value={fields.last4 ?? ''} placeholder="Opcional" onChange={e => patch('last4', e.target.value)} />
-            </label>
-          </div>
-
-          {fields.type === 'credit' && (
-            <label className="mpr-field">
-              <span>Límite de crédito</span>
-              <input className="mpr-input" type="number" value={fields.limit ?? ''} onChange={e => patch('limit', Number(e.target.value) || undefined)} />
-            </label>
-          )}
-
-          {fields.type !== 'credit' && (
-            <label className="mpr-field">
-              <span>Sobregiro</span>
-              <select className="mpr-input" value={fields.overdraftPolicy ?? ''} onChange={e => patch('overdraftPolicy', (e.target.value || undefined) as OverdraftPolicy | undefined)}>
-                <option value="">Usar configuración global</option>
-                <option value="block">Bloquear cuando vacío</option>
-                <option value="warn">Advertir</option>
-                <option value="allow">Siempre permitir</option>
-              </select>
-            </label>
-          )}
-
-          <div className="mpr-field">
-            <span>Color</span>
-            <div className="mpr-color-strip">
-              {COLORS.map(c => (
-                <button
-                  key={c}
-                  className={`mpr-color-dot${fields.color === c ? ' on' : ''}`}
-                  aria-label={`Color ${c}`}
-                  aria-pressed={fields.color === c}
-                  style={{ background: c }}
-                  onClick={() => patch('color', c)}
-                />
-              ))}
-            </div>
-          </div>
-
-          {account && onDelete && (
-            !confirmDel ? (
-              <button className="mpr-del-btn" onClick={() => setConfirmDel(true)}>
-                <Icon name="trash" size={16} /> Eliminar cuenta
-              </button>
-            ) : (
-              <div className="mpr-confirm-del">
-                <p>¿Eliminar "{account.name}"? Esta acción no se puede deshacer.</p>
-                <div>
-                  <button onClick={() => setConfirmDel(false)}>Cancelar</button>
-                  <button className="danger" onClick={() => onDelete(account)}>
-                    <Icon name="trash" size={16} /> Eliminar
-                  </button>
-                </div>
-              </div>
-            )
-          )}
-        </div>
-
-        <div className="mpr-editor-actions">
-          <button className="mpr-btn-cancel" onClick={onClose}>Cancelar</button>
-          <button className="mpr-btn-save" style={{ background: fields.color }} onClick={() => onSave(fields)}>
-            {account ? 'Guardar' : 'Crear'}
-          </button>
-        </div>
-      </section>
-    </div>
-  )
+  return account.last4 ? `${typeLabel} - ****${account.last4}` : typeLabel
 }

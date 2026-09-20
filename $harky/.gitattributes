@@ -1,0 +1,40 @@
+# ── Finales de línea ────────────────────────────────────────────────────────
+# Git para Windows trae `core.autocrlf=true` en su config de SISTEMA
+# (C:/Program Files/Git/etc/gitconfig). Por eso cada `git add` escupía cientos
+# de avisos "LF will be replaced by CRLF" y el working tree acababa con una
+# mezcla de LF y CRLF.
+#
+# El repositorio ya guarda TODO en LF; aquí lo hacemos explícito para que el
+# working tree también use LF. Con esto la conversión (y el aviso) desaparecen,
+# y el contenido del índice no cambia.
+* text=auto eol=lf
+
+# Scripts que Windows sí exige en CRLF: cmd.exe no interpreta LF de forma
+# fiable. Esto cubre también `gradlew.bat`.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# `gradlew` es un script de shell y DEBE quedarse en LF: con CRLF falla al
+# ejecutarse en Linux/CI (bad interpreter). Estaba en CRLF en el working tree.
+gradlew text eol=lf
+*.sh    text eol=lf
+
+# ── Binarios: git no debe convertir ni difear su contenido ─────────────────
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.webp binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.otf   binary
+*.jar binary
+*.zip binary
+*.pdf binary
+# Artefactos y llaves de firma Android: tocarlos los corrompe.
+*.apk      binary
+*.aab      binary
+*.keystore binary
+*.jks      binary

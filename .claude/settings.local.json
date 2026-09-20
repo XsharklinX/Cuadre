@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(npx vite:*)",
+      "Bash(node -e \"require\\('./src/main/store.js'\\); require\\('./src/main/ipc/app-manager.js'\\); require\\('./src/main/ipc/shortcuts.js'\\); console.log\\('✓ All main process modules load correctly'\\)\")",
+      "Bash(npm run:*)",
+      "Bash(node -e \"const e = require\\('electron'\\); console.log\\(typeof e.ipcMain, Object.keys\\(e\\).slice\\(0,10\\)\\)\")",
+      "Bash(node -e ':*)",
+      "Bash(npx electron:*)",
+      "Bash(cat)",
+      "Bash(node_modules/electron/dist/electron.exe test-builtins.cjs)",
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('electron version:', d['devDependencies'].get\\('electron','?'\\)\\)\")",
+      "Bash(node_modules/electron/dist/electron.exe out/main/debug3.cjs)",
+      "Bash(rm -f diag.txt)",
+      "Bash(timeout 5 ./node_modules/.bin/electron .)",
+      "Bash(cat diag.txt)",
+      "Bash(\"e:/Programacion/SharkReaderElite/node_modules/electron/dist/electron.exe\" \"e:/Programacion/SharkReaderElite\")",
+      "Bash(kill %1)",
+      "Bash(wait)",
+      "Bash(timeout 5 \"e:/Programacion/SharkReaderElite/node_modules/electron/dist/electron.exe\" \"e:/Programacion/SharkReaderElite/diag.js\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d.get\\('bin', {}\\)\\)\")",
+      "Bash(node -e \"const p = require\\('e:/Programacion/SharkReaderElite/node_modules/electron-vite/package.json'\\); console.log\\(JSON.stringify\\(p.bin\\)\\)\")",
+      "Bash(.venv/Scripts/pip install:*)",
+      "Read(//c/Users/otaku/.claude/skills/**)",
+      "Read(//c/Users/otaku/.claude/**)",
+      "Skill(lazyweb-design-research)",
+      "Skill(lazyweb-design-research:*)",
+      "Bash(node -e ' *)"
+    ]
+  }
+}

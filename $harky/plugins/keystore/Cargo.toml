@@ -1,0 +1,19 @@
+[package]
+name = "tauri-plugin-keystore"
+version = "0.1.0"
+edition = "2021"
+description = "Cifrado/descifrado de datos sensibles respaldado por Android Keystore"
+links = "tauri-plugin-keystore"
+
+[lib]
+name = "tauri_plugin_keystore"
+path = "src/lib.rs"
+
+[dependencies]
+tauri = { version = "2", default-features = false }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }

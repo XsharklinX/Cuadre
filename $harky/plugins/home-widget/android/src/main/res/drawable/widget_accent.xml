@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Acento lateral: el azul de la marca ($harky) sin gastar una fila de titulo. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="#4D82FF" />
+    <corners android:radius="3dp" />
+</shape>

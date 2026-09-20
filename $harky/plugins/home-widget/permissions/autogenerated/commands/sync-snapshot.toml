@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-sync-snapshot"
+description = "Enables the sync_snapshot command without any pre-configured scope."
+commands.allow = ["sync_snapshot"]
+
+[[permission]]
+identifier = "deny-sync-snapshot"
+description = "Denies the sync_snapshot command without any pre-configured scope."
+commands.deny = ["sync_snapshot"]

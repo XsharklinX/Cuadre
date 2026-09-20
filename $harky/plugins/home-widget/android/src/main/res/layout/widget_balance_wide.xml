@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Balance 4x2 — la variante ancha.
+
+  Crece A LO ANCHO, no a lo alto: el alto es lo que se come la pantalla de
+  inicio. Solo aparece si el usuario agranda el widget; el tamano por defecto
+  sigue siendo el 2x2 de widget_balance.xml.
+
+  Zonas tactiles independientes: el cuerpo abre Cuentas, y cada boton va a su
+  formulario (gasto / ingreso).
+-->
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_surface"
+    android:paddingStart="14dp"
+    android:paddingEnd="14dp"
+    android:paddingTop="13dp"
+    android:paddingBottom="13dp">
+
+    <!-- ImageView, no <View>: ver nota en widget_balance.xml (RemoteViews). -->
+    <ImageView
+        android:id="@+id/widget_accent"
+        android:layout_width="3dp"
+        android:layout_height="match_parent"
+        android:layout_alignParentStart="true"
+        android:layout_marginEnd="11dp"
+        android:background="@drawable/widget_accent"
+        android:contentDescription="@null" />
+
+    <!-- Acciones a la derecha: no compiten con la cifra. -->
+    <LinearLayout
+        android:id="@+id/widget_actions"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:layout_alignParentEnd="true"
+        android:gravity="center_vertical"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/widget_btn_expense"
+            android:layout_width="92dp"
+            android:layout_height="wrap_content"
+            android:background="@drawable/widget_act_expense"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:paddingTop="9dp"
+            android:paddingBottom="9dp"
+            android:text="@string/widget_add_expense"
+            android:textColor="#FF6B8A"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/widget_btn_income"
+            android:layout_width="92dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="7dp"
+            android:background="@drawable/widget_act_income"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:paddingTop="9dp"
+            android:paddingBottom="9dp"
+            android:text="@string/widget_add_income"
+            android:textColor="#35D0A2"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- Cuerpo: saldo + variacion + cuentas. Toca aqui y abre Cuentas. -->
+    <LinearLayout
+        android:id="@+id/widget_body"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_toStartOf="@id/widget_actions"
+        android:layout_toEndOf="@id/widget_accent"
+        android:layout_marginEnd="12dp"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/widget_balance_label"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:includeFontPadding="false"
+            android:letterSpacing="0.11"
+            android:maxLines="1"
+            android:text="@string/widget_balance_label"
+            android:textAllCaps="true"
+            android:textColor="#6E7688"
+            android:textSize="9sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/widget_balance"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:ellipsize="end"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:text="--"
+            android:textColor="#F2F5FB"
+            android:textSize="26sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/widget_delta"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:ellipsize="end"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:textColor="#6E7688"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <!-- Espaciador: FrameLayout vacio, no <Space> (no es @RemoteView). -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <!-- Cuentas en una linea de texto, no en tarjetas con borde. -->
+        <TextView
+            android:id="@+id/widget_accounts_line"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:textColor="#99A1B3"
+            android:textSize="11sp"
+            android:visibility="gone" />
+
+    </LinearLayout>
+
+</RelativeLayout>
