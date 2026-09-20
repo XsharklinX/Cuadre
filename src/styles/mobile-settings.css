@@ -1940,3 +1940,51 @@
   }
   .mhealth-backup-action[disabled] { cursor: not-allowed; opacity: .5; }
   .mhealth-backup-action:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ── Changelog agrupado ────────────────────────────────────
+   Era una lista plana de veinte viñetas donde todo pesaba igual: nadie
+   distingue "rediseñamos Cuentas" de "corregimos un margen", y el resultado
+   es que no se lee ninguna. */
+.mnews-counts { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 4px; }
+.mnews-count {
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 850;
+  letter-spacing: .03em;
+  padding: 2px 8px;
+  text-transform: lowercase;
+}
+.mnews-count.new    { background: color-mix(in oklab, var(--accent) 16%, transparent); color: var(--accent); }
+.mnews-count.better { background: color-mix(in oklab, var(--income) 15%, transparent); color: var(--income); }
+.mnews-count.fix    { background: var(--track); color: var(--text-dim); }
+
+.mnews-group { display: grid; gap: 5px; margin-top: 10px; }
+.mnews-group-title {
+  font-size: 10.5px;
+  font-weight: 850;
+  letter-spacing: .08em;
+  margin: 0;
+  text-transform: uppercase;
+}
+.mnews-group-title.new    { color: var(--accent); }
+.mnews-group-title.better { color: var(--income); }
+.mnews-group-title.fix    { color: var(--text-dim); }
+
+/* Las viñetas heredan el color de su grupo por el marcador, no por el texto:
+   el texto tiene que seguir leyéndose con el contraste del cuerpo. */
+.mnews-group .mnews-items { margin: 0; padding-left: 16px; }
+.mnews-group .mnews-items li { color: var(--text-dim); }
+.mnews-group-title.new + .mnews-items li::marker    { color: var(--accent); }
+.mnews-group-title.better + .mnews-items li::marker { color: var(--income); }
+
+/* Lo que de verdad importa de una versión se distingue del resto. */
+.mnews-items li.highlight {
+  color: var(--text);
+  font-weight: 700;
+}
+
+/* Los overlays de estas hojas heredan el velo y el centrado de
+   `.mobile-detail-sheet`; estas reglas solo fijan que la hoja quede PEGADA
+   ABAJO, que es de donde el pulgar la alcanza. Sin ellas las clases existían
+   en el markup sin hacer nada. */
+.mhealth-overlay, .mnews-overlay { align-items: flex-end; }

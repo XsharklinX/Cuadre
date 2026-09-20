@@ -1,4 +1,15 @@
-/** Logo $harky — fin de tiburón como línea de tendencia, SVG inline. */
+/**
+ * Logo de Cuadre — las dos tarjetas, en SVG inline.
+ *
+ * Es el MISMO dibujo que el ícono de la app (`public/icon.svg`). Antes eran
+ * dos marcas distintas: el ícono del teléfono mostraba un pico azul y dentro
+ * de la app aparecía otra versión con su propio degradado. Una marca que se
+ * ve distinta en dos sitios no se recuerda en ninguno.
+ *
+ * El `id` de cada degradado lleva el tamaño porque puede haber varias marcas
+ * en la misma pantalla: con ids repetidos, todas heredan el degradado de la
+ * primera que se monta.
+ */
 interface Props {
   size?:      number
   className?: string
@@ -6,6 +17,7 @@ interface Props {
 }
 
 export function BrandMark({ size = 34, className, style }: Props) {
+  const uid = `bm${size}`
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -16,21 +28,36 @@ export function BrandMark({ size = 34, className, style }: Props) {
       aria-hidden="true"
     >
       <defs>
-        <radialGradient id="bm-bg" cx="50%" cy="35%" r="70%">
-          <stop offset="0%"   stopColor="#0E1E38"/>
-          <stop offset="100%" stopColor="#070C18"/>
-        </radialGradient>
+        <linearGradient id={`${uid}-bg`} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#12403C"/>
+          <stop offset="1" stopColor="#06211F"/>
+        </linearGradient>
+        <linearGradient id={`${uid}-oro`} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#FFD166"/>
+          <stop offset="1" stopColor="#F09F1A"/>
+        </linearGradient>
+        <linearGradient id={`${uid}-tur`} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#5FEBC9"/>
+          <stop offset="1" stopColor="#17A38E"/>
+        </linearGradient>
       </defs>
-      <rect width="512" height="512" rx="108" fill="url(#bm-bg)"/>
-      <polyline
-        points="76,388 256,88 426,268"
-        fill="none" stroke="white" strokeWidth="40"
-        strokeLinecap="round" strokeLinejoin="round" opacity="0.96"
-      />
-      <circle cx="256" cy="88" r="30" fill="#3B82F6"/>
-      <circle cx="248" cy="80" r="10" fill="#93C5FD" opacity="0.6"/>
-      <line x1="58" y1="416" x2="454" y2="416"
-        stroke="#3B82F6" strokeWidth="7" strokeLinecap="round" opacity="0.28"/>
+
+      <rect width="512" height="512" rx="108" fill={`url(#${uid}-bg)`}/>
+
+      <g transform="rotate(-9 223 213)">
+        <rect x="85" y="123" width="275" height="180" rx="38" fill={`url(#${uid}-oro)`}/>
+      </g>
+
+      {/* Sombra de contacto: da el orden de apilado sin usar un filtro, que a
+          tamaño pequeño convertiría la marca en una mancha. */}
+      <g transform="rotate(7 299 308)">
+        <rect x="161" y="218" width="275" height="180" rx="38" fill="#04120F" opacity="0.28"/>
+      </g>
+
+      <g transform="rotate(7 299 308)">
+        <rect x="161" y="218" width="275" height="180" rx="38" fill={`url(#${uid}-tur)`}/>
+        <rect x="190" y="276" width="114" height="19" rx="9" fill="#08332D" opacity="0.42"/>
+      </g>
     </svg>
   )
 }

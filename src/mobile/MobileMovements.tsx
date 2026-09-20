@@ -80,17 +80,22 @@ export function MobileMovements({
 
   return (
     <div className="mobile-movements-screen">
+      {/* Sin centavos en esta franja. Son tres cifras en tres columnas de
+          unos 110px: con decimales, un ingreso de cinco digitos no cabe y se
+          cortaba con puntos suspensivos ("RD$ 65,132.…"). Una app de
+          dinero no puede recortar una cifra de dinero; el centavo aqui no le
+          dice nada a nadie y el detalle exacto esta a un toque. */}
       <section className="mobile-summary-strip mobile-summary-strip-movements">
         <article className="mini-stat">
           <small>{t('incomes')}</small>
           <strong className="income">
-            <AnimatedMoney value={summary.income} compact={compactNumbers} />
+            <AnimatedMoney value={summary.income} compact={compactNumbers} decimals={0} />
           </strong>
         </article>
         <article className="mini-stat">
           <small>{t('expenses')}</small>
           <strong className="expense">
-            <AnimatedMoney value={summary.expense} compact={compactNumbers} />
+            <AnimatedMoney value={summary.expense} compact={compactNumbers} decimals={0} />
           </strong>
         </article>
         <button
@@ -102,7 +107,7 @@ export function MobileMovements({
           <small>{t('totalBalance')}</small>
           <strong className={balancePositive ? 'income' : 'expense'}>
             {!balancePositive && '-'}
-            <AnimatedMoney value={Math.abs(totalBalance)} compact={compactNumbers} />
+            <AnimatedMoney value={Math.abs(totalBalance)} compact={compactNumbers} decimals={0} />
           </strong>
         </button>
       </section>
@@ -178,7 +183,9 @@ export function MobileMovements({
           <div className="mweek-body">
             <div className="mweek-main">
               <small>{t('weeklySpentLabel')}</small>
-              <strong>{fmt(digest.expense, currency)}</strong>
+              {/* Sin centavos: es la cifra mas grande de la tarjeta y con
+                  decimales se partia en dos lineas. */}
+              <strong>{fmt(digest.expense, currency, { decimals: 0 })}</strong>
               {digest.expenseDeltaPct !== null && (
                 <span className={`mweek-delta ${digest.expenseDeltaPct > 0 ? 'up' : 'down'}`}>
                   <Icon name="arrowUp" size={11} style={{ transform: digest.expenseDeltaPct > 0 ? 'none' : 'rotate(180deg)' }} />

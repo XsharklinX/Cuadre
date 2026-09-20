@@ -105,7 +105,7 @@ class ScannerOverlayView @JvmOverloads constructor(
     }
 
     companion object {
-        private val AMOUNT_COLOR = Color.parseColor("#4D82FF")
+        private val AMOUNT_COLOR = Color.parseColor("#17A38E")
         private val CARD_COLOR = Color.parseColor("#35D0A2")
     }
 }

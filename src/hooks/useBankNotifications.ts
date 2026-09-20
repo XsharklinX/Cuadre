@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { toast } from '@/components/ui/Toast'
 import { guessCategoryId } from '@/data/bankCsv'
-import { movementDedupKey, resolveDetectedAccount } from '@/data/bankIngest'
+import { looksAlreadyRecorded, movementDedupKey, resolveDetectedAccount } from '@/data/bankIngest'
 import { accountCurrency, fmt, localToday } from '@/data/helpers'
 import { entryInAccountCurrency } from '@/data/currencies'
 import { hasSecondaryBalance } from '@/data/creditCard'
@@ -75,7 +75,23 @@ export function useBankNotifications() {
           // usuario lo tiene activado, se registra el movimiento SOLO. Si no, o
           // si falla (p.ej. saldo insuficiente en política bloquear), cae a
           // sugerencia manual para que el usuario elija cuenta / lo revise.
-          if (bank.autoCreate && account) {
+          /**
+           * ¿Ya lo tecleaste tú? Pagas en el supermercado, lo registras a
+           * mano, y segundos después llega el aviso del banco por la misma
+           * compra. Sin esto el gasto queda dos veces y el saldo miente.
+           *
+           * Cuando hay sospecha NO se auto-crea y NO se descarta: se ofrece
+           * como sugerencia marcada. Dos cafés del mismo precio el mismo día
+           * son dos gastos legítimos y no hay forma de distinguirlos desde
+           * aquí — la app no debe decidir por el usuario, debe preguntar.
+           */
+          const alreadyRecorded = account
+            ? looksAlreadyRecorded(finance.transactions, {
+                amount: tx.amount, accountId: account.id, date, type: tx.type,
+              })
+            : null
+
+          if (bank.autoCreate && account && !alreadyRecorded) {
             const categoryId = guessCategoryId(tx.note, finance.categories, tx.type, false)
             const id = newId('tx_')
             // El aviso trae SU divisa, y antes se ignoraba: un aviso de US$25
@@ -107,7 +123,12 @@ export function useBankNotifications() {
               // cae a sugerencia manual abajo
             }
           }
-          bank.add({ ...tx, date, postTime, pkg })
+          bank.add({
+            ...tx, date, postTime, pkg,
+            // Marca para que la sugerencia se muestre con el aviso de posible
+            // repetido, en vez de parecer un movimiento nuevo cualquiera.
+            ...(alreadyRecorded ? { possibleDuplicateOf: alreadyRecorded.id } : {}),
+          })
           record({ pkg, title, text, postTime, verdict: 'added' })
         }
       } finally {

@@ -35,8 +35,9 @@ import { MobilePatternGate } from '@/mobile/MobilePatternGate'
 import { MobileShell } from '@/mobile/MobileShell'
 import { MobileRatingPrompt } from '@/mobile/MobileRatingPrompt'
 import { useRatingPrompt } from '@/hooks/useRatingPrompt'
+import { useWhatsNew } from '@/hooks/useWhatsNew'
+import { MobileWhatsNew } from '@/mobile/MobileWhatsNew'
 import { useExitConfirm } from '@/mobile/useExitConfirm'
-import { MobileSplash } from '@/mobile/MobileSplash'
 import { useMobileBackDismiss } from '@/mobile/useMobileBackDismiss'
 import type { Sheet } from '@/mobile/settings/shared'
 import type { Transaction, ViewId, ViewProps } from '@/types'
@@ -64,7 +65,6 @@ export default function App() {
   const hasAppLock = !!(s.appPin || s.appPattern)
   const [bioUnlocked, setBioUnlocked]  = useState(!s.requireBiometric)
   const [credUnlocked, setCredUnlocked] = useState(!hasAppLock)
-  const [splashDone,   setSplashDone]   = useState(false)
   const [view,         setView]         = useState<ViewId>('dashboard')
   const [mkey,         setMkey]         = useState(currentMonthKey())
   const [txForm,       setTxForm]       = useState<Transaction | 'new' | null>(null)
@@ -124,7 +124,8 @@ export default function App() {
   useLiveExchangeRates()
   // Valoracion: se evalua una vez por sesion, con retraso, y solo si el usuario
   // ya lleva tiempo usando la app de verdad (ver `data/ratingPrompt.ts`).
-  const rating = useRatingPrompt()
+  const whatsNew = useWhatsNew()
+  const rating = useRatingPrompt(whatsNew.open)
 
   const overlayOpen = !!txForm || settingsOpen
   useMobileBackDismiss(overlayOpen, () => {
@@ -222,7 +223,6 @@ export default function App() {
 
   return (
     <div className="app mobile-app" {...themeProps}>
-      {!splashDone && <MobileSplash onGone={() => setSplashDone(true)} />}
       <DialogProvider>
         <MobileShell
           view={view}
@@ -246,6 +246,7 @@ export default function App() {
           onConsumeNotificationTarget={consumeNotificationTarget}
         />
         <ToastHost />
+        {whatsNew.open && <MobileWhatsNew onClose={whatsNew.close} highlightLatest />}
         {rating.open && (
           <MobileRatingPrompt
             onRated={rating.rated}

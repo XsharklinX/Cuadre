@@ -4,12 +4,17 @@ import { toast } from '@/components/ui/Toast'
 import { AnimatedMoney } from '@/components/ui/AnimatedMoney'
 import { CatBadge } from '@/views/shared'
 import { ACCENT_COLORS } from '@/constants'
-import { accountActivity, accountBalanceInBase, accountCurrency, dateLocale, fmt, getAccount, getCategory, monthlyAccountSeries, visibleAccounts } from '@/data/helpers'
-import { CURRENCIES as CURRENCY_LIST, getCurrencyMeta } from '@/data/currencies'
+import { accountActivity, accountBalanceInBase, creditCardsOwedInBase, accountCurrency, dateLocale, fmt, getAccount, getCategory, localToday, monthlyAccountSeries, visibleAccounts } from '@/data/helpers'
+import { CURRENCIES as CURRENCY_LIST, convertCurrency, getCurrencyMeta } from '@/data/currencies'
+import { CARD_NETWORKS, networkMeta } from '@/data/cardNetwork'
 import {
-  creditCycle, creditUsedInPrimary, creditUtilization, hasSecondaryBalance,
-  minimumPayment, projectMinimumPayoff, utilizationBand,
+  creditCycle, creditUsed, creditUsedInPrimary, creditUtilization, hasSecondaryBalance,
+  hasSplitLimits, minimumPayment, projectMinimumPayoff, secondaryUtilization, utilizationBand,
 } from '@/data/creditCard'
+import { canDeleteAccountType, canHaveNetwork, creatableTypes, guessNetwork } from '@/data/cardNetwork'
+import { findBank, guessBank } from '@/data/banks'
+import { MobileBankPicker } from './MobileBankPicker'
+import { NetworkMark } from '@/components/ui/NetworkMark'
 import { useFinance } from '@/store/finance'
 import { useSettings } from '@/store/settings'
 import { useFmt } from '@/hooks/useFmt'
@@ -19,6 +24,7 @@ import { translateCategoryName, useT } from '@/i18n'
 import { useDialogA11y } from './useDialogA11y'
 import { useMobileBackDismiss } from './useMobileBackDismiss'
 import { useSubmitGuard } from './useSubmitGuard'
+import { playSuccessHaptic } from '@/lib/sound'
 import { MobileAmountSheet } from './MobileAmountSheet'
 import { DayOfMonthSheet, PercentSheet } from './MobileNumberSheets'
 import { MobileTextSheet } from './MobileTextSheet'
@@ -52,8 +58,7 @@ export function MobileAccounts({ mkey, createRequest, onEditTx, onDeleteTx }: {
   onEditTx: (transaction: Transaction) => void
   onDeleteTx?: (id: string) => void
 }) {
-  const { accounts, transactions, currency, addAccount, updateAccount, deleteAccount, restoreAccount } = useFinance()
-  const lang = useSettings(s => s.language)
+  const { accounts, currency, addAccount, updateAccount, deleteAccount, restoreAccount } = useFinance()
   const fmtVal = useFmt()
   const t = useT()
   const TYPE_META = getTypeMeta(t)
@@ -63,7 +68,6 @@ export function MobileAccounts({ mkey, createRequest, onEditTx, onDeleteTx }: {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   // Cuenta desplegada en la lista: al tocarla se abren sus cifras del mes y sus
   // acciones, sin salir de la pantalla.
-  const [expandedId, setExpandedId] = useState<string | null>(null)
   const selected = accounts.find(a => a.id === selectedId) ?? null
   const [activityAccount, setActivityAccount] = useState<Account | null>(null)
   const [editingAccount, setEditingAccount] = useState<Account | 'new' | null>(null)
@@ -115,180 +119,233 @@ export function MobileAccounts({ mkey, createRequest, onEditTx, onDeleteTx }: {
     return { assets, liabilities, net: assets - liabilities, cashCount, bankCount, creditCount, visibleCount: visible.length }
   }, [accounts, currency, TYPE_META, t])
 
-  const groups = [t('cash'), t('bankAccountsGroupLabel'), t('creditCardsGroupLabel')].map(group => ({
-    group,
-    accounts: accounts.filter(a => TYPE_META[a.type].group === group),
-    visibleTotal: accounts
-      .filter(a => a.includeInTotal !== false && TYPE_META[a.type].group === group)
-      .reduce((s, a) => s + accountBalanceInBase(a, currency), 0),
-  })).filter(g => g.accounts.length)
+
+  const cashAccounts = accounts.filter(a => a.type !== 'credit')
+  const creditCards  = accounts.filter(a => a.type === 'credit')
+  const cashTotal    = cashAccounts
+    .filter(a => a.includeInTotal !== false)
+    .reduce((sum, a) => sum + accountBalanceInBase(a, currency), 0)
+
+  /**
+   * La tarjeta cuyo pago vence antes. Con dos o tres tarjetas, "¿cuánto debo
+   * y cuándo?" es LA pregunta, y antes había que abrir cada ficha por
+   * separado para armar la respuesta mentalmente.
+   */
+  const nextDue = useMemo(() => {
+    const withCycle = creditCards
+      .map(a => ({ account: a, cycle: creditCycle(a), min: minimumPayment(a) }))
+      .filter(x => x.cycle.daysToPayment !== null && creditUsed(x.account.balance) > 0)
+      .sort((a, b) => (a.cycle.daysToPayment ?? 0) - (b.cycle.daysToPayment ?? 0))
+    return withCycle[0] ?? null
+  }, [creditCards])
+
+  const assetShare = summary.assets + summary.liabilities > 0
+    ? summary.assets / (summary.assets + summary.liabilities) * 100
+    : 100
 
   return (
-    <div className="mrep-root">
+    <div className="sacc-root">
 
-      {/* Net worth hero */}
-      <div className="mrep-hero">
-        <span className="mrep-hero-label">{t('netWorthLabel')}</span>
-        <strong className="mrep-hero-value">{fmtVal(summary.net, currency)}</strong>
-        <div className="mrep-hero-bar">
-          {summary.assets + summary.liabilities > 0 && (
-            <div
-              className="mrep-hero-bar-fill"
-              style={{ width: `${Math.min(100, summary.assets / (summary.assets + summary.liabilities) * 100)}%` }}
-            />
+      {/* ── Patrimonio ──────────────────────────────────── */}
+      <section className="sacc-hero">
+        <div>
+          <span className="sacc-hero-label">{t('netWorthLabel')}</span>
+          <strong className={`sacc-hero-value${summary.net < 0 ? ' negative' : ''}`}>
+            {fmtVal(summary.net, currency)}
+          </strong>
+        </div>
+        <div className="sacc-hero-bar" role="img" aria-label={t('assetsLabel')}>
+          <i style={{ width: `${assetShare}%` }} />
+        </div>
+        <div className="sacc-hero-split">
+          <div className="sacc-hero-stat asset">
+            <small>{t('assetsLabel')}</small>
+            <strong>{fmtVal(summary.assets, currency)}</strong>
+          </div>
+          <div className="sacc-hero-stat debt">
+            <small>{t('liabilitiesLabel')}</small>
+            <strong>{fmtVal(summary.liabilities, currency)}</strong>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Próximo pago ────────────────────────────────── */}
+      {nextDue && (
+        <button
+          className={`sacc-next${nextDue.cycle.paymentSoon ? '' : ' calm'}`}
+          onClick={() => setSelectedId(nextDue.account.id)}
+        >
+          <Icon name="calendar" size={18} className="sacc-next-ico" />
+          <span className="sacc-next-body">
+            <b>{t('nextCardPayment').replace('{name}', nextDue.account.name)}</b>
+            <small>
+              {nextDue.cycle.daysToPayment === 0
+                ? t('dueToday')
+                : t('dueInDays').replace('{n}', String(nextDue.cycle.daysToPayment))}
+            </small>
+          </span>
+          {nextDue.min !== null && nextDue.min > 0 && (
+            <span className="sacc-next-amount">
+              {fmtVal(nextDue.min, accountCurrency(nextDue.account, currency))}
+            </span>
           )}
-        </div>
-        <div className="mrep-hero-row">
-          <div className="mrep-hero-stat">
-            <span className="mrep-hero-dot asset" />
-            <div>
-              <small>{t('assetsLabel')}</small>
-              <strong>{fmtVal(summary.assets, currency)}</strong>
-            </div>
-          </div>
-          <div className="mrep-hero-stat">
-            <span className="mrep-hero-dot debt" />
-            <div>
-              <small>{t('liabilitiesLabel')}</small>
-              <strong>{fmtVal(summary.liabilities, currency)}</strong>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Section header */}
-      <div className="macc-section-head">
-        <span className="mrep-section-title">{t('accounts')}</span>
-        <button className="mpr-add-btn" onClick={() => setEditingAccount('new')}>
-          <Icon name="plus" size={15} /> {t('add')}
         </button>
-      </div>
-
-      {/* Las tres píldoras de conteo («3 cuentas · 2 bancarias · 1 tarjeta») se
-          quitaron: eran contadores, no dinero, y ocupaban el mejor espacio de la
-          pantalla. Lo que sí interesa por cuenta aparece ahora al tocarla. */}
+      )}
 
       {accounts.length === 0 ? (
-        <div className="mrep-empty">
-          <Icon name="cards" size={40} style={{ opacity: .25 }} />
-          <p>{t('noAccountsShort')}</p>
+        <div className="sacc-empty">
+          <Icon name="cards" size={44} className="sacc-empty-ico" />
+          <h3>{t('noAccountsShort')}</h3>
+          <p>{t('accountsEmptyHint')}</p>
           <button onClick={() => setEditingAccount('new')}>{t('createAccount')}</button>
         </div>
       ) : (
         <>
-          {/* La barra de distribución con leyenda se quitó: era decorativa y con
-              4+ cuentas resultaba ilegible. El reparto ya se lee en los totales
-              por grupo y en el saldo de cada cuenta. */}
-
-          {/* Groups */}
-          {groups.map(({ group, accounts: accs, visibleTotal }) => (
-            <div key={group} className="mrep-group">
-              <div className="mrep-group-header">
-                <span>{group}</span>
-                <strong>{fmtVal(visibleTotal, currency)}</strong>
+          {/* ── REGISTRO 1: dinero que tienes ───────────────
+              Filas compactas. Un saldo es un número: no necesita una
+              tarjeta ni el sparkline de 20px que antes competía con él. */}
+          {cashAccounts.length > 0 && (
+            <div className="sacc-block">
+              <div className="sacc-section">
+                <span className="sacc-section-title">{t('yourMoneyLabel')}</span>
+                <span className="sacc-section-total">{fmtVal(cashTotal, currency)}</span>
               </div>
-              {accs.map(a => {
-                const used    = a.type === 'credit' && a.limit ? Math.abs(Math.min(0, a.balance)) : null
-                const utilPct = used !== null && a.limit ? Math.min(100, used / a.limit * 100) : null
-                const series  = monthlyAccountSeries(transactions, a.id, mkey, dateLocale(lang))
-                const maxFlow = Math.max(1, ...series.map(s => Math.abs(s.inflow - s.outflow)))
-                return (
-                  <div key={a.id} className={`macc-item${expandedId === a.id ? ' open' : ''}`}>
-                  <button
-                    className="mrep-account-row"
-                    aria-expanded={expandedId === a.id}
-                    onClick={() => setExpandedId(id => id === a.id ? null : a.id)}
-                  >
-                    <span className="mrep-account-icon" style={{ background: a.color + '22', color: a.color }}>
-                      <Icon name={TYPE_META[a.type].icon} size={20} />
+              <div className="sacc-rows">
+                {cashAccounts.map(a => (
+                  <button key={a.id} className="sacc-row" onClick={() => setSelectedId(a.id)}>
+                    <span className="sacc-row-ico" style={{ background: `color-mix(in oklab, ${a.color} 16%, transparent)`, color: a.color }}>
+                      <Icon name={TYPE_META[a.type].icon} size={19} />
                     </span>
-                    <div className="mrep-account-info">
-                      <b>
-                        <span className="mrep-account-name">{a.name}</span>
+                    <span className="sacc-row-info">
+                      <span className="sacc-row-name">
+                        {a.name}
                         {a.includeInTotal === false && (
-                          <span className="mrep-excluded-badge">{t('excludedFromTotalBadge')}</span>
+                          <span className="sacc-badge">{t('excludedFromTotalBadge')}</span>
                         )}
-                      </b>
-                      <small>
+                      </span>
+                      <span className="sacc-row-meta">
                         {TYPE_META[a.type].label}
-                        {a.last4 ? ` - ****${a.last4}` : ''}
+                        {a.last4 ? ` · ····${a.last4}` : ''}
                         {a.currency && a.currency !== currency ? ` · ${a.currency}` : ''}
-                      </small>
-                      {utilPct !== null && a.limit && (
-                        <div className="mrep-util-wrap">
-                          <div className="mrep-util-bar">
-                            <div style={{
-                              width: `${utilPct}%`,
-                              background: utilPct >= 90 ? '#ff6b8a' : utilPct >= 70 ? '#f59e0b' : '#35d0a2',
-                            }} />
-                          </div>
-                          <span className={utilPct >= 90 ? 'text-expense' : utilPct >= 70 ? 'text-warn' : ''}>
-                            {t('pctUsedAvailable').replace('{pct}', String(Math.round(utilPct))).replace('{amount}', fmtVal(a.limit - used!, accountCurrency(a, currency)))}
-                          </span>
-                        </div>
+                      </span>
+                    </span>
+                    <span className="sacc-row-right">
+                      {/* La red identifica la tarjeta antes que el nombre que
+                          el usuario le puso. Solo si la cuenta lleva plastico. */}
+                      {a.network && canHaveNetwork(a.type) && (
+                        <NetworkMark network={a.network} size={24} />
                       )}
-                    </div>
-                    <div className="macc-spark" title={t('last6Months')}>
-                      {series.map(b => {
-                        const net = b.inflow - b.outflow
-                        return (
-                          <span
-                            key={b.key}
-                            className={`macc-spark-bar ${net >= 0 ? 'pos' : 'neg'}`}
-                            style={{ height: `${Math.max(8, Math.round(Math.abs(net) / maxFlow * 100))}%` }}
-                          />
-                        )
-                      })}
-                    </div>
-                    <strong className={accountKind(a) === 'debt' ? 'text-expense' : ''}>
-                      {fmtVal(a.balance, accountCurrency(a, currency))}
-                    </strong>
-                    <Icon
-                      name="arrowUp"
-                      size={14}
-                      style={{
-                        transform: expandedId === a.id ? 'rotate(180deg)' : 'rotate(90deg)',
-                        color: 'var(--m-muted)', flexShrink: 0,
-                      }}
-                    />
+                      <span className="sacc-row-amount">
+                        {fmtVal(a.balance, accountCurrency(a, currency))}
+                      </span>
+                    </span>
                   </button>
-                  {expandedId === a.id && (() => {
-                    const month = series[series.length - 1]
-                    const moves = transactions.filter(tx =>
-                      tx.date.startsWith(mkey)
-                      && (tx.accountId === a.id || tx.fromAccount === a.id || tx.toAccount === a.id)).length
-                    return (
-                      <div className="macc-expand">
-                        <div className="macc-expand-stats">
-                          <div>
-                            <small>{t('movementsThisMonth')}</small>
-                            <b>{moves}</b>
-                          </div>
-                          <div>
-                            <small>{t('accountInflow')}</small>
-                            <b className="text-income">{fmtVal(month?.inflow ?? 0, currency)}</b>
-                          </div>
-                          <div>
-                            <small>{t('accountOutflow')}</small>
-                            <b className="text-expense">{fmtVal(month?.outflow ?? 0, currency)}</b>
-                          </div>
-                        </div>
-                        <div className="macc-expand-actions">
-                          <button onClick={() => setSelectedId(a.id)}>
-                            <Icon name="chart" size={15} /> {t('viewDetailLabel')}
-                          </button>
-                          <button onClick={() => setEditingAccount(a)}>
-                            <Icon name="edit" size={15} /> {t('edit')}
-                          </button>
-                        </div>
-                      </div>
-                    )
-                  })()}
-                  </div>
-                )
-              })}
+                ))}
+              </div>
             </div>
-          ))}
+          )}
+
+          {/* ── REGISTRO 2: dinero que debes ────────────────
+              CARRUSEL de tarjetas reales, no un panel plano. Una tarjeta de
+              crédito ES un objeto físico con proporción, marca y color; la
+              gente la reconoce por cómo se ve, no por leer su nombre. Se
+              desliza en horizontal con anclaje, como el billetero del
+              teléfono.
+
+              Cada tarjeta lleva solo lo que cabe sin apretar: identidad,
+              saldos y cuánto del cupo va. El ciclo, el mínimo y el aviso de
+              interés viven en la ficha, a un toque. */}
+          {creditCards.length > 0 && (
+            <div className="sacc-block">
+              <div className="sacc-section">
+                <span className="sacc-section-title">{t('yourCardsLabel')}</span>
+                <span className="sacc-section-total">
+                  {fmtVal(creditCardsOwedInBase(accounts, currency), currency)} {t('owedLabel')}
+                </span>
+              </div>
+
+              <div className="sacc-carousel" role="list">
+                {creditCards.map(a => {
+                  const cur     = accountCurrency(a, currency)
+                  const owed    = creditUsed(a.balance)
+                  const util    = creditUtilization(a, currency)
+                  const band    = util !== null ? utilizationBand(util) : null
+                  const dual    = hasSecondaryBalance(a)
+                  const secOwed = creditUsed(a.secondaryBalance ?? 0)
+                  const bank    = findBank(a.bankId) ?? guessBank(a.name)
+                  const cycle   = creditCycle(a)
+
+                  return (
+                    <button
+                      key={a.id}
+                      role="listitem"
+                      className="sacc-plastic"
+                      style={{ '--card': a.color } as React.CSSProperties}
+                      onClick={() => setSelectedId(a.id)}
+                      aria-label={`${a.name}, ${TYPE_META[a.type].label}`}
+                    >
+                      {/* La textura: dos arcos muy tenues del propio color de
+                          la tarjeta. Da profundidad sin usar una imagen ni un
+                          degradado que compita con las cifras. */}
+                      <span className="sacc-plastic-sheen" aria-hidden="true" />
+
+                      <span className="sacc-plastic-top">
+                        <span className="sacc-plastic-bank">
+                          {bank?.name ?? TYPE_META[a.type].label}
+                        </span>
+                        {a.network
+                          ? <NetworkMark network={a.network} size={30} />
+                          : <Icon name="cards" size={20} className="sacc-plastic-generic" />}
+                      </span>
+
+                      {/* Los ultimos 4 digitos van con el NOMBRE, como van
+                          impresos en el plastico de verdad. Antes compartian
+                          fila con las cifras y en una tarjeta de dos divisas
+                          (pesos y dolares) los tres textos no caben: los
+                          montos se montaban encima del numero. */}
+                      <span className="sacc-plastic-id">
+                        <span className="sacc-plastic-name">{a.name}</span>
+                        {a.last4 && <span className="sacc-plastic-last4">···· {a.last4}</span>}
+                      </span>
+
+                      <span className="sacc-plastic-bottom">
+                        <span className="sacc-plastic-figures">
+                          <span className="sacc-plastic-fig">
+                            <em>{cur}</em>
+                            <b className={owed > 0 ? 'owed' : ''}>{fmtVal(a.balance, cur)}</b>
+                          </span>
+                          {dual && (
+                            <span className="sacc-plastic-fig">
+                              <em>{a.secondaryCurrency}</em>
+                              <b className={secOwed > 0 ? 'owed' : ''}>
+                                {fmtVal(a.secondaryBalance ?? 0, a.secondaryCurrency!)}
+                              </b>
+                            </span>
+                          )}
+                        </span>
+                      </span>
+
+                      {/* Franja de cupo al borde inferior: se lee de un
+                          vistazo sin robarle sitio a las cifras. */}
+                      {util !== null && a.limit && (
+                        <span className="sacc-plastic-util" aria-hidden="true">
+                          <i className={band ?? 'ok'} style={{ width: `${Math.max(2, util * 100)}%` }} />
+                        </span>
+                      )}
+
+                      {cycle.paymentSoon && (
+                        <span className="sacc-plastic-due">{t('dueSoonShort')}</span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          <button className="sacc-add" onClick={() => setEditingAccount('new')}>
+            <Icon name="plus" size={16} /> {t('addAccountLabel')}
+          </button>
         </>
       )}
 
@@ -299,6 +356,7 @@ export function MobileAccounts({ mkey, createRequest, onEditTx, onDeleteTx }: {
           onClose={() => setSelectedId(null)}
           onEdit={a => { setSelectedId(null); setEditingAccount(a) }}
           onViewAll={() => setActivityAccount(selected)}
+          onEditTx={tx => { setSelectedId(null); onEditTx(tx) }}
         />
       )}
 
@@ -323,13 +381,21 @@ export function MobileAccounts({ mkey, createRequest, onEditTx, onDeleteTx }: {
   )
 }
 
-function AccountDetailSheet({ account, mkey, onClose, onEdit, onViewAll }: { account: Account; mkey: string; onClose: () => void; onEdit: (account: Account) => void; onViewAll: () => void }) {
+function AccountDetailSheet({ account, mkey, onClose, onEdit, onViewAll, onEditTx }: {
+  account: Account
+  mkey: string
+  onClose: () => void
+  onEdit: (account: Account) => void
+  onViewAll: () => void
+  onEditTx: (tx: Transaction) => void
+}) {
   const { transactions, accounts, categories, currency, reconcileAccount } = useFinance()
   const fmtVal = useFmt()
   const t = useT()
   const lang = useSettings(s => s.language)
   const TYPE_META = getTypeMeta(t)
   const [reconciling, setReconciling] = useState(false)
+  const [paying, setPaying] = useState(false)
   const { beginSubmit, endSubmit } = useSubmitGuard()
 
   useMobileBackDismiss(reconciling, () => setReconciling(false))
@@ -370,73 +436,119 @@ function AccountDetailSheet({ account, mkey, onClose, onEdit, onViewAll }: { acc
   const minPay  = account.type === 'credit' ? minimumPayment(account) : null
   const payoff  = account.type === 'credit' ? projectMinimumPayoff(account) : null
   const secondary = hasSecondaryBalance(account)
+  const secUtil   = secondaryUtilization(account)
 
   return (
     <>
     <SheetPortal>
     <div ref={dialogRef} className="mobile-detail-sheet" role="dialog" aria-modal="true" aria-label={account.name} onClick={onClose}>
-      <section className="macc-sheet" onClick={e => e.stopPropagation()}>
+      <section className="sacc-detail" onClick={e => e.stopPropagation()}>
         <header>
           <span>{account.name}</span>
-          <div className="macc-sheet-head-actions">
+          <div className="sacc-detail-actions">
             <button aria-label={t('edit')} onClick={() => onEdit(account)}><Icon name="edit" size={18} /></button>
             <button aria-label={t('close')} onClick={onClose}><Icon name="close" size={18} /></button>
           </div>
         </header>
 
-        <div className="macc-sheet-body">
-          <div className="macc-sheet-head">
-            <span className="macc-sheet-icon" style={{ background: account.color + '22', color: account.color }}>
+        <div className="sacc-detail-body">
+          <div className="sacc-detail-head">
+            <span className="sacc-detail-icon" style={{ background: account.color + '22', color: account.color }}>
               <Icon name={TYPE_META[account.type].icon} size={24} />
             </span>
-            <div className="macc-sheet-head-info">
-              <small>{TYPE_META[account.type].label}{account.last4 ? ` - ****${account.last4}` : ''}</small>
-              <AnimatedMoney value={account.balance} currency={accountCurrency(account, currency)} className="macc-sheet-balance" />
+            <div className="sacc-detail-id">
+              <small>
+                {TYPE_META[account.type].label}
+                {account.last4 ? ` · ····${account.last4}` : ''}
+              </small>
+              {/* Con doble saldo, el numero grande de aqui repetia el de las
+                  cajas de abajo. Se muestra solo cuando NO hay dos libros. */}
+              {!secondary && (
+                <AnimatedMoney
+                  value={account.balance}
+                  currency={accountCurrency(account, currency)}
+                  className="sacc-detail-balance"
+                />
+              )}
             </div>
           </div>
 
           {/* Segundo saldo: al mismo peso que el principal, no como nota al
               pie. Son dos deudas reales y se pagan por separado. */}
           {secondary && (
-            <div className="macc-dual">
-              <div className="macc-dual-cell">
-                <span className="macc-dual-label">
+            <div className="sacc-card-balances">
+              <div className="sacc-bal">
+                <span className="sacc-bal-label">
                   {getCurrencyMeta(accountCurrency(account, currency)).flag} {accountCurrency(account, currency)}
                 </span>
-                <strong className={account.balance < 0 ? 'macc-dual-debt' : 'macc-dual-zero'}>
+                <strong className={`sacc-bal-value${account.balance < 0 ? ' owed' : ' clear'}`}>
                   {fmtVal(account.balance, accountCurrency(account, currency))}
                 </strong>
               </div>
-              <div className="macc-dual-cell">
-                <span className="macc-dual-label">
+              <div className="sacc-bal">
+                <span className="sacc-bal-label">
                   {getCurrencyMeta(account.secondaryCurrency!).flag} {account.secondaryCurrency}
                 </span>
-                <strong className={(account.secondaryBalance ?? 0) < 0 ? 'macc-dual-debt' : 'macc-dual-zero'}>
+                <strong className={`sacc-bal-value${(account.secondaryBalance ?? 0) < 0 ? ' owed' : ' clear'}`}>
                   {fmtVal(account.secondaryBalance ?? 0, account.secondaryCurrency!)}
                 </strong>
               </div>
             </div>
           )}
 
-          {utilPct !== null && account.limit && (
-            <div className="mrep-util-wrap">
-              <div className="mrep-util-bar">
-                {/* Deja un 2% visible con deuda cero: un canal totalmente
-                    vacio se lee como un componente que no cargo. */}
-                <div className={`macc-util-fill band-${band}`} style={{ width: `${Math.max(2, utilPct)}%` }} />
+          {/* Cupo PROPIO de la linea extranjera. Vive aqui y no en la
+              tarjeta del carrusel: en el plastico solo cabe una franja, y
+              partirla en dos la vuelve ilegible. */}
+          {secUtil !== null && account.secondaryLimit && account.secondaryCurrency && (
+            <div className="sacc-util">
+              <div className="sacc-util-head">
+                <span className="sacc-util-label">{t('creditUsedLabel')} · {account.secondaryCurrency}</span>
+                <span className={`sacc-util-value ${utilizationBand(secUtil)}`}>
+                  {Math.round(secUtil * 100)}% · {fmtVal(
+                    Math.max(0, account.secondaryLimit - creditUsed(account.secondaryBalance ?? 0)),
+                    account.secondaryCurrency,
+                  )}
+                </span>
               </div>
-              <span className={band === 'high' ? 'text-expense' : band === 'watch' ? 'text-warn' : ''}>
-                {t('pctUsedAvailable')
-                  .replace('{pct}', String(Math.round(utilPct)))
-                  .replace('{amount}', fmtVal(account.limit - used!, accountCurrency(account, currency)))}
-              </span>
+              <div
+                className="sacc-util-track"
+                role="progressbar"
+                aria-valuenow={Math.round(secUtil * 100)}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label={`${t('creditUsedLabel')} ${account.secondaryCurrency}`}
+              >
+                <div className={`sacc-util-fill ${utilizationBand(secUtil)}`} style={{ width: `${Math.max(2, secUtil * 100)}%` }} />
+              </div>
+            </div>
+          )}
+
+          {utilPct !== null && account.limit && (
+            <div className="sacc-util">
+              <div className="sacc-util-head">
+                <span className="sacc-util-label">{t('creditUsedLabel')}</span>
+                <span className={`sacc-util-value ${band}`}>
+                  {hasSplitLimits(account) ? `${accountCurrency(account, currency)} · ` : ''}
+                  {Math.round(utilPct)}% · {fmtVal(Math.max(0, account.limit - used!), accountCurrency(account, currency))}
+                </span>
+              </div>
+              <div
+                className="sacc-util-track"
+                role="progressbar"
+                aria-valuenow={Math.round(utilPct)}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label={`${t('creditUsedLabel')} ${account.name}`}
+              >
+                <div className={`sacc-util-fill ${band}`} style={{ width: `${Math.max(2, utilPct)}%` }} />
+              </div>
             </div>
           )}
 
           {/* El ciclo es lo que convierte un saldo en una TARJETA: sin corte y
               fecha de pago, el numero no tiene consecuencia. */}
           {cycle && (cycle.statementDate || cycle.paymentDate || minPay !== null) && (
-            <dl className="macc-cycle">
+            <dl className="sacc-cycle">
               <div>
                 <dt>{t('cycleStatement')}</dt>
                 <dd>{cycle.statementDate ? formatCycleDate(cycle.statementDate, lang) : '—'}</dd>
@@ -460,7 +572,7 @@ function AccountDetailSheet({ account, mkey, onClose, onEdit, onViewAll }: { acc
               dinero y tiempo, no el porcentaje: "24% anual" no significa nada
               al leerlo de pasada; "4 anos y RD$14,209" si. */}
           {payoff && used !== null && used > 0 && (
-            <p className="macc-interest-warn">
+            <p className="sacc-card-warn">
               <Icon name="alert" size={14} />
               {payoff.never
                 ? t('minOnlyNever')
@@ -471,75 +583,127 @@ function AccountDetailSheet({ account, mkey, onClose, onEdit, onViewAll }: { acc
           )}
 
           {/* Trend chart */}
-          <div className="macc-trend">
-            <p className="mrep-tools-heading">{t('last6Months')}</p>
-            <div className="macc-trend-chart">
+          <div className="sacc-trend">
+            {/* ACCIONES, arriba y no al fondo. "Conciliar" vivia despues de la
+                lista de actividad: es lo que arregla "mi banco dice otra cosa"
+                y habia que hacer scroll por toda la ficha para encontrarlo.
+                "Pagar tarjeta" es la accion #1 de una tarjeta y estaba a tres
+                toques detras de un "Transferir" generico. */}
+            <div className="sacc-actions">
+              {/* Deuda en CUALQUIERA de los dos libros. Antes solo miraba el
+                  principal: una tarjeta con el saldo en pesos a favor y deuda
+                  en dolares no ofrecia el boton de pagar. */}
+              {account.type === 'credit'
+                && (creditUsed(account.balance) > 0 || creditUsed(account.secondaryBalance ?? 0) > 0) && (
+                <button className="sacc-action primary" onClick={() => setPaying(true)}>
+                  <Icon name="banknote" size={16} />
+                  {t('payCardLabel')}
+                </button>
+              )}
+              <button className="sacc-action" onClick={() => setReconciling(true)}>
+                <Icon name="check" size={16} />
+                {t('reconcileShort')}
+              </button>
+              <button className="sacc-action" onClick={() => onEdit(account)}>
+                <Icon name="edit" size={16} />
+                {t('edit')}
+              </button>
+            </div>
+
+            <p className="sacc-detail-heading">{t('last6Months')}</p>
+            <div className="sacc-trend-chart">
               {series.map(b => (
-                <div key={b.key} className="macc-trend-col">
-                  <div className="macc-trend-bars">
-                    <div className="macc-trend-bar in" style={{ height: `${b.inflow / maxVal * 100}%` }} title={fmtVal(b.inflow, currency)} />
-                    <div className="macc-trend-bar out" style={{ height: `${b.outflow / maxVal * 100}%` }} title={fmtVal(b.outflow, currency)} />
+                <div key={b.key} className="sacc-trend-col">
+                  <div className="sacc-trend-bars">
+                    <div className="sacc-trend-bar in" style={{ height: `${b.inflow / maxVal * 100}%` }} title={fmtVal(b.inflow, currency)} />
+                    <div className="sacc-trend-bar out" style={{ height: `${b.outflow / maxVal * 100}%` }} title={fmtVal(b.outflow, currency)} />
                   </div>
                   <small>{b.label}</small>
                 </div>
               ))}
             </div>
-            <div className="macc-trend-legend">
-              <span><i className="macc-dot in" />{t('accountInflow')}</span>
-              <span><i className="macc-dot out" />{t('accountOutflow')}</span>
+            <div className="sacc-trend-legend">
+              <span><i className="sacc-legend-dot in" />{t('accountInflow')}</span>
+              <span><i className="sacc-legend-dot out" />{t('accountOutflow')}</span>
             </div>
           </div>
 
           {/* Recent activity */}
-          <div className="macc-recent">
-            <div className="macc-recent-head">
-              <p className="mrep-tools-heading">{t('recentActivityLabel')}</p>
+          <div className="sacc-recent">
+            <div className="sacc-recent-head">
+              <p className="sacc-detail-heading">{t('recentActivityLabel')}</p>
               {recent.length > 0 && (
-                <button className="macc-view-all" onClick={onViewAll}>{t('viewAllLabel')}</button>
+                <button className="sacc-view-all" onClick={onViewAll}>{t('viewAllLabel')}</button>
               )}
             </div>
             {recent.length === 0 ? (
-              <p className="macc-empty">{t('noRecentActivity')}</p>
+              <p className="sacc-detail-empty">{t('noRecentActivity')}</p>
             ) : (
-              <div className="macc-recent-list">
+              <div className="sacc-recent-list">
                 {recent.map(tx => {
+                  /**
+                   * La divisa del MOVIMIENTO, no la base de la app.
+                   *
+                   * Antes todo se formateaba con `currency`, asi que un gasto
+                   * de US$39.80 en una tarjeta aparecia como "RD$ 39.80" —
+                   * mismo numero, moneda equivocada, y sesenta veces menos
+                   * dinero del que en realidad se gasto.
+                   */
+                  const txCur = tx.onSecondaryBalance && account.secondaryCurrency
+                    ? account.secondaryCurrency
+                    : accountCurrency(account, currency)
+
                   if (tx.type === 'transfer') {
                     const isOutflow = tx.fromAccount === account.id
                     return (
-                      <div key={tx.id} className="mobile-tx-row">
+                      <button key={tx.id} className="mobile-tx-row sacc-tx-row" onClick={() => onEditTx(tx)}>
                         <span className="mobile-transfer-icon"><Icon name="repeat" size={24} /></span>
                         <span>
                           <b>{t('transfer')}</b>
                           <small>{getAccount(tx.fromAccount, accounts)?.name} → {getAccount(tx.toAccount, accounts)?.name}</small>
                         </span>
-                        <strong className={isOutflow ? '' : 'income'}>{isOutflow ? '−' : '+'}{fmtVal(tx.amount, currency)}</strong>
-                      </div>
+                        <strong className={isOutflow ? '' : 'income'}>
+                          {isOutflow ? '−' : '+'}{fmtVal(tx.amount, txCur)}
+                        </strong>
+                      </button>
                     )
                   }
                   const cat = getCategory(tx.categoryId, categories)
                   const income = tx.type === 'income'
                   return (
-                    <div key={tx.id} className="mobile-tx-row">
+                    /* Tocar edita. Antes eran `div`: se veia el movimiento y no
+                       habia forma de corregirlo sin salir a buscarlo. */
+                    <button key={tx.id} className="mobile-tx-row sacc-tx-row" onClick={() => onEditTx(tx)}>
                       <CatBadge category={cat} size={40} />
                       <span>
                         <b>{tx.note}</b>
-                        <small>{cat ? translateCategoryName(cat, lang) : t('noCategoryLabel')}</small>
+                        <small>
+                          {cat ? translateCategoryName(cat, lang) : t('noCategoryLabel')}
+                          {tx.onSecondaryBalance && account.secondaryCurrency ? ` · ${account.secondaryCurrency}` : ''}
+                        </small>
                       </span>
-                      <strong className={income ? 'income' : ''}>{income ? '+' : '−'}{fmtVal(tx.amount, currency)}</strong>
-                    </div>
+                      <strong className={income ? 'income' : ''}>
+                        {income ? '+' : '−'}{fmtVal(tx.amount, txCur)}
+                      </strong>
+                    </button>
                   )
                 })}
               </div>
             )}
           </div>
 
-          <button className="macc-view-all" style={{ width: '100%', justifyContent: 'center', marginTop: 4 }} onClick={() => setReconciling(true)}>
-            <Icon name="check" size={14} style={{ marginRight: 4 }} />{t('reconcileAccountLabel')}
-          </button>
         </div>
       </section>
     </div>
     </SheetPortal>
+
+    {paying && (
+      <PayCardSheet
+        card={account}
+        onClose={() => setPaying(false)}
+        onDone={() => { setPaying(false); onClose() }}
+      />
+    )}
 
     {reconciling && (
       <MobileAmountSheet
@@ -597,7 +761,7 @@ function getOverdraftOptions(t: ReturnType<typeof useT>): { value: OverdraftPoli
 
 type SubSheet = 'balance' | 'limit' | 'short' | 'last4' | 'accCurrency'
   | 'secondCurrency' | 'secondBalance' | 'statementDay' | 'paymentDay'
-  | 'apr' | 'minPct' | null
+  | 'apr' | 'minPct' | 'network' | 'bank' | 'secondLimit' | null
 
 function AccountEditorSheet({
   account,
@@ -616,10 +780,28 @@ function AccountEditorSheet({
   const OVERDRAFT_OPTIONS = getOverdraftOptions(t)
   const [fields, setFields] = useState<Omit<Account, 'id'>>(account ?? EMPTY_ACCOUNT)
   const [confirmDel, setConfirmDel] = useState(false)
+  const allAccounts = useFinance(st => st.accounts)
+  // Tipos que este editor puede ofrecer: excluye efectivo si ya existe, salvo
+  // que la cuenta que se edita SEA el efectivo.
+  const allowedTypes = creatableTypes(allAccounts, account?.type)
   const [sub, setSub] = useState<SubSheet>(null)
 
   const patch = <K extends keyof typeof fields>(key: K, val: typeof fields[K]) =>
-    setFields(cur => ({ ...cur, [key]: val }))
+    setFields(cur => {
+      const next = { ...cur, [key]: val }
+      // Al escribir el nombre se PROPONE la red ("Visa Clasica" -> Visa), pero
+      // solo si el usuario no eligio una: una sugerencia nunca pisa una
+      // decision suya.
+      if (key === 'name' && !cur.network && canHaveNetwork(next.type)) {
+        const guessed = guessNetwork(String(val))
+        if (guessed) next.network = guessed
+      }
+      if (key === 'name' && !cur.bankId) {
+        const bank = guessBank(String(val))
+        if (bank) next.bankId = bank.id
+      }
+      return next
+    })
 
   useMobileBackDismiss(sub !== null, () => setSub(null))
   useMobileBackDismiss(sub === null, onClose)
@@ -644,32 +826,97 @@ function AccountEditorSheet({
     <>
       <SheetPortal>
       <div ref={dialogRef} className="mobile-detail-sheet mpr-editor-overlay" role="dialog" aria-modal="true" onClick={onClose}>
-        <section className="mpr-editor-sheet" onClick={e => e.stopPropagation()}>
+        <section className="saed-sheet" onClick={e => e.stopPropagation()}>
 
-          {/* Header compacto con icono dinámico */}
-          <header className="mpr-editor-header">
-            <div className="mpr-editor-header-icon" style={{ background: fields.color + '28', color: fields.color }}>
-              <Icon name={TYPE_META[fields.type].icon} size={22} />
-            </div>
-            <input
-              className="mpr-editor-name-input"
-              value={fields.name}
-              placeholder={t('accountNamePlaceholder')}
-              autoCapitalize="words"
-              onChange={e => patch('name', e.target.value)}
-            />
-            <button className="mpr-editor-close" aria-label={t('close')} onClick={onClose}>
+          <header className="saed-header">
+            <span>{account ? t('edit') : t('createAccount')}</span>
+            <button className="saed-close" aria-label={t('close')} onClick={onClose}>
               <Icon name="close" size={18} />
             </button>
           </header>
 
-          <div className="mpr-editor-body">
+          {/*
+            PREVISUALIZACIÓN EN VIVO.
+            Un editor sin vista previa es un formulario: llenas campos a
+            ciegas y descubres el resultado al guardar. Aquí ves la tarjeta
+            que estás creando mientras la creas — el nombre, el color, la red
+            y los últimos dígitos cambian bajo tu dedo.
+
+            Para las cuentas que no son tarjeta se muestra una fila, que es
+            como van a aparecer de verdad en la lista: la vista previa
+            enseña lo que habrá, no una tarjeta bonita que no existe.
+          */}
+          <div className="saed-preview">
+            {fields.type === 'credit' ? (
+              <div className="sacc-plastic saed-preview-card" style={{ '--card': fields.color } as React.CSSProperties}>
+                <span className="sacc-plastic-sheen" aria-hidden="true" />
+                <span className="sacc-plastic-top">
+                  <span className="sacc-plastic-bank">
+                    {findBank(fields.bankId)?.name ?? TYPE_META[fields.type].label}
+                  </span>
+                  {fields.network
+                    ? <NetworkMark network={fields.network} size={28} />
+                    : <Icon name="cards" size={19} className="sacc-plastic-generic" />}
+                </span>
+                <span className="sacc-plastic-id">
+                  <span className="sacc-plastic-name">{fields.name || t('accountNamePlaceholder')}</span>
+                  {fields.last4 && <span className="sacc-plastic-last4">···· {fields.last4}</span>}
+                </span>
+                <span className="sacc-plastic-bottom">
+                  <span className="sacc-plastic-figures">
+                    <span className="sacc-plastic-fig">
+                      <em>{fields.currency ?? currency}</em>
+                      <b>{fmt(fields.balance, fields.currency ?? currency)}</b>
+                    </span>
+                    {fields.secondaryCurrency && (
+                      <span className="sacc-plastic-fig">
+                        <em>{fields.secondaryCurrency}</em>
+                        <b>{fmt(fields.secondaryBalance ?? 0, fields.secondaryCurrency)}</b>
+                      </span>
+                    )}
+                  </span>
+                </span>
+              </div>
+            ) : (
+              <div className="saed-preview-row">
+                <span
+                  className="sacc-row-ico"
+                  style={{ background: `color-mix(in oklab, ${fields.color} 16%, transparent)`, color: fields.color }}
+                >
+                  <Icon name={TYPE_META[fields.type].icon} size={19} />
+                </span>
+                <span className="sacc-row-info">
+                  <span className="sacc-row-name">{fields.name || t('accountNamePlaceholder')}</span>
+                  <span className="sacc-row-meta">
+                    {TYPE_META[fields.type].label}
+                    {fields.last4 ? ` · ····${fields.last4}` : ''}
+                  </span>
+                </span>
+                <span className="sacc-row-amount">{fmt(fields.balance, fields.currency ?? currency)}</span>
+              </div>
+            )}
+          </div>
+
+          <input
+            className="saed-name"
+            value={fields.name}
+            placeholder={t('accountNamePlaceholder')}
+            autoCapitalize="words"
+            aria-label={t('accountNamePlaceholder')}
+            onChange={e => patch('name', e.target.value)}
+          />
+
+          <div className="saed-body">
 
             {/* Tipo */}
             <div className="mpr-field-group">
               <span className="mpr-group-label">{t('type')}</span>
               <div className="mpr-form-section">
-                {(Object.entries(TYPE_META) as [AccountType, typeof TYPE_META[AccountType]][]).map(([type, meta]) => (
+                {/* Efectivo deja de ofrecerse cuando ya existe: un control
+                    que no se puede usar no debe estar activo. */}
+                {(Object.entries(TYPE_META) as [AccountType, typeof TYPE_META[AccountType]][])
+                  .filter(([type]) => allowedTypes.includes(type))
+                  .map(([type, meta]) => (
                   <button
                     key={type}
                     className={`mpr-type-pill${fields.type === type ? ' on' : ''}`}
@@ -711,6 +958,18 @@ function AccountEditorSheet({
                   : `${currency} · ${t('accountCurrencyDefault')}`,
                 !fields.currency || fields.currency === currency, 'accCurrency')}
 
+              {/* BANCO: se elige de una lista, nunca se escribe. Con texto
+                  libre el id no coincide y las comisiones automaticas dejan de
+                  aplicarse sin que nada lo indique. */}
+              {fields.type !== 'cash' && row(t('bankLabel'), 'landmark',
+                findBank(fields.bankId)?.name ?? t('notSetLabel'),
+                !fields.bankId, 'bank')}
+
+              {/* Red de la tarjeta: solo donde hay plastico. */}
+              {canHaveNetwork(fields.type) && row(t('cardNetworkLabel'), 'cards',
+                fields.network ? (networkMeta(fields.network)?.name ?? fields.network) : t('notSetLabel'),
+                !fields.network, 'network')}
+
               {fields.type === 'credit' && row(t('creditLimitLabel'), 'cards',
                 fields.limit ? fmt(fields.limit, fields.currency ?? currency) : t('noLimitLabel'),
                 !fields.limit, 'limit')}
@@ -727,6 +986,16 @@ function AccountEditorSheet({
                 t('secondBalanceLabel'), 'coins',
                 fmt(fields.secondaryBalance ?? 0, fields.secondaryCurrency),
                 !fields.secondaryBalance, 'secondBalance')}
+
+              {/* Cupo PROPIO de la linea extranjera. Se construyo el modelo y
+                  el calculo pero faltaba la fila: el campo existia y nadie
+                  podia fijarlo — el mismo hueco que tenia `bankId`. */}
+              {fields.type === 'credit' && fields.secondaryCurrency && row(
+                t('secondLimitLabel'), 'cards',
+                fields.secondaryLimit
+                  ? fmt(fields.secondaryLimit, fields.secondaryCurrency)
+                  : t('sharedLimitLabel'),
+                !fields.secondaryLimit, 'secondLimit')}
 
               {fields.type === 'credit' && row(t('statementDayLabel'), 'calendar',
                 fields.statementDay ? t('dayOfMonth').replace('{d}', String(fields.statementDay)) : t('notSetLabel'),
@@ -793,8 +1062,19 @@ function AccountEditorSheet({
               </div>
             )}
 
+            {/* El EFECTIVO no se borra: es la cuenta base de la app y siempre
+                hay un bolsillo. Se puede vaciar, no eliminar. En vez del boton
+                se explica por que, y hacia donde ir si lo que querian era
+                guardar dinero aparte. */}
+            {account && account.type === 'cash' && (
+              <p className="sacc-locked-note">
+                <Icon name="info" size={13} />
+                {t('cashIsSingleHint')}
+              </p>
+            )}
+
             {/* Eliminar */}
-            {account && onDelete && (
+            {account && onDelete && canDeleteAccountType(account) && (
               !confirmDel
                 ? <button className="mpr-del-btn" onClick={() => setConfirmDel(true)}>
                     <Icon name="trash" size={15} /> {t('deleteAccountLabel')}
@@ -854,6 +1134,15 @@ function AccountEditorSheet({
           onClose={() => setSub(null)}
         />
       )}
+      {sub === 'secondLimit' && fields.secondaryCurrency && (
+        <MobileAmountSheet
+          title={t('secondLimitLabel')}
+          value={fields.secondaryLimit ?? 0}
+          currency={fields.secondaryCurrency}
+          onDone={v => { patch('secondaryLimit', v || undefined); setSub(null) }}
+          onClose={() => setSub(null)}
+        />
+      )}
       {sub === 'statementDay' && (
         <DayOfMonthSheet
           title={t('statementDayTitle')}
@@ -892,6 +1181,50 @@ function AccountEditorSheet({
           onClose={() => setSub(null)}
         />
       )}
+      {sub === 'bank' && (
+        <MobileBankPicker
+          value={fields.bankId}
+          onPick={id => { patch('bankId', id); setSub(null) }}
+          onClose={() => setSub(null)}
+        />
+      )}
+
+      {sub === 'network' && (
+        <SheetPortal>
+        <div className="mobile-detail-sheet" style={{ zIndex: 420 }} role="dialog" aria-modal="true" onClick={() => setSub(null)}>
+          <section className="mcur-sheet" onClick={e => e.stopPropagation()}>
+            <header>
+              <span>{t('cardNetworkLabel')}</span>
+              <button aria-label={t('close')} onClick={() => setSub(null)}><Icon name="close" size={18} /></button>
+            </header>
+            <p className="mcur-subtitle">{t('cardNetworkHint')}</p>
+            <div className="mcur-list">
+              <button
+                className={`mcur-row${!fields.network ? ' on' : ''}`}
+                onClick={() => { patch('network', undefined); setSub(null) }}
+              >
+                <span className="mcur-flag"><Icon name="close" size={16} /></span>
+                <div className="mcur-info"><strong>{t('noneLabel')}</strong></div>
+              </button>
+              {CARD_NETWORKS.map(n => (
+                <button
+                  key={n.id}
+                  className={`mcur-row${fields.network === n.id ? ' on' : ''}`}
+                  onClick={() => { patch('network', n.id); setSub(null) }}
+                >
+                  <span className="mcur-flag"><NetworkMark network={n.id} size={26} /></span>
+                  <div className="mcur-info"><strong>{n.name}</strong></div>
+                  <div className="mcur-right">
+                    {fields.network === n.id && <Icon name="check" size={16} style={{ color: 'var(--accent)' }} />}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </section>
+        </div>
+        </SheetPortal>
+      )}
+
       {sub === 'secondCurrency' && (
         <SheetPortal>
         <div className="mobile-detail-sheet" style={{ zIndex: 420 }} role="dialog" aria-modal="true" onClick={() => setSub(null)}>
@@ -1013,4 +1346,147 @@ function humanMonths(months: number, t: ReturnType<typeof useT>): string {
   return years > 0
     ? t('yearsMonths').replace('{y}', String(years)).replace('{m}', String(rest))
     : t('monthsOnly').replace('{m}', String(months))
+}
+
+
+/**
+ * PAGAR TARJETA.
+ *
+ * Un pago de tarjeta es una transferencia desde una cuenta de dinero real
+ * hacia la tarjeta. Antes había que salir a la pantalla de crear, elegir
+ * "Transferencia", buscar las dos cuentas y teclear el monto: cuatro pasos
+ * para la acción más frecuente que tiene una tarjeta.
+ *
+ * Aquí se resuelve en la misma ficha: de dónde sale y cuánto.
+ */
+function PayCardSheet({
+  card,
+  onClose,
+  onDone,
+}: {
+  card: Account
+  onClose: () => void
+  onDone: () => void
+}) {
+  const t = useT()
+  const fmtVal = useFmt()
+  const { accounts, currency, transfer } = useFinance()
+  const { submitting, beginSubmit, endSubmit } = useSubmitGuard()
+  const [fromId, setFromId] = useState('')
+  const [amountSheet, setAmountSheet] = useState(false)
+
+  useMobileBackDismiss(true, onClose)
+  const dialogRef = useDialogA11y<HTMLDivElement>(onClose)
+
+  // Solo cuentas con dinero real: no se paga una tarjeta con otra tarjeta.
+  const sources = accounts.filter(a => a.type !== 'credit' && a.id !== card.id)
+  const owed = creditUsed(card.balance)
+  const minimum = minimumPayment(card)
+
+  /**
+   * @param amountInCard Monto EN LA DIVISA DE LA TARJETA.
+   *
+   * `transfer()` interpreta su `amount` en la divisa de la cuenta de ORIGEN,
+   * no la de destino. Pagar RD$18,430 desde una cuenta en dólares enviaría
+   * 18,430 DÓLARES si no se convierte aquí primero.
+   */
+  const pay = (amountInCard: number) => {
+    if (!fromId || amountInCard <= 0) return
+    const source = accounts.find(a => a.id === fromId)
+    if (!source) return
+    const cardCur = accountCurrency(card, currency)
+    const sourceCur = accountCurrency(source, currency)
+    const amount = cardCur === sourceCur
+      ? amountInCard
+      : convertCurrency(amountInCard, cardCur, sourceCur)
+
+    if (!beginSubmit()) return
+    try {
+      transfer({
+        fromAccount: fromId,
+        toAccount: card.id,
+        amount,
+        date: localToday(),
+        note: t('payCardLabel'),
+      })
+      playSuccessHaptic()
+      toast(t('cardPaymentRecorded'), { icon: 'check', type: 'ok' })
+      onDone()
+    } catch (error) {
+      toast(error instanceof Error ? error.message : t('couldNotSave'), { icon: 'alert' })
+    } finally {
+      endSubmit()
+    }
+  }
+
+  return (
+    <>
+      <SheetPortal>
+        <div ref={dialogRef} className="mobile-detail-sheet" style={{ zIndex: 430 }} role="dialog" aria-modal="true" onClick={onClose}>
+          <section className="sacc-pay-sheet" onClick={e => e.stopPropagation()}>
+            <header className="mbank-header">
+              <span>{t('payCardLabel')}</span>
+              <button aria-label={t('close')} onClick={onClose}><Icon name="close" size={18} /></button>
+            </header>
+
+            <div className="sacc-pay-owed">
+              <small>{t('owedLabel')}</small>
+              <strong>{fmtVal(owed, accountCurrency(card, currency))}</strong>
+              {minimum !== null && minimum > 0 && (
+                <span>{t('cycleMinimum')}: {fmtVal(minimum, accountCurrency(card, currency))}</span>
+              )}
+            </div>
+
+            <p className="mbank-group-title">{t('fromAccountLabel')}</p>
+            <div className="sacc-pay-sources">
+              {sources.map(a => (
+                <button
+                  key={a.id}
+                  className={`mbank-row${fromId === a.id ? ' on' : ''}`}
+                  onClick={() => setFromId(a.id)}
+                >
+                  <span className="sacc-row-ico" style={{ background: `color-mix(in oklab, ${a.color} 16%, transparent)`, color: a.color }}>
+                    <Icon name={a.type === 'cash' ? 'wallet' : a.type === 'savings' ? 'piggy' : 'cards'} size={17} />
+                  </span>
+                  <span className="mbank-info">
+                    <strong>{a.name}</strong>
+                    <small>{fmtVal(a.balance, accountCurrency(a, currency))}</small>
+                  </span>
+                  {fromId === a.id && <Icon name="check" size={16} style={{ color: 'var(--accent)' }} />}
+                </button>
+              ))}
+              {sources.length === 0 && <p className="mbank-empty">{t('noSourceAccounts')}</p>}
+            </div>
+
+            {/* Atajos por el monto que la gente de verdad paga: el minimo o
+                todo. Teclear el total exacto de memoria es el paso que hace
+                que la gente posponga el pago. */}
+            <div className="sacc-pay-quick">
+              {minimum !== null && minimum > 0 && (
+                <button disabled={!fromId || submitting} onClick={() => pay(minimum)}>
+                  {t('payMinimum')}
+                </button>
+              )}
+              <button disabled={!fromId || submitting} onClick={() => pay(owed)}>
+                {t('payFull')}
+              </button>
+              <button className="ghost" disabled={!fromId || submitting} onClick={() => setAmountSheet(true)}>
+                {t('payOther')}
+              </button>
+            </div>
+          </section>
+        </div>
+      </SheetPortal>
+
+      {amountSheet && (
+        <MobileAmountSheet
+          title={t('payCardLabel')}
+          value={0}
+          currency={accountCurrency(card, currency)}
+          onDone={v => { setAmountSheet(false); pay(v) }}
+          onClose={() => setAmountSheet(false)}
+        />
+      )}
+    </>
+  )
 }

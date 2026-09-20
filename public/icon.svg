@@ -1,33 +1,51 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Cuadre">
+  <!--
+    CUADRE — dos tarjetas.
+
+    La idea: el ícono promete lo que la app entrega. La pantalla principal es
+    un carrusel de tarjetas; el ícono son dos tarjetas. Nada que traducir.
+
+    Reglas que se respetan a propósito:
+    · Sin filtros de desenfoque. El ícono anterior llevaba un feGaussianBlur
+      de stdDeviation 14 y a 48dp se convertía en una mancha.
+    · Todo dentro de la zona segura del ícono adaptativo (el 66% central,
+      x/y de 87 a 425), para que Android pueda recortarlo redondo, cuadrado
+      o en gota sin comerse una esquina.
+    · Los degradados son de UN solo tono cada uno — profundidad, no arcoíris.
+  -->
   <defs>
-    <filter id="glow-dot" x="-80%" y="-80%" width="260%" height="260%">
-      <feGaussianBlur in="SourceGraphic" stdDeviation="14" result="blur"/>
-      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
-    <filter id="glow-line" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur"/>
-      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
+    <linearGradient id="fondo" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#12403C"/>
+      <stop offset="1" stop-color="#06211F"/>
+    </linearGradient>
+    <linearGradient id="oro" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFD166"/>
+      <stop offset="1" stop-color="#F09F1A"/>
+    </linearGradient>
+    <linearGradient id="turquesa" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5FEBC9"/>
+      <stop offset="1" stop-color="#17A38E"/>
+    </linearGradient>
   </defs>
 
-  <!-- Background -->
-  <rect width="512" height="512" fill="#080F1E"/>
+  <rect width="512" height="512" fill="url(#fondo)"/>
 
-  <!-- Peak lines: left arm and right arm -->
-  <line x1="74" y1="385" x2="256" y2="148"
-        stroke="#D4E4F5" stroke-width="26" stroke-linecap="round"
-        filter="url(#glow-line)"/>
-  <line x1="256" y1="148" x2="438" y2="385"
-        stroke="#D4E4F5" stroke-width="26" stroke-linecap="round"
-        filter="url(#glow-line)"/>
+  <!-- Tarjeta de atrás, girada a la izquierda -->
+  <g transform="rotate(-9 223 213)">
+    <rect x="85" y="123" width="275" height="180" rx="38" fill="url(#oro)"/>
+  </g>
 
-  <!-- Blue dot glow -->
-  <circle cx="256" cy="148" r="38" fill="#3B6FFF" opacity="0.20" filter="url(#glow-dot)"/>
+  <!-- Sombra de contacto: da el orden de apilado sin usar un filtro -->
+  <g transform="rotate(7 299 308)">
+    <rect x="161" y="218" width="275" height="180" rx="38" fill="#04120F" opacity="0.28"/>
+  </g>
 
-  <!-- Blue dot -->
-  <circle cx="256" cy="148" r="22" fill="#4D82FF"/>
-
-  <!-- Horizontal baseline -->
-  <line x1="58" y1="422" x2="454" y2="422"
-        stroke="#3B6FFF" stroke-width="9" stroke-linecap="round" opacity="0.55"/>
+  <!-- Tarjeta de delante, girada a la derecha -->
+  <g transform="rotate(7 299 308)">
+    <rect x="161" y="218" width="275" height="180" rx="38" fill="url(#turquesa)"/>
+    <!-- La banda: lo poco que hace falta para que se lea "tarjeta" y no
+         "rectángulo". A 48dp desaparece, y está bien: a ese tamaño lo que
+         se reconoce es el par de formas superpuestas. -->
+    <rect x="190" y="276" width="114" height="19" rx="9" fill="#08332D" opacity="0.42"/>
+  </g>
 </svg>

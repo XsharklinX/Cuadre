@@ -3,20 +3,42 @@
     android:height="24dp"
     android:viewportWidth="512"
     android:viewportHeight="512">
-    <!-- Logo REAL de $harky, no una aproximación: mismos puntos que
-         src/components/ui/BrandMark.tsx (la aleta de tiburón como línea de
-         tendencia ascendente). Viewport 512x512 idéntico al original — así
-         no hay margen para que se desvíe del logo real. El grosor del trazo
-         se sube de 40 a 64 (y el punto de 30 a 44) SOLO por legibilidad a
-         tamaño de notificación; los puntos de la línea son los mismos. -->
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="64"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:pathData="M76,388 L256,88 L426,268" />
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M256,88 m-44,0 a44,44 0 1,0 88,0 a44,44 0 1,0 -88,0" />
+    <!--
+        Icono de NOTIFICACION de Cuadre: las dos tarjetas.
+
+        Android obliga a que este icono sea de UNA sola tinta: toma la silueta
+        y la rellena con el color del sistema, descartando cualquier color que
+        traiga. Por eso aqui no hay degradados ni el oro y el turquesa del
+        icono de la app — seria pintar algo que el sistema va a tirar.
+
+        La legibilidad a 24dp se resuelve con la FORMA: la tarjeta de delante
+        se recorta con un margen alrededor de la de atras (el trazo en
+        `strokeColor` sobre fondo transparente), asi se distinguen dos piezas
+        superpuestas aunque ambas sean del mismo color.
+
+        Las proporciones y rotaciones son las mismas que public/icon.svg: la
+        marca tiene que ser reconocible como la misma en los dos sitios.
+    -->
+
+    <!-- Tarjeta de atras (contorno) -->
+    <group
+        android:pivotX="223"
+        android:pivotY="213"
+        android:rotation="-9">
+        <path
+            android:pathData="M123,123 L322,123 A38,38 0 0 1 360,161 L360,265 A38,38 0 0 1 322,303 L123,303 A38,38 0 0 1 85,265 L85,161 A38,38 0 0 1 123,123 Z"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="30"
+            android:fillColor="#00000000" />
+    </group>
+
+    <!-- Tarjeta de delante (solida), con su propio borde para separarse -->
+    <group
+        android:pivotX="299"
+        android:pivotY="308"
+        android:rotation="7">
+        <path
+            android:pathData="M199,218 L398,218 A38,38 0 0 1 436,256 L436,360 A38,38 0 0 1 398,398 L199,398 A38,38 0 0 1 161,360 L161,256 A38,38 0 0 1 199,218 Z"
+            android:fillColor="#FFFFFFFF" />
+    </group>
 </vector>

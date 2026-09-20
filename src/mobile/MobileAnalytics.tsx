@@ -4,6 +4,8 @@ import { AnimatedMoney } from '@/components/ui/AnimatedMoney'
 import { toast } from '@/components/ui/Toast'
 import { generateFinancialIntelligence, subscriptionInsightKey } from '@/data/financeIntelligence'
 import { compareCategoryTotals } from '@/data/comparisons'
+import { computeVerdict, savingsRate as savingsRateOf } from '@/data/analyticsVerdict'
+import { exportElementPng } from '@/data/imageExport'
 import { exportCsv, exportExcel, exportMonthlyPdf } from '@/data/professionalExport'
 import { advanceRecurrenceDate } from '@/hooks/useRecurring'
 import { playConfirmSound } from '@/lib/sound'
@@ -102,35 +104,6 @@ function getPeriods(t: ReturnType<typeof useT>): Array<{ id: AnalyticsPeriod; la
   ]
 }
 
-function SavingsRing({ rate, amount, t, fmtAmount }: { rate: number; amount: number; t: ReturnType<typeof useT>; fmtAmount: string }) {
-  const pct = Math.max(0, Math.min(100, rate))
-  const dash = 2 * Math.PI * 36
-  const fill = dash * pct / 100
-  const color = amount > 0 ? 'var(--income)' : 'var(--text-dim)'
-  return (
-    <div className="man-ring">
-      <svg viewBox="0 0 80 80" width={80} height={80}>
-        <circle cx={40} cy={40} r={36} fill="none" strokeWidth={8} stroke="rgba(255,255,255,.07)" />
-        <circle
-          cx={40}
-          cy={40}
-          r={36}
-          fill="none"
-          strokeWidth={8}
-          stroke={color}
-          strokeDasharray={`${fill} ${dash - fill}`}
-          strokeDashoffset={dash / 4}
-          strokeLinecap="round"
-          style={{ transition: 'stroke-dasharray var(--m-duration-slow, 220ms) var(--m-ease-out, ease)' }}
-        />
-      </svg>
-      <span style={{ color }}>
-        <strong>{Math.round(rate)}%</strong>
-        <small>{amount > 0 ? t('savings') : fmtAmount}</small>
-      </span>
-    </div>
-  )
-}
 
 /**
  * Curva de patrimonio neto: últimos 12 meses reales + proyección lineal a 6
@@ -238,14 +211,22 @@ export function MobileAnalytics({ mkey, onBudgets, onImport, onEditTx, initialPe
   const finance = useFinance()
   const ownerName = useSettings(s => s.displayName) || '$harky'
   const [exportOpen, setExportOpen] = useState(false)
-  const [exporting, setExporting] = useState<'pdf' | 'excel' | 'csv' | null>(null)
+  const [exporting, setExporting] = useState<'pdf' | 'excel' | 'csv' | 'png' | null>(null)
   useMobileBackDismiss(exportOpen, () => setExportOpen(false))
   const exportRef = useDialogA11y<HTMLDivElement>(() => setExportOpen(false), exportOpen)
 
-  const runExport = async (kind: 'pdf' | 'excel' | 'csv') => {
+  const runExport = async (kind: 'pdf' | 'excel' | 'csv' | 'png') => {
     setExporting(kind)
     try {
-      if (kind === 'pdf') {
+      if (kind === 'png') {
+        // Compartir el periodo como imagen: era lo unico de la vista "Anual"
+        // que no existia aqui.
+        const el = document.getElementById('man-capture')
+        if (el) {
+          await exportElementPng(el, `sharky-${period}-${mkey}`)
+          toast(t('reportExportedAsImage'), { icon: 'download', type: 'ok' })
+        }
+      } else if (kind === 'pdf') {
         await exportMonthlyPdf(finance, mkey, ownerName, lang)
         toast(t('pdfExportedFor').replace('{month}', monthLabel(mkey, dateLocale(lang))), { icon: 'download', type: 'ok' })
       } else if (kind === 'excel') {
@@ -599,6 +580,37 @@ export function MobileAnalytics({ mkey, onBudgets, onImport, onEditTx, initialPe
       : null,
   ].filter(Boolean) as InsightRow[]
 
+  /**
+   * El veredicto y los avisos que lo acompañan. Se calculan aquí, sobre los
+   * mismos datos que ya alimentaban los acordeones — no hay plomería nueva,
+   * solo se sube a la superficie lo que ya existía enterrado.
+   */
+  /**
+   * El mes en curso se compara CONTRA EL MISMO PUNTO del mes pasado, no
+   * contra el mes pasado entero.
+   *
+   * Comparar 20 dias contra 30 siempre da un resultado bonito: el veredicto
+   * anunciaba "vas gastando 31% menos" mientras el aviso de ritmo, justo
+   * debajo, decia "3% mas que el mes pasado". Los dos numeros eran correctos
+   * y se contradecian, y el que mentia era el grande. `prevPace` ya existia
+   * para el aviso de ritmo; ahora el veredicto usa la misma vara.
+   */
+  const verdictPrevious = useMemo(
+    () => (period === 'month' && isCurrentMonth && prevPace > 0
+      ? { ...comparePrev, expense: prevPace }
+      : comparePrev),
+    [period, isCurrentMonth, prevPace, comparePrev],
+  )
+
+  const verdict = useMemo(() => computeVerdict({
+    current: summary,
+    previous: verdictPrevious,
+    txCount: scopedTx.length,
+    noPrevious: previousScopedTx.length === 0,
+  }), [summary, verdictPrevious, scopedTx.length, previousScopedTx.length])
+
+  const rate = savingsRateOf(summary)
+
   const visibleInsights = insightRows.filter(row =>
     !hiddenInsightTypes.includes(row.id)
     && !hiddenInsights.includes(row.dismissKey)
@@ -606,8 +618,33 @@ export function MobileAnalytics({ mkey, onBudgets, onImport, onEditTx, initialPe
     // pantalla de Suscripciones — es la misma sugerencia, no dos distintas.
     && !(row.subscriptionKey && dismissedSubscriptions.includes(row.subscriptionKey)))
 
+  /**
+   * Superlativos y fuentes de ingreso del año. Solo se calculan en el período
+   * anual, que es el único donde tienen sentido: "tu mejor mes" dentro de un
+   * mes no significa nada.
+   */
+  const yearHighlights = useMemo(() => {
+    if (period !== 'year') return null
+    const months = monthlySeries(visTx, year, dateLocale(lang))
+    if (months.length === 0) return null
+    const bestMonth = months.reduce((best, m) => m.net > best.net ? m : best, months[0])
+    const worstMonth = months.reduce((worst, m) => m.expense > worst.expense ? m : worst, months[0])
+    return {
+      bestMonth,
+      worstMonth,
+      incomeSources: byCategory(scopedTx, 'income', categories).slice(0, 5),
+    }
+  }, [period, visTx, year, lang, scopedTx, categories])
+
+  // Dos titulares como máximo. Tres ya es una lista, y una lista vuelve a ser
+  // "todo con el mismo peso", que es justo lo que había que resolver.
+  const headlineInsights = visibleInsights.slice(0, 2)
+  // El resto sigue viviendo en su acordeón: no se pierde nada, solo deja de
+  // competir por la parte alta de la pantalla.
+  const foldInsights = visibleInsights.slice(2)
+
   return (
-    <div className="man-root">
+    <div className="man-root" id="man-capture">
       <div className="mobile-segment man-tabs" role="tablist" aria-label={t('periodLabel')}>
         {PERIODS.map(p => (
           <button key={p.id} className={period === p.id ? 'on' : ''} role="tab" aria-selected={period === p.id} onClick={() => setPeriod(p.id)}>
@@ -616,34 +653,95 @@ export function MobileAnalytics({ mkey, onBudgets, onImport, onEditTx, initialPe
         ))}
       </div>
 
-      <section className="man-hero">
-        <div className="man-hero-head">
-          <div>
-            <span className="man-hero-kicker">{heroLabel}</span>
-            <h2>{t('monthlyFlowTitle')}</h2>
-            <p>{t('monthlyFlowDesc')}</p>
-          </div>
-          <SavingsRing rate={savingsRate} amount={savedAmount} t={t} fmtAmount={fmtVal(savedAmount, currency)} />
+      {/* ── VEREDICTO ────────────────────────────────────────
+          La pantalla responde UNA pregunta —¿cómo voy?— antes de ofrecer
+          nada. Antes abría con cuatro números empatados (ingresos, gastos,
+          neto y el anillo de ahorro) y cinco acordeones cerrados: el usuario
+          tenía que saber de antemano qué buscaba. */}
+      <section className={`man-verdict ${verdict.tone}`}>
+        <div className="man-verdict-head">
+          <span className="man-verdict-kicker">{heroLabel}</span>
+          <h2 className="man-verdict-line">{t(verdict.key).replace('{pct}', String(verdict.params.pct ?? ''))}</h2>
         </div>
 
-        <div className="man-hero-grid">
-          <article className="man-hero-card">
-            <small>{t('incomes')}</small>
-            <strong className="income"><AnimatedMoney value={summary.income} compact={compactNumbers} /></strong>
-          </article>
-          <article className="man-hero-card">
-            <small>{t('expenses')}</small>
-            <strong className="expense"><AnimatedMoney value={summary.expense} compact={compactNumbers} /></strong>
-          </article>
-        </div>
-
-        <article className="man-hero-net">
-          <small>{t('netLabel')}</small>
-          <strong style={{ color: summary.net >= 0 ? 'var(--income)' : 'var(--expense)' }}>
-            <AnimatedMoney value={summary.net} compact={compactNumbers} />
+        <div className="man-verdict-hero">
+          <span className="man-verdict-hero-label">
+            {verdict.heroKind === 'overspent' ? t('overspentLabel')
+              : verdict.heroKind === 'saved' ? t('savedThisPeriod')
+              : t('netLabel')}
+          </span>
+          <strong className="man-verdict-hero-value">
+            <AnimatedMoney value={verdict.hero} compact={compactNumbers} />
           </strong>
-        </article>
+        </div>
+
+        {/* Ingresos y gastos SOSTIENEN la cifra de arriba, no compiten con
+            ella: por eso van pequeños y en una sola línea. */}
+        <div className="man-verdict-support">
+          <span><i className="dot income" />{t('incomes')} <b>{fmtVal(summary.income, currency)}</b></span>
+          <span><i className="dot expense" />{t('expenses')} <b>{fmtVal(summary.expense, currency)}</b></span>
+          {rate !== null && (
+            <span><i className="dot save" />{t('savingsRateLabel')} <b>{Math.round(rate)}%</b></span>
+          )}
+        </div>
       </section>
+
+      {/* ── TU AÑO ───────────────────────────────────────────
+          Los superlativos y las fuentes de ingreso vivían en una vista
+          "Anual" aparte que, por lo demás, repetía exactamente este período
+          de Análisis: los mismos totales, la misma comparación contra el año
+          anterior, el mismo desglose y la misma serie de patrimonio. Mantener
+          dos destinos para el mismo dato es lo que hacía que la app se
+          sintiera dispersa. */}
+      {period === 'year' && yearHighlights && (
+        <section className="man-year">
+          <div className="man-year-grid">
+            <article>
+              <small>{t('bestSavingsMonthLabel')}</small>
+              <b>{yearHighlights.bestMonth.label}</b>
+              <span className="income">{fmtVal(yearHighlights.bestMonth.net, currency)}</span>
+            </article>
+            <article>
+              <small>{t('highestExpenseMonthLabel')}</small>
+              <b>{yearHighlights.worstMonth.label}</b>
+              <span className="expense">{fmtVal(yearHighlights.worstMonth.expense, currency)}</span>
+            </article>
+          </div>
+
+          {yearHighlights.incomeSources.length > 0 && (
+            <div className="man-year-sources">
+              <p className="man-year-sources-title">{t('incomeSourcesTitle')}</p>
+              {yearHighlights.incomeSources.map(row => (
+                <div key={row.category.id} className="man-year-source">
+                  <span className="man-year-source-dot" style={{ background: row.category.color }} />
+                  <span className="man-year-source-name">{translateCategoryName(row.category, lang)}</span>
+                  <span className="man-year-source-amount">{fmtVal(row.amount, currency)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* ── LO QUE CAMBIÓ ────────────────────────────────────
+          Los dos o tres avisos más urgentes, FUERA del acordeón. Había 465
+          líneas de motor de insights alimentando un cajón cerrado que nadie
+          abría. */}
+      {headlineInsights.length > 0 && (
+        <section className="man-headlines">
+          {headlineInsights.map(insight => (
+            <div key={insight.id} className="man-headline">
+              <span className={`man-headline-ico ${insight.tone || ''}`}>
+                <Icon name={insight.icon} size={17} />
+              </span>
+              <span className="man-headline-body">
+                <b>{insight.title}</b>
+                <small>{insight.subtitle}</small>
+              </span>
+            </div>
+          ))}
+        </section>
+      )}
 
       <section className="man-panel man-panel-distribution">
         <div className="man-panel-head">
@@ -811,12 +909,12 @@ export function MobileAnalytics({ mkey, onBudgets, onImport, onEditTx, initialPe
         </div>
       </AnalyticsFold>
 
-      {(showCompare || visibleInsights.length > 0) && (
+      {(showCompare || foldInsights.length > 0) && (
         <AnalyticsFold
           id="trends"
           title={t('quickReadTitle')}
           subtitle={t('quickReadDesc')}
-          count={visibleInsights.length + (showCompare ? categoryComparison.length : 0)}
+          count={foldInsights.length + (showCompare ? categoryComparison.length : 0)}
         >
 
           {showCompare && (
@@ -870,9 +968,9 @@ export function MobileAnalytics({ mkey, onBudgets, onImport, onEditTx, initialPe
             </div>
           )}
 
-          {visibleInsights.length > 0 && (
+          {foldInsights.length > 0 && (
             <div className="man-insights">
-              {visibleInsights.map(insight => (
+              {foldInsights.map(insight => (
                 <div key={insight.id} className="man-insight-row">
                   <span className={`man-insight-icon ${insight.tone}`}>
                     <Icon name={insight.icon} size={16} />
@@ -1011,6 +1109,10 @@ export function MobileAnalytics({ mkey, onBudgets, onImport, onEditTx, initialPe
                 <span>{t('exportData')}</span>
                 <button aria-label={t('close')} onClick={() => setExportOpen(false)}><Icon name="close" size={18} /></button>
               </header>
+              <button className="man-export-row" disabled={exporting !== null} onClick={() => void runExport('png')}>
+                <span className="man-export-ic" style={exportIcon(EXPORT_COLORS.import)}><Icon name="camera" size={20} /></span>
+                <div><b>{t('exportImageLabel')}</b><small>{exporting === 'png' ? t('generatingImageEllipsis') : t('shareAsImageHint')}</small></div>
+              </button>
               <button className="man-export-row" disabled={exporting !== null} onClick={() => void runExport('pdf')}>
                 <span className="man-export-ic" style={exportIcon(EXPORT_COLORS.pdf)}><Icon name="book" size={20} /></span>
                 <div><b>{t('monthStatementPdf')}</b><small>{exporting === 'pdf' ? t('generatingPdf') : monthLabel(mkey, dateLocale(lang))}</small></div>

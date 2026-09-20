@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   creditCardsAsDebts, creditCycle, creditUsed, creditUtilization, hasSecondaryBalance,
-  minimumPayment, nextMonthDay, projectMinimumPayoff, utilizationBand,
+  hasSplitLimits, minimumPayment, nextMonthDay, projectMinimumPayoff,
+  secondaryUtilization, utilizationBand,
 } from './creditCard'
 import { sanitizeFinanceData } from '@/store/finance'
 import type { Account } from '@/types'
@@ -266,5 +267,41 @@ describe('utilización con dos divisas', () => {
       balance: -10_000, limit: 50_000, secondaryCurrency: 'USD', secondaryBalance: 0,
     }))!
     expect(con).toBe(sin)
+  })
+})
+
+describe('cupo separado por divisa', () => {
+  it('sin cupo propio, el limite es compartido y cuenta ambas deudas', () => {
+    const shared = card({ balance: -10_000, limit: 50_000, secondaryCurrency: 'USD', secondaryBalance: -300 })
+    expect(secondaryUtilization(shared)).toBeNull()
+    expect(hasSplitLimits(shared)).toBe(false)
+    // La deuda en dolares consume el limite principal.
+    expect(creditUtilization(shared)!).toBeGreaterThan(10_000 / 50_000)
+  })
+
+  it('con cupo propio, cada linea se mide contra el suyo', () => {
+    const split = card({
+      balance: -10_000, limit: 50_000,
+      secondaryCurrency: 'USD', secondaryBalance: -300, secondaryLimit: 1_000,
+    })
+    expect(hasSplitLimits(split)).toBe(true)
+    // La linea local ya NO carga con la deuda en dolares.
+    expect(creditUtilization(split)!).toBeCloseTo(10_000 / 50_000, 3)
+    expect(secondaryUtilization(split)!).toBeCloseTo(0.3, 3)
+  })
+
+  it('la deuda en dolares no se cuenta contra dos limites a la vez', () => {
+    const shared = card({ balance: -10_000, limit: 50_000, secondaryCurrency: 'USD', secondaryBalance: -300 })
+    const split = { ...shared, secondaryLimit: 1_000 }
+    expect(creditUtilization(split)!).toBeLessThan(creditUtilization(shared)!)
+  })
+
+  it('el cupo propio nunca pasa de 100%', () => {
+    const over = card({ secondaryCurrency: 'USD', secondaryBalance: -5_000, secondaryLimit: 1_000 })
+    expect(secondaryUtilization(over)).toBe(1)
+  })
+
+  it('sin divisa secundaria no hay cupo secundario que medir', () => {
+    expect(secondaryUtilization(card({ secondaryCurrency: undefined, secondaryLimit: 1_000 }))).toBeNull()
   })
 })

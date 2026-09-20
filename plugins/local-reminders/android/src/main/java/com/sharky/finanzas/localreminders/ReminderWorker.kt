@@ -55,9 +55,9 @@ private val LEGACY_CHANNELS = listOf(
 private const val DUE_SOON_DAYS = 3
 private const val EVENING_HOUR = 19
 private const val INACTIVITY_DAYS = 3
-// Acento de $harky: mismo azul del punto en el ícono de la app (public/icon.svg),
-// para que todas las notificaciones se tiñan igual sin importar qué las genera.
-private val ACCENT_COLOR = 0xFF4D82FF.toInt()
+// Acento de Cuadre: el turquesa de la tarjeta de delante del icono
+// (public/icon.svg), para que todo lo de la app se tiña igual.
+private val ACCENT_COLOR = 0xFF17A38E.toInt()
 /** Tamano al que Android dibuja el icono grande de una notificacion. */
 private const val LARGE_ICON_DP = 64f
 

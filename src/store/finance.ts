@@ -4,6 +4,7 @@ import { makeDemo, makeEmpty, newId, CURRENCIES } from '@/data/seed'
 import { learnCategoryRule } from '@/data/bankCsv'
 import { convertCurrency } from '@/data/currencies'
 import { creditUsedInPrimary } from '@/data/creditCard'
+import { canHaveNetwork } from '@/data/cardNetwork'
 import { accountMovementsTotal, accountSecondaryMovementsTotal, localToday } from '@/data/helpers'
 import { validateEnvelopeTransfer } from '@/data/envelopes'
 import { createRecoverySnapshot } from '@/data/recovery'
@@ -88,7 +89,33 @@ export function sanitizeFinanceData(value: unknown): FinanceData {
       if (!amount(next.apr) || next.apr! <= 0 || next.apr! > 200) next.apr = undefined
       if (!amount(next.minPaymentPct) || next.minPaymentPct! <= 0 || next.minPaymentPct! > 100) next.minPaymentPct = undefined
       if (!amount(next.minPaymentFloor) || next.minPaymentFloor! < 0) next.minPaymentFloor = undefined
+      // Cupo propio de la linea extranjera: solo tiene sentido si esa linea
+      // existe. Sin divisa secundaria, un limite secundario no mide nada.
+      if (!next.secondaryCurrency || !amount(next.secondaryLimit) || next.secondaryLimit! <= 0) {
+        next.secondaryLimit = undefined
+      }
       return next
+    })
+    .map((account): Account => {
+      // Red de tarjeta: solo en cuentas con plastico, y solo una de las
+      // conocidas. Un efectivo con "visa" es un dato que no significa nada.
+      const NETWORKS = ['visa', 'mastercard', 'amex', 'discover', 'other']
+      if (account.network && (!canHaveNetwork(account.type) || !NETWORKS.includes(account.network))) {
+        return { ...account, network: undefined }
+      }
+      return account
+    })
+    .map((account, index, list): Account => {
+      // EFECTIVO UNICO: el efectivo es uno solo — no tienes "dos efectivos",
+      // tienes el dinero que cargas encima.
+      //
+      // Si un backup antiguo trae varios, el primero se queda como efectivo y
+      // el resto se DEGRADA a ahorro. Nunca se descartan ni se fusionan: lo
+      // primero borraria dinero del libro y lo segundo lo moveria en
+      // silencio. Un efectivo guardado aparte es, literalmente, ahorro.
+      if (account.type !== 'cash') return account
+      const first = list.findIndex(a => a.type === 'cash')
+      return first === index ? account : { ...account, type: 'savings' }
     })
   const accountIds = new Set(accounts.map(account => account.id))
   const categories = (Array.isArray(data.categories) ? data.categories : []).filter(category =>
@@ -570,10 +597,18 @@ export const useFinance = create<FinanceState>()(
       }),
 
       // Cuentas
-      addAccount: (account) => set(s => ({
-        // Cuenta nueva sin movimientos: el saldo de apertura es el saldo inicial.
-        accounts: [...s.accounts, { id: newId('acc_'), ...account, openingBalance: account.openingBalance ?? account.balance }],
-      })),
+      addAccount: (account) => set(s => {
+        // EFECTIVO UNICO, tambien al crear. El saneado ya degradaba un segundo
+        // efectivo a ahorro al recargar, pero eso llegaba tarde: el usuario
+        // veia su cuenta cambiar de tipo sola. Aqui se rechaza de entrada.
+        if (account.type === 'cash' && s.accounts.some(a => a.type === 'cash')) {
+          throw new Error(tt('errCashAlreadyExists'))
+        }
+        return {
+          // Cuenta nueva sin movimientos: el saldo de apertura es el saldo inicial.
+          accounts: [...s.accounts, { id: newId('acc_'), ...account, openingBalance: account.openingBalance ?? account.balance }],
+        }
+      }),
 
       updateAccount: (id, fields) => set(s => {
         const account = s.accounts.find(a => a.id === id)

@@ -99,6 +99,8 @@ export function MobileNotificationCenter({ onClose, onGotoBudgets, onGotoTarget,
     return () => { document.body.style.overflow = prev }
   }, [])
 
+  const [historyOpen, setHistoryOpen] = useState(false)
+
   return (
     <SheetPortal>
       <div className="mobile-detail-sheet mnc-wrap" role="dialog" aria-modal="true"
@@ -130,8 +132,11 @@ export function MobileNotificationCenter({ onClose, onGotoBudgets, onGotoTarget,
               <>
                 {suggestions.length > 0 && (
                   <div className="mnc-group">
-                    <div className="mnc-group-title">
-                      <span className="mnc-group-dot mnc-group-dot-detected" />
+                    {/* PRIMERO lo que pide accion. Antes los tres bloques
+                        —detectados, avisos e historial— tenian el mismo
+                        tratamiento: punto de color y contador. Tres grupos de
+                        igual peso no son jerarquia. */}
+                    <div className="mnc-group-title primary">
                       {t('notifDetectedSection')}
                       <span className="mnc-group-count">{suggestions.length}</span>
                     </div>
@@ -176,6 +181,17 @@ export function MobileNotificationCenter({ onClose, onGotoBudgets, onGotoTarget,
                               </button>
                             </div>
 
+                            {/* Si el usuario pudo haberlo tecleado ya, se dice
+                                aqui y NO se auto-creo. La app no decide por el:
+                                dos cafes del mismo precio el mismo dia son dos
+                                gastos legitimos. */}
+                            {item.possibleDuplicateOf && (
+                              <p className="mnc-card-dup">
+                                <Icon name="alert" size={12} />
+                                {t('maybeAlreadyRecorded')}
+                              </p>
+                            )}
+
                             <div className="mnc-card-actions">
                               <button className="mnc-card-dismiss" onClick={() => suggestionStore.remove(item.id)}>
                                 <Icon name="close" size={14} /> {t('dismiss')}
@@ -194,7 +210,6 @@ export function MobileNotificationCenter({ onClose, onGotoBudgets, onGotoTarget,
                 {alerts.length > 0 && (
                   <div className="mnc-group">
                     <div className="mnc-group-title">
-                      <span className="mnc-group-dot mnc-group-dot-alert" />
                       {t('notifAlertsSection')}
                       <span className="mnc-group-count">{alerts.length}</span>
                     </div>
@@ -230,14 +245,25 @@ export function MobileNotificationCenter({ onClose, onGotoBudgets, onGotoTarget,
                   </div>
                 )}
 
+                {/* El historial es REFERENCIA, no accion: va plegado. Abierto
+                    competia por la pantalla con lo que si hay que revisar, y
+                    era lo que hacia que el panel se sintiera un volcado. */}
                 {history.length > 0 && (
                   <div className="mnc-group">
-                    <div className="mnc-group-title">
-                      <span className="mnc-group-dot mnc-group-dot-history" />
+                    <button
+                      className="mnc-group-title toggle"
+                      onClick={() => setHistoryOpen(v => !v)}
+                      aria-expanded={historyOpen}
+                    >
                       {t('notifHistorySection')}
                       <span className="mnc-group-count">{history.length}</span>
-                    </div>
-                    <div className="mnc-card-list">
+                      <Icon
+                        name="arrowUp"
+                        size={13}
+                        style={{ transform: historyOpen ? 'rotate(180deg)' : 'rotate(90deg)', marginLeft: 'auto' }}
+                      />
+                    </button>
+                    <div className="mnc-card-list" hidden={!historyOpen}>
                       {history.map(entry => (
                         <div key={entry.id} className="mnc-history-row">
                           <button className="mnc-history-tap" onClick={() => goToHistoryEntry(entry.type)}>

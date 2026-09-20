@@ -62,7 +62,7 @@ describe('MobileTopBar date navigation', () => {
     const { rerender } = render(
       <MobileTopBar
         route="analysis"
-        view="annual"
+        view="calendar"
         mkey="2026-06"
         monthKeys={keys}
         onSelectMonth={vi.fn()}

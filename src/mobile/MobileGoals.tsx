@@ -186,7 +186,9 @@ function GoalCard({ goal, currency, projection, onClick }: { goal: Goal; currenc
         <div className="mgl-card-info">
           <strong>{goal.name}</strong>
           <span className="mgl-card-amounts">
-            {fmt(goal.saved, cur)} <span className="mgl-dim">{t('of')} {fmt(goal.target, cur)}</span>
+            {/* Sin centavos: son dos cifras seguidas en una sola linea y con
+                decimales la meta se cortaba ("de RD$ 80,..."). */}
+            {fmt(goal.saved, cur, { decimals: 0 })} <span className="mgl-dim">{t('of')} {fmt(goal.target, cur, { decimals: 0 })}</span>
           </span>
         </div>
         <span className="mgl-pct" style={{ color: goal.color }}>{p}%</span>
@@ -1057,7 +1059,9 @@ export function MobileGoals(_props: ViewProps) {
             </div>
             <div className="mgl-summary-row mgl-summary-row-dim">
               <span className="mgl-sum-label">{t('savings')}</span>
-              <strong className="mgl-sum-value">{savingsCoverage}% · {fmt(backedSavings, cur)}</strong>
+              {/* Esta fila lleva DOS datos (cobertura y monto) en el ancho de
+                  una: con centavos el monto se cortaba. */}
+              <strong className="mgl-sum-value">{savingsCoverage}% · {fmt(backedSavings, cur, { decimals: 0 })}</strong>
             </div>
           </div>
         </div>

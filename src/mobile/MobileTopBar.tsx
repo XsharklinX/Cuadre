@@ -55,7 +55,7 @@ export function MobileTopBar({
 
   const showMonth = route === 'home'
     || (route === 'analysis' && view === 'stats')
-    || (route === 'profile' && (view === 'budgets' || view === 'annual' || view === 'calendar'))
+    || (route === 'profile' && (view === 'budgets' || view === 'calendar'))
   const compactHeader = route === 'add'
 
   return (

@@ -39,9 +39,27 @@ var CURRENCIES = {
   CAD: { code: "CAD", symbol: "CA$", decimals: 2 }
 };
 var ACCOUNTS_DEMO = [
-  { id: "acc_popular", name: "Banco Principal", short: "D\xE9bito", type: "debit", color: "#3b82f6", balance: 84250.75, last4: "4821" },
+  { id: "acc_popular", name: "Banco Principal", short: "D\xE9bito", type: "debit", color: "#3b82f6", balance: 84250.75, last4: "4821", network: "visa" },
   { id: "acc_bhd", name: "Banco de Ahorros", short: "Ahorros", type: "savings", color: "#22c55e", balance: 152800, last4: "1093" },
-  { id: "acc_visa", name: "Visa Platino", short: "Cr\xE9dito", type: "credit", color: "#a78bfa", balance: -23410.4, last4: "7745", limit: 12e4 },
+  {
+    id: "acc_visa",
+    name: "Visa Platino",
+    short: "Cr\xE9dito",
+    type: "credit",
+    color: "#a78bfa",
+    balance: -23410.4,
+    last4: "7745",
+    limit: 12e4,
+    network: "visa",
+    secondaryCurrency: "USD",
+    secondaryBalance: -312.45,
+    statementDay: 25,
+    paymentDay: 15,
+    apr: 59.88,
+    minPaymentPct: 5,
+    minPaymentFloor: 500
+  },
+  { id: "acc_mc", name: "Mastercard Oro", short: "Cr\xE9dito", type: "credit", color: "#f97316", balance: -8940, last4: "2210", limit: 6e4, network: "mastercard", statementDay: 5, paymentDay: 25 },
   { id: "acc_cash", name: "Efectivo", short: "Efectivo", type: "cash", color: "#f59e0b", balance: 6500, last4: null }
 ];
 var ACCOUNTS_EMPTY = [

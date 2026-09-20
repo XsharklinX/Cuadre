@@ -2890,3 +2890,67 @@
     from { opacity: 0; transform: translateX(-50%) translateY(8px) scale(.92); }
     to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
   }
+
+/* ── Centro de notificaciones: jerarquía ───────────────────
+   Tenía tres bloques —detectados, avisos e historial— con exactamente el
+   mismo tratamiento: punto de color y contador. Tres grupos de igual peso no
+   son una jerarquía, son un volcado con encabezados. */
+.mnc-group-title {
+  align-items: center;
+  color: var(--text-dim);
+  display: flex;
+  font-size: 11px;
+  font-weight: 850;
+  gap: 8px;
+  letter-spacing: .07em;
+  padding: 0 2px 8px;
+  text-transform: uppercase;
+  width: 100%;
+}
+/* Lo que pide acción se distingue de lo que solo informa. */
+.mnc-group-title.primary { color: var(--accent); }
+.mnc-group-title.toggle {
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+  min-height: 40px;
+  padding-bottom: 0;
+  text-align: left;
+}
+.mnc-group-title.toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mnc-group-count {
+  background: var(--track);
+  border-radius: 999px;
+  color: var(--text-dim);
+  font-size: 10.5px;
+  font-weight: 850;
+  letter-spacing: 0;
+  padding: 1px 7px;
+}
+.mnc-group-title.primary .mnc-group-count {
+  background: color-mix(in oklab, var(--accent) 18%, transparent);
+  color: var(--accent);
+}
+
+/* Aviso de posible repetido. La app no decide por el usuario: dos cafés del
+   mismo precio el mismo día son dos gastos legítimos, y desde aquí no hay
+   forma de distinguirlos. Se avisa y se deja decidir. */
+.mnc-card-dup {
+  align-items: center;
+  background: color-mix(in oklab, var(--warn) 14%, transparent);
+  border-radius: 9px;
+  color: var(--warn);
+  display: flex;
+  font-size: 11.5px;
+  font-weight: 750;
+  gap: 6px;
+  line-height: 15px;
+  margin: 0 0 8px;
+  padding: 7px 9px;
+}
+.mnc-card-dup svg { flex-shrink: 0; }
+
+/* Separación entre los bloques del centro de notificaciones. */
+.mnc-group { display: grid; gap: 0; margin-bottom: 18px; }
+.mnc-group:last-child { margin-bottom: 0; }

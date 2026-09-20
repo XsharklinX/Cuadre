@@ -43,7 +43,7 @@ private const val EVENING_CHECK_HOUR = 19
 // Notificación persistente de "agregar rápido" (gasto/ingreso de un toque).
 private const val QUICK_ADD_CHANNEL = "sharky_quick_add"
 private const val QUICK_ADD_NOTIF_ID = 9911
-private val QUICK_ADD_ACCENT = 0xFF4D82FF.toInt()
+private val QUICK_ADD_ACCENT = 0xFF17A38E.toInt()
 
 @InvokeArg
 class SyncSnapshotArgs {

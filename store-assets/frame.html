@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<!--
+  MARCO de captura para Play Store — 1080×1920.
+
+  Toma una captura REAL de la app y la compone con un titular y el fondo de
+  marca. Una captura cruda no vende: el usuario que hojea la tienda lee el
+  titular, no la pantalla. Y una maqueta dibujada a mano tampoco, porque
+  deja de parecerse a la app en cuanto la app cambia — que es exactamente lo
+  que le pasó al pipeline anterior.
+
+  Lo rellena `capture-screens.mjs` por query string:
+    ?shot=<url de la imagen>&title=<titular>&sub=<apoyo>&tone=<1..5>
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=Fraunces:opsz,wght@9..144,600&display=swap">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1080px; height: 1920px; overflow: hidden; }
+
+  body {
+    align-items: center;
+    background: #06211F;
+    color: #EDF2EE;
+    display: flex;
+    flex-direction: column;
+    font-family: 'Archivo', system-ui, sans-serif;
+    height: 1920px;
+    padding: 120px 72px 0;
+    position: relative;
+    width: 1080px;
+  }
+
+  /* Un foco de color por pantalla: da variedad a la tira de capturas sin que
+     cada una parezca de una app distinta. */
+  body[data-tone="1"] { background-image: radial-gradient(760px 560px at 78% 6%, rgba(95,235,201,.22), transparent 68%); }
+  body[data-tone="2"] { background-image: radial-gradient(760px 560px at 22% 6%, rgba(245,182,43,.18), transparent 68%); }
+  body[data-tone="3"] { background-image: radial-gradient(760px 560px at 78% 6%, rgba(139,214,255,.16), transparent 68%); }
+  body[data-tone="4"] { background-image: radial-gradient(760px 560px at 22% 6%, rgba(95,235,201,.18), transparent 68%); }
+  body[data-tone="5"] { background-image: radial-gradient(760px 560px at 78% 6%, rgba(245,182,43,.15), transparent 68%); }
+
+  .grid {
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(rgba(255,255,255,.055) 1.5px, transparent 1.5px);
+    background-size: 30px 30px;
+    -webkit-mask-image: linear-gradient(#000 20%, transparent 62%);
+    mask-image: linear-gradient(#000 20%, transparent 62%);
+  }
+
+  .head {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    position: relative;
+    text-align: center;
+    width: 100%;
+  }
+  h1 {
+    font-family: 'Fraunces', Georgia, serif;
+    font-size: 74px;
+    font-weight: 600;
+    letter-spacing: -.025em;
+    line-height: 1.04;
+    text-wrap: balance;
+  }
+  p {
+    color: #A9C4BC;
+    font-size: 31px;
+    font-weight: 500;
+    line-height: 1.36;
+    margin: 0 auto;
+    max-width: 24ch;
+    text-wrap: balance;
+  }
+
+  /* El teléfono. Sin marco de dispositivo con marca: Google los desaconseja
+     y además envejecen mal. Solo esquinas redondeadas y una sombra que lo
+     despega del fondo. */
+  .phone {
+    border-radius: 44px;
+    box-shadow: 0 48px 120px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.07);
+    margin-top: 86px;
+    overflow: hidden;
+    position: relative;
+    width: 760px;
+  }
+  .phone img { display: block; width: 100%; }
+</style>
+</head>
+<body>
+  <div class="grid"></div>
+  <div class="head">
+    <h1 id="title"></h1>
+    <p id="sub"></p>
+  </div>
+  <div class="phone"><img id="shot" alt=""></div>
+
+<script>
+  const q = new URLSearchParams(location.search)
+  document.body.dataset.tone = q.get('tone') || '1'
+  document.getElementById('title').textContent = q.get('title') || ''
+  document.getElementById('sub').textContent = q.get('sub') || ''
+  const shot = q.get('shot')
+  if (shot) document.getElementById('shot').src = shot
+</script>
+</body>
+</html>

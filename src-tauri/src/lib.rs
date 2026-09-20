@@ -35,7 +35,61 @@ fn read_backup(path: String) -> Result<String, String> {
     std::fs::read_to_string(&path).map_err(|e| e.to_string())
 }
 
-/// Guarda un archivo en la carpeta "Sharky Finance" (Descargas en Android,
+/// Mueve lo que quedo en la carpeta vieja "Sharky Finance" a la nueva "Cuadre".
+///
+/// Al renombrarse la app, los backups y reportes ya exportados quedaban en una
+/// carpeta con el nombre anterior: el usuario los veria como perdidos aunque
+/// siguieran ahi.
+///
+/// Se mueve archivo por archivo y NUNCA se sobrescribe: si en la carpeta nueva
+/// ya existe uno con el mismo nombre, el viejo se queda donde esta. Un backup
+/// es el ultimo recurso del usuario; pisarlo con una version anterior seria
+/// exactamente el tipo de dano que esta migracion intenta evitar.
+///
+/// La carpeta vieja solo se borra si queda VACIA. Si algo no se pudo mover, se
+/// conserva: mejor dos carpetas que un archivo perdido. Todo error se ignora en
+/// silencio — esto es una comodidad, no puede impedir que se guarde un backup.
+fn migrate_legacy_export_dir(base: &std::path::Path) {
+    let legacy = base.join("Sharky Finance");
+    if !legacy.is_dir() {
+        return;
+    }
+    let target = base.join("Cuadre");
+    if std::fs::create_dir_all(&target).is_err() {
+        return;
+    }
+
+    let entries = match std::fs::read_dir(&legacy) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+    for entry in entries.flatten() {
+        let from = entry.path();
+        if !from.is_file() {
+            continue;
+        }
+        let name = match from.file_name() {
+            Some(n) => n,
+            None => continue,
+        };
+        let to = target.join(name);
+        if to.exists() {
+            // Ya hay uno nuevo con ese nombre: el viejo no lo pisa.
+            continue;
+        }
+        // `rename` falla entre sistemas de archivos distintos; ahi se copia y
+        // se borra el original solo si la copia salio bien.
+        if std::fs::rename(&from, &to).is_err() && std::fs::copy(&from, &to).is_ok() {
+            let _ = std::fs::remove_file(&from);
+        }
+    }
+
+    // `remove_dir` solo funciona con la carpeta vacia: si quedo algo dentro,
+    // se conserva a proposito.
+    let _ = std::fs::remove_dir(&legacy);
+}
+
+/// Guarda un archivo en la carpeta "Cuadre" (Descargas en Android,
 /// Documentos en desktop) o, si se indica `folder`, directamente en esa
 /// carpeta (ruta absoluta ya resuelta por el lado JS — el usuario la eligió).
 /// Crea la carpeta si no existe. Sobrescribe sin sufijo: se usa para backups
@@ -51,7 +105,8 @@ fn save_to_app_folder(app: tauri::AppHandle, filename: String, contents: Vec<u8>
             } else {
                 app.path().document_dir().map_err(|e| e.to_string())?
             };
-            d.push("Sharky Finance");
+            migrate_legacy_export_dir(&d);
+            d.push("Cuadre");
             d
         }
     };

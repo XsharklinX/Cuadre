@@ -173,7 +173,14 @@ describe('resolveConflict', () => {
     const accounts = useFinance.getState().accounts
     expect(accounts).toHaveLength(2)
     expect(accounts[0]).toEqual({ ...local, openingBalance: local.balance })
-    expect(accounts[1]).toMatchObject({ ...remote, id: expect.stringContaining(`${base.id}_dup_`) })
+    // El duplicado conserva TODO menos el tipo cuando el original es efectivo:
+    // el efectivo es unico en la app, asi que la copia se degrada a ahorro.
+    // Lo que importa es que el dinero no desaparezca — por eso siguen siendo
+    // dos cuentas y el saldo se mantiene.
+    const { type: _remoteType, ...remoteRest } = remote
+    expect(accounts[1]).toMatchObject({ ...remoteRest, id: expect.stringContaining(`${base.id}_dup_`) })
+    expect(accounts[1].balance).toBe(remote.balance)
+    expect(accounts[1].type).toBe(remote.type === 'cash' ? 'savings' : remote.type)
     expect(useCloudSync.getState().conflicts).toEqual([])
     const metadata = JSON.parse(localStorage.getItem(metadataKey)!)
     expect(metadata.baseline.accounts[base.id]).toBe(stableStringify(remote))

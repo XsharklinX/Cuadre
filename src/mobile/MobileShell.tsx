@@ -23,7 +23,6 @@ import { MobileMovements } from './MobileMovements'
 const MobileAnalytics = lazy(() => import('./MobileAnalytics').then(m => ({ default: m.MobileAnalytics })))
 const MobileAccounts = lazy(() => import('./MobileAccounts').then(m => ({ default: m.MobileAccounts })))
 const MobileProfile = lazy(() => import('./MobileProfile').then(m => ({ default: m.MobileProfile })))
-const MobileAnnual = lazy(() => import('./MobileAnnual').then(m => ({ default: m.MobileAnnual })))
 const MobileCalendar = lazy(() => import('./MobileCalendar').then(m => ({ default: m.MobileCalendar })))
 const MobileDebt = lazy(() => import('./MobileDebt').then(m => ({ default: m.MobileDebt })))
 const MobileCashflow = lazy(() => import('./MobileCashflow').then(m => ({ default: m.MobileCashflow })))
@@ -44,11 +43,11 @@ type MobileViewRenderer = (props: ViewProps) => React.ReactNode
 // Orden visual de las sub-pestañas: Cuentas primero (landing por defecto del
 // tab "Cuentas" en el bottom nav), luego Informes, luego Metas.
 const REPORT_TAB_VIEWS: ViewId[] = ['accounts', 'goals']
-const TOOL_VIEWS: ViewId[] = ['budgets', 'subscriptions', 'notes', 'debt', 'cashflow', 'annual', 'calendar']
+const TOOL_VIEWS: ViewId[] = ['budgets', 'subscriptions', 'notes', 'debt', 'cashflow', 'calendar']
 // Pantallas que se abren como "herramienta" desde el menú (⋯) de Movimientos.
 // Al salir de una, volvemos al lugar de origen (normalmente Movimientos, que es
 // donde vive el menú de herramientas) en vez de aterrizar en Cuentas.
-const TOOL_SCREENS: ViewId[] = ['budgets', 'subscriptions', 'annual', 'calendar', 'debt', 'cashflow', 'notes']
+const TOOL_SCREENS: ViewId[] = ['budgets', 'subscriptions', 'calendar', 'debt', 'cashflow', 'notes']
 
 function MobileSkeletonScreen() {
   return (
@@ -72,7 +71,7 @@ function routeFromView(view: ViewId): MobileRoute {
   // listado de cuentas — antes heredaban la pestaña "Cuentas" del bottom nav
   // por reusar la misma ruta, lo cual confundía (se veían como si fueran parte
   // de Cuentas).
-  if (view === 'budgets' || view === 'subscriptions' || view === 'notes' || view === 'debt' || view === 'cashflow' || view === 'annual' || view === 'calendar') return 'profile'
+  if (view === 'budgets' || view === 'subscriptions' || view === 'notes' || view === 'debt' || view === 'cashflow' || view === 'calendar') return 'profile'
   return 'home'
 }
 
@@ -85,7 +84,6 @@ function viewFromRoute(route: Exclude<MobileRoute, 'add'>): ViewId {
 
 function internalTitles(t: ReturnType<typeof useT>): Partial<Record<ViewId, string>> {
   return {
-    annual: t('annualReport'),
     calendar: t('calendarLabel'),
     budgets: t('budgets'),
     subscriptions: t('subscriptions'),
@@ -248,7 +246,7 @@ export function MobileShell({
   }, [route, view])
 
 
-  const isInProfileSub = route === 'profile' && (view === 'budgets' || view === 'subscriptions' || view === 'notes' || view === 'debt' || view === 'cashflow' || view === 'annual' || view === 'calendar')
+  const isInProfileSub = route === 'profile' && (view === 'budgets' || view === 'subscriptions' || view === 'notes' || view === 'debt' || view === 'cashflow' || view === 'calendar')
   useMobileBackDismiss(isInProfileSub, exitTool)
 
   useEffect(() => {
@@ -470,15 +468,6 @@ export function MobileShell({
           <div className={`mobile-tool-pane mobile-tool-pane-${toolTransition}`} key={view}>
             <Suspense fallback={<MobileSkeletonScreen />}>
               <MobileCashflow />
-            </Suspense>
-          </div>
-        )
-      }
-      if (view === 'annual') {
-        return (
-          <div className={`mobile-tool-pane mobile-tool-pane-${toolTransition}`} key={view}>
-            <Suspense fallback={<MobileSkeletonScreen />}>
-              <MobileAnnual mkey={mkey} />
             </Suspense>
           </div>
         )

@@ -86,7 +86,7 @@ export const BANK_PROFILES: BankProfile[] = [
     ],
   },
   {
-    id: 'scotiabank',
+    id: 'scotiabank-do',
     name: 'Scotiabank',
     hints: ['scotiabank', 'scotia'],
     rules: [
@@ -151,6 +151,18 @@ export function guessBankProfile(accountName: string): BankProfile | null {
 
 export function findBankProfile(id: string | undefined): BankProfile | null {
   return BANK_PROFILES.find(p => p.id === id) ?? null
+}
+
+/**
+ * true si de este banco CONOCEMOS el tarifario.
+ *
+ * El catálogo (`banks.ts`) tiene ~60 entidades; aquí solo están las pocas
+ * cuyas tarifas publicadas conocemos. Inventar un recargo para las demás haría
+ * que la app cobre montos que el banco real no cobra — peor que no calcular
+ * nada. La UI usa esto para decir con franqueza cuándo no va a sugerir cargos.
+ */
+export function hasFeeProfile(id: string | undefined): boolean {
+  return findBankProfile(id) !== null
 }
 
 export function ruleFor(profile: BankProfile | null, kind: FeeKind): FeeRule | null {

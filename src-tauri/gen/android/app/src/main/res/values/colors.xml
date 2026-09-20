@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="sharky_bg">#FF070C18</color>
-    <color name="sharky_surface">#FF0E1E38</color>
-    <color name="sharky_yellow">#FFFFDD3D</color>
-    <color name="ic_launcher_background">#FF0A1428</color>
+    <!-- Fondo del splash nativo de Android. Antes azul marino. -->
+    <color name="sharky_bg">#FF06211F</color>
+    <color name="sharky_surface">#FF12403C</color>
+    <color name="sharky_yellow">#FFF5B62B</color>
+    <color name="ic_launcher_background">#FF12403C</color>
     <color name="purple_200">#FFBB86FC</color>
     <color name="purple_500">#FF6200EE</color>
     <color name="purple_700">#FF3700B3</color>

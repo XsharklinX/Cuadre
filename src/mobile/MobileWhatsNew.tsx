@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { Icon } from '@/components/ui/Icon'
-import { APP_VERSION, RELEASE_NOTES } from '@/data/release'
+import { APP_VERSION, RELEASE_NOTES, countByKind, parseReleaseItems, type ReleaseItemKind } from '@/data/release'
 import { dateLocale } from '@/data/helpers'
 import { useT } from '@/i18n'
 import { useSettings } from '@/store/settings'
@@ -122,11 +122,53 @@ export function MobileWhatsNew({
                     <time className="mnews-date" dateTime={note.date}>{formatDate(note.date)}</time>
                   </div>
                   <h3 className="mnews-entry-title">{note.title}</h3>
-                  <ul className="mnews-items">
-                    {note.items.map((item, j) => (
-                      <li key={j}>{item}</li>
-                    ))}
-                  </ul>
+
+                  {(() => {
+                    const items = parseReleaseItems(note.items)
+                    const counts = countByKind(items)
+                    /**
+                     * AGRUPADO POR TIPO. Antes eran veinte viñetas donde todo
+                     * pesaba igual: nadie distinguía "rediseñamos Cuentas" de
+                     * "corregimos un margen", y el resultado es que no se lee
+                     * ninguna.
+                     *
+                     * Lo nuevo primero, las correcciones al final: quien abre
+                     * un changelog quiere saber qué GANÓ, no qué estaba roto.
+                     */
+                    const groups: Array<{ kind: ReleaseItemKind; label: string }> = [
+                      { kind: 'new', label: t('releaseNew') },
+                      { kind: 'better', label: t('releaseBetter') },
+                      { kind: 'fix', label: t('releaseFixed') },
+                    ]
+                    return (
+                      <>
+                        {/* Resumen de un vistazo, para quien no va a leer las
+                            veinte líneas — que es casi todo el mundo. */}
+                        <div className="mnews-counts">
+                          {counts.new > 0 && <span className="mnews-count new">{counts.new} {t('releaseNew')}</span>}
+                          {counts.better > 0 && <span className="mnews-count better">{counts.better} {t('releaseBetter')}</span>}
+                          {counts.fix > 0 && <span className="mnews-count fix">{counts.fix} {t('releaseFixed')}</span>}
+                        </div>
+
+                        {groups.map(group => {
+                          const rows = items.filter(x => x.kind === group.kind)
+                          if (rows.length === 0) return null
+                          return (
+                            <div key={group.kind} className="mnews-group">
+                              <p className={`mnews-group-title ${group.kind}`}>{group.label}</p>
+                              <ul className="mnews-items">
+                                {rows.map((item, j) => (
+                                  <li key={j} className={item.highlight ? 'highlight' : undefined}>
+                                    {item.text}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )
+                        })}
+                      </>
+                    )
+                  })()}
                   {/* La primera entrada abierta y el resto tambien: un
                       changelog plegado obliga a tocar para leer lo que el
                       usuario vino justamente a leer. */}

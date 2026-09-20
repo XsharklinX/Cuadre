@@ -27,9 +27,30 @@ export function creditUsed(balance: number): number {
 export function creditUsedInPrimary(account: Account, base: CurrencyCode): number {
   const primary = creditUsed(account.balance)
   if (!hasSecondaryBalance(account)) return primary
+  // Con cupo SEPARADO en divisa extranjera, esa linea no consume el limite
+  // principal: se mide por su cuenta (`secondaryUtilization`). Sumarla aqui
+  // la contaria dos veces contra dos limites distintos.
+  if (account.secondaryLimit !== undefined && account.secondaryLimit > 0) return primary
   const secondary = creditUsed(account.secondaryBalance ?? 0)
   if (secondary === 0) return primary
   return primary + convertCurrency(secondary, account.secondaryCurrency!, account.currency ?? base)
+}
+
+/**
+ * Utilizacion de la linea en divisa extranjera cuando tiene CUPO PROPIO.
+ * `null` cuando el limite es compartido (lo normal): en ese caso la unica
+ * utilizacion que existe es la de `creditUtilization`, que ya suma ambas.
+ */
+export function secondaryUtilization(account: Account): number | null {
+  if (!hasSecondaryBalance(account)) return null
+  if (account.secondaryLimit === undefined || account.secondaryLimit <= 0) return null
+  return Math.min(1, creditUsed(account.secondaryBalance ?? 0) / account.secondaryLimit)
+}
+
+/** true si la tarjeta reparte cupos separados por divisa en vez de uno compartido. */
+export function hasSplitLimits(account: Account): boolean {
+  return hasSecondaryBalance(account)
+    && account.secondaryLimit !== undefined && account.secondaryLimit > 0
 }
 
 /**

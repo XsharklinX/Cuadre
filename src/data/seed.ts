@@ -19,10 +19,24 @@ export const CURRENCIES: Record<CurrencyCode, Currency> = {
 // ── Seeds ─────────────────────────────────────────────────
 
 // Demo accounts (only used in makeDemo)
+//
+// La demo enseña la app COMPLETA, no una versión recortada: las tarjetas
+// llevan su red (Visa/Mastercard), y la de crédito arrastra las dos deudas a
+// la vez —pesos y dólares— con su ciclo y su tasa. Es lo que de verdad
+// distingue a la app, y una demo sin eso la hace parecer un libro de cuentas
+// genérico. Estos mismos datos alimentan las capturas de la tienda.
 const ACCOUNTS_DEMO: Account[] = [
-  { id: 'acc_popular', name: 'Banco Principal', short: 'Débito',  type: 'debit',   color: '#3b82f6', balance: 84250.75,   last4: '4821' },
+  { id: 'acc_popular', name: 'Banco Principal', short: 'Débito',  type: 'debit',   color: '#3b82f6', balance: 84250.75,   last4: '4821', network: 'visa' },
   { id: 'acc_bhd',     name: 'Banco de Ahorros', short: 'Ahorros', type: 'savings', color: '#22c55e', balance: 152800.00,  last4: '1093' },
-  { id: 'acc_visa',    name: 'Visa Platino',     short: 'Crédito', type: 'credit',  color: '#a78bfa', balance: -23410.40, last4: '7745', limit: 120000 },
+  {
+    id: 'acc_visa', name: 'Visa Platino', short: 'Crédito', type: 'credit',
+    color: '#a78bfa', balance: -23410.40, last4: '7745', limit: 120000,
+    network: 'visa',
+    secondaryCurrency: 'USD', secondaryBalance: -312.45,
+    statementDay: 25, paymentDay: 15,
+    apr: 59.88, minPaymentPct: 5, minPaymentFloor: 500,
+  },
+  { id: 'acc_mc',      name: 'Mastercard Oro',  short: 'Crédito', type: 'credit',  color: '#f97316', balance: -8940.00,  last4: '2210', limit: 60000, network: 'mastercard', statementDay: 5, paymentDay: 25 },
   { id: 'acc_cash',    name: 'Efectivo',          short: 'Efectivo', type: 'cash',    color: '#f59e0b', balance: 6500.00,   last4: null },
 ]
 

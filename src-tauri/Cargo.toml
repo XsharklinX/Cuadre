@@ -1,6 +1,6 @@
 [package]
 name        = "sharky"
-version = "1.9.0"
+version = "1.9.1"
 description = "$harky - Finanzas personales"
 edition     = "2021"
 

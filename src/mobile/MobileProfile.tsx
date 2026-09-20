@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { APP_VERSION } from '@/data/release'
 import { MobileDataHealth } from './MobileDataHealth'
-import { MobileWhatsNew, shouldShowWhatsNew } from './MobileWhatsNew'
+import { MobileWhatsNew } from './MobileWhatsNew'
 import { Icon } from '@/components/ui/Icon'
 import { toast } from '@/components/ui/Toast'
 import { projectCashflow } from '@/data/cashflowProjection'
@@ -32,7 +32,6 @@ function endOfMonth(today: string): string {
 // filas de texto, para no verse como una copia de ese menú.
 const EXPLORE_CARDS: { view: ViewId; icon: IconName; color: string; labelKey: LangKey }[] = [
   { view: 'subscriptions', icon: 'repeat',   color: '#5bc0ff', labelKey: 'subscriptions' },
-  { view: 'annual',       icon: 'chart',     color: '#a78bfa', labelKey: 'annualReport' },
   { view: 'calendar',     icon: 'calendar',  color: '#f59e0b', labelKey: 'calendarLabel' },
 ]
 
@@ -54,10 +53,9 @@ export function MobileProfile({
   const [nameInput, setNameInput] = useState(displayName || userName || '')
   const [photoMenuOpen, setPhotoMenuOpen] = useState(false)
   const [healthOpen, setHealthOpen] = useState(false)
-  // Tras una actualizacion, las novedades se abren solas una vez. En una
-  // instalacion nueva NO: un changelog de cosas que nunca viste no dice nada.
-  const [autoNews] = useState(() => shouldShowWhatsNew())
-  const [newsOpen, setNewsOpen] = useState(autoNews)
+  // El auto-mostrado tras actualizar vive en App (`useWhatsNew`): aqui el
+  // Perfil solo ofrece el acceso manual al historial.
+  const [newsOpen, setNewsOpen] = useState(false)
   const [cropSource, setCropSource] = useState<File | string | null>(null)
 
   const effectiveName = displayName || userName || ''
@@ -279,7 +277,7 @@ export function MobileProfile({
       </div>
 
       {healthOpen && <MobileDataHealth onClose={() => setHealthOpen(false)} />}
-      {newsOpen && <MobileWhatsNew onClose={() => setNewsOpen(false)} highlightLatest={autoNews} />}
+      {newsOpen && <MobileWhatsNew onClose={() => setNewsOpen(false)} />}
 
       <div className="mpr-card">
         <div className="mpr-card-header">

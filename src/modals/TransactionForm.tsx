@@ -4,6 +4,8 @@ import { toast } from '@/components/ui/Toast'
 import { useDialogs } from '@/components/ui/DialogProvider'
 import { isDuplicateTransaction } from '@/data/bankCsv'
 import { accountCurrency, dateLocale, fmt } from '@/data/helpers'
+import { buildTxEntry, readTxEntry, routeTx } from '@/data/txCurrency'
+import { CURRENCIES as CURRENCY_METAS, getCurrencyMeta } from '@/data/currencies'
 import { CURRENCIES } from '@/data/seed'
 import { useFinance } from '@/store/finance'
 import { useSettings } from '@/store/settings'
@@ -53,6 +55,10 @@ export function TransactionForm({ value, mkey, onClose, onDelete }: {
 
   const [type,           setType]           = useState<Exclude<TxType, 'transfer'>>('expense')
   const [amount,         setAmount]         = useState(0)
+  // Divisa en que se teclea. null = seguir a la cuenta. Al editar se rellena
+  // con la divisa REAL del movimiento, no con la de su cuenta.
+  const [entryCurrency,  setEntryCurrency]  = useState<CurrencyCode | null>(null)
+  const [currencyPicker, setCurrencyPicker] = useState(false)
   const [note,           setNote]           = useState('')
   const [date,           setDate]           = useState(`${mkey}-01`)
   const [accountId,      setAccountId]      = useState(accounts[0]?.id ?? '')
@@ -81,7 +87,15 @@ export function TransactionForm({ value, mkey, onClose, onDelete }: {
       return
     }
     setType(value.type === 'income' ? 'income' : 'expense')
-    setAmount(value.amount)
+    // Se devuelve lo que el usuario TECLEO, no el monto convertido: quien
+    // registro "US$ 25" espera ver 25 y poder cambiarlo a 30, no ver 1,540
+    // pesos y tener que hacer la division mental.
+    {
+      const account = accounts.find(a => a.id === value.accountId)
+      const entry = readTxEntry(value, account, currency)
+      setAmount(entry.amount)
+      setEntryCurrency(entry.currency)
+    }
     setNote(value.note)
     setDate(value.date)
     setAccountId(value.accountId ?? accounts[0]?.id ?? '')
@@ -181,8 +195,13 @@ export function TransactionForm({ value, mkey, onClose, onDelete }: {
     if (!mainCategoryId)
       return toast(t('categoryError'), { icon: 'alert' })
 
+    // `buildTxEntry` devuelve SIEMPRE las claves FX (en undefined cuando no
+    // aplican). Es lo que permite que editar un movimiento de dolares a pesos
+    // borre su rastro en vez de dejarlo con la tasa vieja.
+    const entry = buildTxEntry(amount, routing)
     const fields = {
-      type, amount, note: note.trim(), date, accountId, categoryId: mainCategoryId,
+      type, note: note.trim(), date, accountId, categoryId: mainCategoryId,
+      ...entry,
       splits: cleanSplits,
       ...(recurring ? {
         recurring: recurFreq,
@@ -197,11 +216,11 @@ export function TransactionForm({ value, mkey, onClose, onDelete }: {
 
     const acct = accounts.find(a => a.id === accountId)
     const prev = editing && value.type === 'expense' && value.accountId === accountId ? value.amount : 0
-    if (type === 'expense' && acct?.type !== 'credit' && (acct?.balance ?? 0) + prev < amount
+    if (type === 'expense' && acct?.type !== 'credit' && (acct?.balance ?? 0) + prev < entry.amount
       && (acct?.overdraftPolicy ?? overdraftPolicy) === 'warn')
       toast(t('negativeBalanceWarn').replace('{name}', acct?.name ?? t('account')), { icon: 'alert' })
 
-    const duplicate = !editing && isDuplicateTransaction(transactions, { date, amount, note: fields.note, accountId })
+    const duplicate = !editing && isDuplicateTransaction(transactions, { date, amount: entry.amount, note: fields.note, accountId })
 
     if (!beginSubmit()) return
     try {
@@ -225,7 +244,13 @@ export function TransactionForm({ value, mkey, onClose, onDelete }: {
 
   const arrow = <Icon name="arrowUp" size={12} style={{ transform: 'rotate(90deg)', color: 'var(--m-muted)', flexShrink: 0 }} />
   // El monto se registra en la divisa de la cuenta seleccionada (origen, si es transferencia)
-  const txCurrency = (isTransfer ? fromAccountObj?.currency : activeAccount?.currency) ?? currency
+  // MISMA decision que el flujo de crear (`data/txCurrency.ts`): cuando cada
+  // formulario la resolvia por su cuenta, editar un gasto en dolares lo
+  // devolvia a pesos en silencio.
+  const routing = routeTx(activeAccount, entryCurrency, currency)
+  const txCurrency = isTransfer
+    ? (fromAccountObj?.currency ?? currency)
+    : routing.typedCurrency
   const pfx = currencyPrefix(txCurrency)
 
   return (
@@ -275,6 +300,63 @@ export function TransactionForm({ value, mkey, onClose, onDelete }: {
             </span>
             <span className="txf-amount-tap">{t('tapToEditLabel')}</span>
           </button>
+
+          {/* Divisa del movimiento. Solo fuera de transferencias: ahi la divisa
+              la fijan las dos cuentas y `toAmount` ya resuelve el cruce. */}
+          {!isTransfer && (
+            <div className="txf-currency-row">
+              <button
+                type="button"
+                className={`txf-currency-chip${routing.typedCurrency !== (activeAccount ? accountCurrency(activeAccount, currency) : currency) ? ' foreign' : ''}`}
+                onClick={() => setCurrencyPicker(true)}
+                aria-label={t('currency')}
+              >
+                <span>{getCurrencyMeta(routing.typedCurrency).flag}</span>
+                {routing.typedCurrency}
+              </button>
+              {routing.toSecondary && (
+                <span className="txf-currency-note">{t('goesToSecondLine')}</span>
+              )}
+              {!routing.toSecondary && routing.typedCurrency !== routing.targetCurrency && amount > 0 && (
+                <span className="txf-currency-note">
+                  ≈ {fmt(buildTxEntry(amount, routing).amount, routing.targetCurrency)}
+                </span>
+              )}
+            </div>
+          )}
+
+          {currencyPicker && (
+            <div className="mobile-detail-sheet" style={{ zIndex: 430 }} role="dialog" aria-modal="true" onClick={() => setCurrencyPicker(false)}>
+              <section className="mcur-sheet" onClick={e => e.stopPropagation()}>
+                <header>
+                  <span>{t('currency')}</span>
+                  <button aria-label={t('close')} onClick={() => setCurrencyPicker(false)}><Icon name="close" size={18} /></button>
+                </header>
+                <div className="mcur-list">
+                  {CURRENCY_METAS.map(c => {
+                    const selected = routing.typedCurrency === c.code
+                    const isSecondLine = activeAccount?.secondaryCurrency === c.code
+                    return (
+                      <button
+                        key={c.code}
+                        className={`mcur-row${selected ? ' on' : ''}`}
+                        onClick={() => { setEntryCurrency(c.code); setCurrencyPicker(false) }}
+                      >
+                        <span className="mcur-flag">{c.flag}</span>
+                        <div className="mcur-info">
+                          <strong>{c.code}</strong>
+                          <small>{isSecondLine ? t('goesToSecondLine') : c.name}</small>
+                        </div>
+                        <div className="mcur-right">
+                          {selected && <Icon name="check" size={16} style={{ color: 'var(--accent)' }} />}
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </section>
+            </div>
+          )}
 
           {/* Detail rows */}
           <div className="mpr-form-rows txf-rows">

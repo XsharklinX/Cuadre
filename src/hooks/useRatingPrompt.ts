@@ -12,7 +12,7 @@ const SETTLE_MS = 2500
  * tarea (mientras registras un gasto, mientras revisas un saldo) es lo que
  * convierte una pregunta razonable en una interrupción.
  */
-export function useRatingPrompt(): { open: boolean; close: () => void; rated: () => void } {
+export function useRatingPrompt(suppressed = false): { open: boolean; close: () => void; rated: () => void } {
   const [open, setOpen] = useState(false)
   const noteLaunch = useRating(s => s.noteLaunch)
   const markRated = useRating(s => s.markRated)
@@ -23,6 +23,10 @@ export function useRatingPrompt(): { open: boolean; close: () => void; rated: ()
     // El conteo se lee DESPUÉS del retraso, no ahora: en el arranque el store
     // puede no haber hidratado todavía y saldría 0.
     const id = setTimeout(() => {
+      // Nunca encima de las Novedades: quien acaba de actualizar ya tiene un
+      // dialogo abierto, y apilar una peticion de valoracion sobre el es la
+      // forma mas rapida de conseguir una estrella.
+      if (suppressed) return
       if (useRating.getState().shouldAsk(useFinance.getState().transactions.length)) {
         setOpen(true)
       }
@@ -30,7 +34,7 @@ export function useRatingPrompt(): { open: boolean; close: () => void; rated: ()
     return () => clearTimeout(id)
     // Solo al montar: una sola evaluación por sesión.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [suppressed])
 
   return {
     open,

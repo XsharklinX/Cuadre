@@ -12,7 +12,7 @@ function isAndroidTauri(): boolean {
 
 /**
  * Backup automático semanal en formato JSON, guardado en la carpeta
- * "Sharky Finance" con un nombre fijo: cada ejecución sobrescribe la
+ * "Cuadre" con un nombre fijo: cada ejecución sobrescribe la
  * anterior, sin acumular archivos. Se ejecuta al abrir la app si han
  * pasado ≥7 días desde el último backup automático exitoso.
  *

@@ -1,7 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Fondo del icono adaptativo: el mismo verde profundo de la marca.
+  Antes era un degradado azul marino (#0E1E38 -> #070C18) que no tenia
+  relacion con nada de la app y que se perdia entre las demas apps de la
+  tienda. El angulo 315 acompania la diagonal de las dos tarjetas.
+-->
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
     <gradient
-        android:angle="270"
-        android:endColor="#070C18"
-        android:startColor="#0E1E38" />
+        android:angle="315"
+        android:endColor="#06211F"
+        android:startColor="#12403C" />
 </shape>

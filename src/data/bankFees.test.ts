@@ -8,7 +8,7 @@ import type { Account, Transaction } from '@/types'
 
 describe('catálogo de bancos', () => {
   it('cubre los bancos que el parser de avisos ya reconoce', () => {
-    for (const id of ['banreservas', 'popular', 'bhd', 'scotiabank']) {
+    for (const id of ['banreservas', 'popular', 'bhd', 'scotiabank-do']) {
       expect(findBankProfile(id), id).not.toBeNull()
     }
   })

@@ -5,6 +5,7 @@ export type CurrencyCode = 'DOP' | 'USD' | 'EUR' | 'MXN' | 'GBP' | 'COP' | 'ARS'
 export type ThemeName    = 'dark' | 'light' | 'amoled' | 'system'
 export type DensityName  = 'compact' | 'regular' | 'comfy'
 export type OverdraftPolicy = 'block' | 'warn' | 'allow'
+export type CardNetwork = 'visa' | 'mastercard' | 'amex' | 'discover' | 'other'
 export type RecurrenceFrequency = 'weekly' | 'monthly'
 export type IconName =
   // categorías existentes
@@ -75,6 +76,15 @@ export interface Account {
    * el banco significaría sugerir cargos ajenos.
    */
   bankId?: string
+  /**
+   * Red de la tarjeta (Visa, Mastercard…). Es lo que está impreso en el
+   * plástico, y lo que permite reconocer la cuenta de un vistazo sin leer.
+   *
+   * Solo en cuentas con tarjeta física (débito, ahorro, crédito). No se
+   * deduce de `last4`: la red se identifica por el PRIMER dígito del número,
+   * que la app nunca guarda.
+   */
+  network?: CardNetwork
 
   // ── Solo tarjetas de crédito (type === 'credit') ───────
   /**
@@ -91,6 +101,17 @@ export interface Account {
   secondaryBalance?:  number
   /** Saldo de apertura de la divisa secundaria, con el mismo rol que `openingBalance`. */
   secondaryOpeningBalance?: number
+  /**
+   * Límite PROPIO de la línea en divisa extranjera, en esa divisa.
+   *
+   * La mayoría de las tarjetas dominicanas comparten un solo límite entre
+   * ambas líneas, y ese es `limit` (se mide contra la deuda total convertida).
+   * Pero algunas emiten un cupo separado en dólares; cuando existe, se mide
+   * aparte y `limit` deja de aplicar a la línea extranjera.
+   *
+   * Ausente = límite compartido, que es el caso normal.
+   */
+  secondaryLimit?: number
 
   /**
    * CICLO. Sin estas fechas el saldo de una tarjeta es un número sin
@@ -310,6 +331,17 @@ export interface FmtOptions {
 }
 
 // ── Props compartidas de vistas ───────────────────────────
+/**
+ * Las pantallas que existen de verdad.
+ *
+ * `'annual'` se fue: repetía el período anual de Análisis (mismos totales,
+ * misma comparación contra el año anterior, mismo desglose, misma serie de
+ * patrimonio). Lo único suyo —mejor mes, mes de mayor gasto, fuentes de
+ * ingreso y exportar como imagen— vive ahora en ese período.
+ *
+ * `'reports'` también: era un id que nadie renderizaba. La pestaña del bottom
+ * nav que se llama "reports" muestra `accounts`.
+ */
 export type ViewId =
   | 'dashboard'
   | 'transactions'
@@ -317,9 +349,7 @@ export type ViewId =
   | 'stats'
   | 'budgets'
   | 'goals'
-  | 'annual'
   | 'calendar'
-  | 'reports'
   | 'subscriptions'
   | 'debt'
   | 'cashflow'

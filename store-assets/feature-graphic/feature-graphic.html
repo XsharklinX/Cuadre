@@ -2,123 +2,163 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
+<!--
+  GRÁFICO DESTACADO de Play Store — 1024×500.
+
+  Se renderiza con `node store-assets/capture-screens.mjs`.
+
+  Reglas que Google aplica a esta imagen y que aquí se respetan:
+  · En muchos listados aparece RECORTADA por los bordes y con el botón de
+    "Instalar" encima del tercio inferior. Todo lo que importa vive en la
+    banda central, lejos de los bordes.
+  · Nada de capturas de pantalla dentro: se rechazan.
+  · El texto debe leerse en miniatura, así que hay una frase y no tres.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800;900&family=Fraunces:opsz,wght@9..144,600&display=swap">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { width: 1024px; height: 500px; overflow: hidden; }
+
   body {
+    align-items: center;
+    /* El verde profundo de la marca, con dos focos del turquesa y el oro de
+       las tarjetas del ícono. Antes era azul marino con focos azules: el
+       color de la mitad de la tienda. */
+    background: #06211F;
+    background-image:
+      radial-gradient(620px 460px at 84% 14%, rgba(95, 235, 201, .22), transparent 68%),
+      radial-gradient(520px 420px at 6% 104%, rgba(245, 182, 43, .14), transparent 70%);
+    color: #EDF2EE;
+    display: flex;
+    font-family: 'Archivo', system-ui, sans-serif;
+    position: relative;
     width: 1024px;
     height: 500px;
-    background: #080F1E;
-    background-image:
-      radial-gradient(620px 420px at 82% 18%, rgba(59,111,255,.30), transparent 70%),
-      radial-gradient(700px 500px at 10% 100%, rgba(59,111,255,.12), transparent 70%);
-    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-    display: flex;
-    align-items: center;
-    position: relative;
   }
-  .glow-line {
+
+  /* Trama de puntos al paso de la rejilla del sistema de diseño: da textura
+     sin competir con el texto. Se desvanece hacia la izquierda para que el
+     titular quede sobre fondo limpio. */
+  .grid {
     position: absolute;
-    opacity: .35;
-    filter: blur(1px);
+    inset: 0;
+    background-image: radial-gradient(rgba(255,255,255,.075) 1.5px, transparent 1.5px);
+    background-size: 24px 24px;
+    -webkit-mask-image: linear-gradient(100deg, transparent 34%, #000 78%);
+    mask-image: linear-gradient(100deg, transparent 34%, #000 78%);
   }
+
   .content {
-    display: flex;
     align-items: center;
-    gap: 56px;
-    padding: 0 64px;
+    display: flex;
+    gap: 64px;
+    padding: 0 72px;
+    position: relative;
     width: 100%;
   }
-  .logo {
-    flex: 0 0 auto;
-    width: 220px;
-    height: 220px;
-  }
-  .text {
-    flex: 1;
+
+  .text { display: flex; flex-direction: column; gap: 18px; flex: 1; }
+
+  .brand {
+    align-items: baseline;
     display: flex;
-    flex-direction: column;
     gap: 14px;
   }
-  .brand {
-    font-size: 64px;
+  .brand h1 {
+    font-family: 'Fraunces', Georgia, serif;
+    font-size: 76px;
+    font-weight: 600;
+    letter-spacing: -.03em;
+    line-height: .9;
+  }
+  .brand span {
+    color: #5FEBC9;
+    font-size: 19px;
     font-weight: 800;
-    color: #FFFFFF;
-    letter-spacing: -1px;
-    display: flex;
-    align-items: baseline;
-    gap: 4px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
   }
-  .brand .dollar {
-    color: #4D82FF;
+
+  .claim {
+    color: #A9C4BC;
+    font-size: 27px;
+    font-weight: 500;
+    line-height: 1.32;
+    max-width: 19ch;
   }
-  .tagline {
-    font-size: 26px;
-    font-weight: 600;
-    color: #D4E4F5;
-  }
-  .sub {
-    font-size: 17px;
-    color: #9E9EB8;
-    max-width: 560px;
-    line-height: 1.5;
-  }
-  .pills {
-    display: flex;
-    gap: 10px;
-    margin-top: 6px;
-  }
-  .pill {
-    border: 1px solid rgba(255,255,255,.12);
-    color: #D4E4F5;
-    background: rgba(255,255,255,.04);
+  .claim b { color: #EDF2EE; font-weight: 800; }
+
+  .chips { display: flex; gap: 10px; margin-top: 4px; }
+  .chip {
+    background: rgba(255,255,255,.07);
+    border: 1px solid rgba(255,255,255,.13);
     border-radius: 999px;
-    padding: 7px 18px;
-    font-size: 14px;
-    font-weight: 600;
+    font-size: 15px;
+    font-weight: 700;
+    padding: 8px 16px;
+  }
+
+  /* Las dos tarjetas del ícono, a tamaño grande. Es la misma marca, no una
+     ilustración distinta hecha para esta imagen. */
+  .art { flex: 0 0 auto; height: 340px; position: relative; width: 340px; }
+  .card {
+    border-radius: 26px;
+    height: 128px;
+    position: absolute;
+    width: 206px;
+  }
+  .card-back {
+    background: linear-gradient(135deg, #FFD166, #F09F1A);
+    left: 22px;
+    top: 44px;
+    transform: rotate(-9deg);
+  }
+  .card-shadow {
+    background: #04120F;
+    left: 92px;
+    opacity: .3;
+    top: 138px;
+    transform: rotate(7deg);
+  }
+  .card-front {
+    background: linear-gradient(135deg, #5FEBC9, #17A38E);
+    left: 92px;
+    top: 138px;
+    transform: rotate(7deg);
+  }
+  .card-front::after {
+    background: #08332D;
+    border-radius: 7px;
+    content: '';
+    height: 14px;
+    left: 22px;
+    opacity: .42;
+    position: absolute;
+    top: 78px;
+    width: 86px;
   }
 </style>
 </head>
 <body>
-  <!-- baseline accent -->
-  <svg class="glow-line" width="1024" height="500" viewBox="0 0 1024 500" xmlns="http://www.w3.org/2000/svg">
-    <line x1="0" y1="430" x2="1024" y2="430" stroke="#3B6FFF" stroke-width="3" stroke-linecap="round" opacity="0.5"/>
-  </svg>
-
+  <div class="grid"></div>
   <div class="content">
-    <svg class="logo" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <filter id="glow-dot" x="-80%" y="-80%" width="260%" height="260%">
-          <feGaussianBlur in="SourceGraphic" stdDeviation="14" result="blur"/>
-          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-        </filter>
-        <filter id="glow-line2" x="-20%" y="-20%" width="140%" height="140%">
-          <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur"/>
-          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-        </filter>
-      </defs>
-      <rect width="512" height="512" rx="96" fill="#0C1426"/>
-      <line x1="74" y1="385" x2="256" y2="148" stroke="#D4E4F5" stroke-width="26" stroke-linecap="round" filter="url(#glow-line2)"/>
-      <line x1="256" y1="148" x2="438" y2="385" stroke="#D4E4F5" stroke-width="26" stroke-linecap="round" filter="url(#glow-line2)"/>
-      <circle cx="256" cy="148" r="38" fill="#3B6FFF" opacity="0.20" filter="url(#glow-dot)"/>
-      <circle cx="256" cy="148" r="22" fill="#4D82FF"/>
-      <line x1="58" y1="422" x2="454" y2="422" stroke="#3B6FFF" stroke-width="9" stroke-linecap="round" opacity="0.55"/>
-    </svg>
-
     <div class="text">
-      <div class="brand"><span class="dollar">$</span>harky</div>
-      <div class="tagline">Tus finanzas, simples y bajo control</div>
-      <div class="sub">
-        Registra gastos e ingresos, gestiona presupuestos, metas de ahorro y
-        cuentas, y mira tu progreso en reportes claros — todo en una app
-        rapida que funciona sin conexion.
+      <div class="brand">
+        <h1>Cuadre</h1>
+        <span>RD</span>
       </div>
-      <div class="pills">
-        <span class="pill">Presupuestos</span>
-        <span class="pill">Metas de ahorro</span>
-        <span class="pill">Reportes</span>
-        <span class="pill">100% privado</span>
+      <p class="claim">Tus gastos, tus tarjetas y tus dólares, <b>en un solo lugar</b>.</p>
+      <div class="chips">
+        <span class="chip">Pesos y dólares</span>
+        <span class="chip">Tarjetas de crédito</span>
       </div>
+    </div>
+    <div class="art">
+      <div class="card card-back"></div>
+      <div class="card card-shadow"></div>
+      <div class="card card-front"></div>
     </div>
   </div>
 </body>

@@ -70,7 +70,7 @@ interface SettingsState {
   weeklyAutoBackupEnabled: boolean
   weeklyAutoBackupDay: number
   weeklyAutoBackupHour: number
-  /** Carpeta destino elegida por el usuario para el backup (manual y automático). `null` = predeterminada ("Sharky Finance"). */
+  /** Carpeta destino elegida por el usuario para el backup (manual y automático). `null` = predeterminada ("Cuadre"). */
   weeklyBackupFolder: string | null
   fxAlertEnabled: boolean
   fxAlertCurrency: string

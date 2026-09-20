@@ -18,6 +18,13 @@ export interface BankSuggestion {
   cardLast4?: string
   /** Moneda detectada en el aviso; ayuda a elegir la cuenta correcta (DOP vs USD). */
   currency?: 'DOP' | 'USD'
+  /**
+   * Id del movimiento que YA podrías haber tecleado tú por esta misma compra.
+   * Cuando está presente, la sugerencia no se auto-creó a propósito y se
+   * muestra marcada, para que decidas si es repetido o son dos gastos
+   * distintos del mismo monto.
+   */
+  possibleDuplicateOf?: string
 }
 
 interface BankSuggestionsState {

@@ -129,7 +129,7 @@ export async function saveFile(blob: Blob, filename: string, title: string, exte
 }
 
 /**
- * Guarda un archivo en la carpeta "Sharky Finance" (Descargas en Android,
+ * Guarda un archivo en la carpeta "Cuadre" (Descargas en Android,
  * Documentos en desktop) o, si se pasa `folder`, en esa carpeta exacta
  * (ruta absoluta elegida por el usuario). Sin diálogo, sobrescribe si ya
  * existe. Solo disponible en Tauri.
@@ -154,7 +154,7 @@ export async function pickBackupFolder(): Promise<string | null> {
 /**
  * Guarda un backup JSON.
  * - Tauri: se guarda directo en la carpeta destino configurada (o
- *   "Sharky Finance" por defecto), sin diálogo.
+ *   "Cuadre" por defecto), sin diálogo.
  * - Web/PWA: el usuario elige la ubicación (selector de archivos / share sheet).
  */
 export async function saveBackup(json: string, folder?: string | null): Promise<boolean> {
@@ -189,7 +189,7 @@ export async function sendNativeNotification(
   // que todas las notificaciones de $harky se vean iguales.
   sendNotification({
     title, body, actionTypeId: opts?.actionTypeId, extra: opts?.extra,
-    icon: 'ic_stat_sharky', iconColor: '#4D82FF',
+    icon: 'ic_stat_sharky', iconColor: '#17A38E',
   })
 }
 

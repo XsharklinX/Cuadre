@@ -96,3 +96,45 @@ describe('contenido del changelog', () => {
     expect(new Set(versions).size).toBe(versions.length)
   })
 })
+
+describe('agrupado del changelog', () => {
+  it('clasifica por prefijo', async () => {
+    const { parseReleaseItems } = await import('@/data/release')
+    const out = parseReleaseItems(['nuevo: A', 'mejor: B', 'arreglo: C'])
+    expect(out.map(x => x.kind)).toEqual(['new', 'better', 'fix'])
+    // El prefijo no queda en el texto visible.
+    expect(out.map(x => x.text)).toEqual(['A', 'B', 'C'])
+  })
+
+  it('las entradas VIEJAS sin prefijo siguen funcionando', async () => {
+    // Las versiones anteriores no se reescriben: se clasifican por contenido.
+    const { parseReleaseItems } = await import('@/data/release')
+    const out = parseReleaseItems(['Corregido: algo', 'Una mejora cualquiera'])
+    expect(out[0].kind).toBe('fix')
+    expect(out[0].text).toBe('algo')
+    expect(out[1].kind).toBe('better')
+  })
+
+  it('marca lo grave como destacado', async () => {
+    const { parseReleaseItems } = await import('@/data/release')
+    const [item] = parseReleaseItems(['Corregido (grave): el patrimonio estaba mal'])
+    expect(item.highlight).toBe(true)
+    expect(item.text).toBe('el patrimonio estaba mal')
+  })
+
+  it('cuenta por tipo para el resumen', async () => {
+    const { countByKind, parseReleaseItems } = await import('@/data/release')
+    const counts = countByKind(parseReleaseItems(['nuevo: A', 'nuevo: B', 'arreglo: C']))
+    expect(counts).toEqual({ new: 2, better: 0, fix: 1 })
+  })
+
+  it('ninguna versión queda sin clasificar', async () => {
+    const { RELEASE_NOTES, parseReleaseItems } = await import('@/data/release')
+    for (const note of RELEASE_NOTES) {
+      for (const item of parseReleaseItems(note.items)) {
+        expect(['new', 'better', 'fix'], `${note.version}: ${item.text}`).toContain(item.kind)
+        expect(item.text.trim().length, note.version).toBeGreaterThan(0)
+      }
+    }
+  })
+})

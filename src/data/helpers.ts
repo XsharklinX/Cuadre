@@ -168,7 +168,18 @@ export function accountCurrency(account: Account, base: CurrencyCode): CurrencyC
 /** Saldo de una cuenta convertido a la divisa base de la app (tasas en vivo). */
 export function accountBalanceInBase(account: Account, base: CurrencyCode): number {
   const cur = account.currency ?? base
-  return cur === base ? account.balance : convertCurrency(account.balance, cur, base)
+  const primary = cur === base ? account.balance : convertCurrency(account.balance, cur, base)
+
+  // El SEGUNDO libro de una tarjeta es parte de la posicion de esa cuenta: una
+  // deuda de US$312 es deuda real. Sin esto no aparecia en el patrimonio neto,
+  // ni en el total adeudado, ni en los totales por grupo — existia en la ficha
+  // de la tarjeta y en ningun agregado.
+  if (account.type !== 'credit' || !account.secondaryCurrency) return primary
+  const secondary = account.secondaryBalance ?? 0
+  if (secondary === 0) return primary
+  return primary + (account.secondaryCurrency === base
+    ? secondary
+    : convertCurrency(secondary, account.secondaryCurrency, base))
 }
 
 /**

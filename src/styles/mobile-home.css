@@ -82,10 +82,13 @@
     font-size: 11px; font-weight: 850; letter-spacing: .06em; text-transform: uppercase;
   }
   .mweek-dismiss { background: none; border: 0; color: var(--m-muted); padding: 2px; }
-  .mweek-body { align-items: flex-end; display: flex; gap: 10px; justify-content: space-between; margin-top: 8px; }
+  /* `wrap`: la cifra de la semana y la categoria top no siempre caben en la
+     misma fila (un gasto de cinco cifras + un nombre de categoria largo), y
+     sin envolver la cifra se partia por la mitad. */
+  .mweek-body { align-items: flex-end; display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; margin-top: 8px; }
   .mweek-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
   .mweek-main small { color: var(--m-muted); font-size: 11px; }
-  .mweek-main strong { font-size: 22px; font-weight: 900; letter-spacing: -.02em; }
+  .mweek-main strong { font-size: 22px; font-weight: 900; letter-spacing: -.02em; white-space: nowrap; }
   .mweek-delta {
     align-items: center; display: inline-flex; font-size: 11px; font-weight: 800; gap: 2px; margin-top: 2px;
   }
@@ -93,7 +96,9 @@
   .mweek-delta.down { color: var(--m-income); }
   .mweek-top {
     align-items: center; background: color-mix(in oklab, var(--m-text) 6%, transparent);
-    border-radius: 12px; display: flex; gap: 6px; max-width: 55%; padding: 7px 10px;
+    /* El 55% era para compartir fila con la cifra. Ahora la fila envuelve, y
+       ese tope dejaba "Supermercado" en "Super..." con media tarjeta vacia. */
+    border-radius: 12px; display: flex; gap: 6px; max-width: 100%; padding: 7px 10px;
   }
   .mweek-top-dot { border-radius: 50%; flex: none; height: 8px; width: 8px; }
   .mweek-top-name { color: var(--m-muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

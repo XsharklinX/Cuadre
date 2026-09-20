@@ -44,12 +44,39 @@ export function isOccurrenceGenerated(template: Transaction, date: string, trans
 }
 
 export function useRecurring(): void {
-  const { transactions, addTx, updateTx } = useFinance()
-  const ran = useRef(false)
+  const addTx = useFinance(s => s.addTx)
+  const updateTx = useFinance(s => s.updateTx)
+  /**
+   * Último día en que se generó. Sustituye al antiguo "ya corrí una vez":
+   * ese guard hacía que la generación ocurriera SOLO al montar el componente.
+   *
+   * Consecuencia real: si dejabas la app abierta y cruzaba la medianoche, o
+   * si volvía de segundo plano tres días después, no se generaba nada hasta
+   * cerrarla y abrirla de nuevo. Con las ventanas de WorkManager que mide
+   * este teléfono (jobs diferidos a 17h+), "volver a primer plano" es la
+   * señal más fiable que tenemos.
+   */
+  const lastRunDay = useRef<string | null>(null)
 
   useEffect(() => {
-    if (ran.current) return
-    ran.current = true
+    const run = () => {
+      const day = localToday()
+      if (lastRunDay.current === day) return
+      lastRunDay.current = day
+      generate()
+    }
+
+    const onVisible = () => { if (document.visibilityState === 'visible') run() }
+    run()
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+
+    function generate() {
+    // Se lee del STORE, no del closure: el efecto se monta una vez y vuelve a
+    // correr al pasar a primer plano, así que una lista capturada en el
+    // primer render estaría vieja — y comprobar duplicados contra una lista
+    // vieja es exactamente cómo se generan ocurrencias repetidas.
+    const transactions = useFinance.getState().transactions
     const today = localToday()
     let created = 0
     let skipped = 0
@@ -88,5 +115,9 @@ export function useRecurring(): void {
       tt(skipped > 1 ? 'recurringSkippedMany' : 'recurringSkippedOne', { n: skipped }),
       { icon: 'alert' },
     )
-  }, [addTx, transactions, updateTx])
+    }
+    // Las dependencias se leen del store dentro de `generate`, y el guard por
+    // día evita re-generar: montar este efecto una vez es suficiente.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 }

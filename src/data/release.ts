@@ -2,6 +2,29 @@
  *  coincide con la versión que se sube a la tienda, sin pasos manuales. */
 export const APP_VERSION = __APP_VERSION__
 
+/**
+ * Una entrada del changelog.
+ *
+ * Los items se escriben con un PREFIJO opcional que dice de qué tipo son, y
+ * la pantalla los agrupa por eso:
+ *
+ *   'nuevo: ...'      una función que antes no existía
+ *   'mejor: ...'      algo que ya estaba y ahora funciona mejor
+ *   'arreglo: ...'    un bug corregido
+ *
+ * Sin prefijo se trata como "mejor". Existe porque una lista de veinte
+ * puntos donde todos pesan igual no se lee: nadie distingue "rediseñamos
+ * Cuentas" de "corregimos un margen", y acaba sin leer ninguno.
+ */
+export type ReleaseItemKind = 'new' | 'better' | 'fix'
+
+export interface ReleaseItem {
+  kind: ReleaseItemKind
+  text: string
+  /** true para lo que de verdad importa de esa versión: se muestra primero. */
+  highlight?: boolean
+}
+
 export interface ReleaseNote {
   version: string
   date: string
@@ -9,7 +32,71 @@ export interface ReleaseNote {
   items: string[]
 }
 
+const PREFIXES: Array<[string, ReleaseItemKind]> = [
+  ['nuevo:', 'new'],
+  ['mejor:', 'better'],
+  ['arreglo:', 'fix'],
+]
+
+/**
+ * Convierte los items en texto plano a items tipados. El texto viejo (sin
+ * prefijo) sigue funcionando: se clasifica por su contenido, para que las
+ * versiones anteriores no haya que reescribirlas.
+ */
+export function parseReleaseItems(items: string[]): ReleaseItem[] {
+  return items.map(raw => {
+    const lower = raw.toLowerCase()
+    for (const [prefix, kind] of PREFIXES) {
+      if (lower.startsWith(prefix)) {
+        return { kind, text: raw.slice(prefix.length).trim() }
+      }
+    }
+    // Compatibilidad con las entradas antiguas, que no llevan prefijo.
+    if (lower.startsWith('corregido')) {
+      return { kind: 'fix', text: raw.replace(/^corregido(\s*\(grave\))?:?\s*/i, '').trim(), highlight: /grave/i.test(raw) }
+    }
+    return { kind: 'better', text: raw }
+  })
+}
+
+/** Cuántos items de cada tipo tiene una versión, para resumirla de un vistazo. */
+export function countByKind(items: ReleaseItem[]): Record<ReleaseItemKind, number> {
+  return items.reduce((acc, item) => {
+    acc[item.kind]++
+    return acc
+  }, { new: 0, better: 0, fix: 0 } as Record<ReleaseItemKind, number>)
+}
+
 export const RELEASE_NOTES: ReleaseNote[] = [
+  {
+    version: '1.9.1',
+    date: '2026-09-20',
+    title: 'Cuentas y Analisis rediseniados',
+    items: [
+      'nuevo: Cuentas rediseniada. Tu dinero y tus tarjetas ya no comparten la misma fila.',
+      'nuevo: Tu proximo pago de tarjeta, arriba del todo. Y puedes pagarla desde ahi.',
+      'nuevo: Elige tu banco de una lista con mas de 60 entidades.',
+      'nuevo: Las tarjetas muestran su red: Visa, Mastercard, Amex.',
+      'nuevo: Cupo aparte para la linea en dolares, si tu tarjeta lo maneja asi.',
+      'nuevo: Analisis abre diciendote como vas, en una frase.',
+      'nuevo: Si el banco avisa de una compra que ya registraste, te lo dice antes de agregarla.',
+      'mejor: Conciliar saldo esta al frente, no al fondo.',
+      'mejor: El Efectivo es uno solo. Para guardar aparte, usa una cuenta de Ahorro.',
+      'mejor: El onboarding te deja con tus saldos cargados, no con una app vacia.',
+      'mejor: "Anual" ahora vive dentro del periodo anual de Analisis.',
+      'mejor: Las notificaciones se ordenaron por lo que pide tu atencion.',
+      'mejor: La app abre casi 2 segundos mas rapido.',
+      'arreglo: GRAVE - la deuda en dolares no contaba en tu patrimonio.',
+      'arreglo: Los gastos en dolares se veian como pesos en el historial de la cuenta.',
+      'arreglo: La ficha de una cuenta se veia rota: cabecera pegada y grafico sin dibujar.',
+      'arreglo: Ahora puedes tocar un movimiento del historial para editarlo.',
+      'arreglo: Al editar un movimiento ya se puede cambiar su divisa.',
+      'arreglo: Los gastos en dolares no cuadraban en calendario ni en flujo de caja.',
+      'arreglo: Las Novedades no aparecian al actualizar.',
+      'arreglo: Un aviso del banco en dolares se registraba como pesos.',
+      'arreglo: Los recurrentes solo se generaban al abrir la app.',
+    ],
+  },
   {
     version: '1.9.0',
     date: '2026-09-19',

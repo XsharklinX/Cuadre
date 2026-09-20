@@ -1,6 +1,6 @@
 <resources>
-    <string name="app_name">$harky Finanzas</string>
-    <string name="main_activity_title">$harky Finanzas</string>
+    <string name="app_name">Cuadre</string>
+    <string name="main_activity_title">Cuadre</string>
 
     <!-- Accesos directos (mantener presionado el ícono de la app) -->
     <string name="shortcut_add_expense_short">Gasto</string>

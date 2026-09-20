@@ -971,3 +971,183 @@ button.man-quick-card {
 .man-export-row > div { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .man-export-row b { font-size: 14.5px; font-weight: 700; }
 .man-export-row small { color: var(--m-muted); font-size: 12px; }
+
+/* ═══════════════════════════════════════════════════════════
+   VEREDICTO
+   ═══════════════════════════════════════════════════════════
+   Análisis abría con cuatro números empatados (ingresos, gastos, neto y el
+   anillo de ahorro), un dónut y cinco acordeones cerrados. Eso no es una
+   jerarquía: es una lista de cajones que obliga al usuario a saber de
+   antemano qué busca — y si lo supiera, no necesitaría la pantalla.
+
+   Ahora la pantalla responde UNA pregunta antes de ofrecer nada.
+   ═══════════════════════════════════════════════════════════ */
+
+.man-verdict {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+/* El tono tiñe el BORDE y un velo, no el fondo entero: un panel de color
+   pleno arriba de todo convierte cada apertura de la pantalla en una alarma. */
+.man-verdict.good { background: color-mix(in oklab, var(--income) 9%, var(--surface)); border-color: color-mix(in oklab, var(--income) 30%, transparent); }
+.man-verdict.warn { background: color-mix(in oklab, var(--warn) 9%, var(--surface)); border-color: color-mix(in oklab, var(--warn) 30%, transparent); }
+.man-verdict.bad  { background: color-mix(in oklab, var(--expense) 10%, var(--surface)); border-color: color-mix(in oklab, var(--expense) 32%, transparent); }
+.man-verdict.neutral { background: var(--surface); }
+
+.man-verdict-head { display: grid; gap: 4px; }
+.man-verdict-kicker {
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+/* La frase, no un título de sección. Es lo primero que se lee y lo único que
+   el usuario vino a saber. */
+.man-verdict-line {
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 24px;
+  margin: 0;
+  text-wrap: balance;
+}
+
+.man-verdict-hero { display: grid; gap: 2px; }
+.man-verdict-hero-label {
+  color: var(--text-dim);
+  font-size: 12px;
+  font-weight: 700;
+}
+.man-verdict-hero-value {
+  color: var(--text);
+  font-size: 34px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 850;
+  letter-spacing: -.025em;
+  line-height: 1.05;
+}
+.man-verdict.bad .man-verdict-hero-value { color: var(--expense); }
+.man-verdict.good .man-verdict-hero-value { color: var(--income); }
+
+/* Ingresos y gastos SOSTIENEN la cifra de arriba, no compiten con ella. */
+.man-verdict-support {
+  border-top: 1px solid var(--border);
+  color: var(--text-dim);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+  gap: 8px 16px;
+  padding-top: 12px;
+}
+.man-verdict-support span { align-items: center; display: inline-flex; gap: 5px; }
+.man-verdict-support b {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+.man-verdict-support .dot { border-radius: 50%; height: 7px; width: 7px; }
+.man-verdict-support .dot.income  { background: var(--income); }
+.man-verdict-support .dot.expense { background: var(--expense); }
+.man-verdict-support .dot.save    { background: var(--accent); }
+
+/* ── Titulares ─────────────────────────────────────────────
+   Los dos avisos más urgentes, FUERA del acordeón. Había 465 líneas de motor
+   de insights alimentando un cajón cerrado que nadie abría. Dos, no tres:
+   tres ya es una lista, y una lista vuelve a ser "todo con el mismo peso". */
+.man-headlines { display: grid; gap: 8px; }
+.man-headline {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  display: flex;
+  gap: 11px;
+  padding: 12px 14px;
+  text-align: left;
+  width: 100%;
+}
+.man-headline-ico {
+  background: var(--surface-2);
+  border-radius: 10px;
+  color: var(--text-dim);
+  display: grid;
+  flex-shrink: 0;
+  height: 34px;
+  place-items: center;
+  width: 34px;
+}
+.man-headline-ico.warn { background: color-mix(in oklab, var(--warn) 15%, transparent); color: var(--warn); }
+.man-headline-ico.good { background: color-mix(in oklab, var(--income) 15%, transparent); color: var(--income); }
+.man-headline-ico.bad  { background: color-mix(in oklab, var(--expense) 15%, transparent); color: var(--expense); }
+.man-headline-body { display: grid; flex: 1; gap: 1px; min-width: 0; }
+.man-headline-body b { color: var(--text); font-size: 14px; font-weight: 750; line-height: 19px; }
+.man-headline-body small { color: var(--text-dim); font-size: 12px; line-height: 16px; }
+
+/* ── Tu año ────────────────────────────────────────────────
+   Los superlativos y las fuentes de ingreso vivían en una vista "Anual"
+   aparte que repetía este mismo período: mismos totales, misma comparación
+   contra el año anterior, mismo desglose, misma serie de patrimonio.
+   Mantener dos destinos para el mismo dato es lo que hacía que la app se
+   sintiera dispersa. */
+.man-year {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+}
+.man-year-grid { display: grid; gap: 10px; grid-template-columns: 1fr 1fr; }
+.man-year-grid article {
+  background: var(--surface-2);
+  border-radius: 12px;
+  display: grid;
+  gap: 2px;
+  padding: 12px;
+}
+.man-year-grid small {
+  color: var(--text-dim);
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+.man-year-grid b { color: var(--text); font-size: 15px; font-weight: 800; }
+.man-year-grid span {
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+.man-year-grid .income { color: var(--income); }
+.man-year-grid .expense { color: var(--expense); }
+
+.man-year-sources { border-top: 1px solid var(--border); display: grid; gap: 8px; padding-top: 12px; }
+.man-year-sources-title {
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  margin: 0;
+  text-transform: uppercase;
+}
+.man-year-source { align-items: center; display: flex; gap: 9px; }
+.man-year-source-dot { border-radius: 50%; flex-shrink: 0; height: 8px; width: 8px; }
+.man-year-source-name {
+  color: var(--text);
+  flex: 1;
+  font-size: 13.5px;
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.man-year-source-amount {
+  color: var(--text);
+  font-size: 13.5px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
