@@ -1179,3 +1179,100 @@
     padding: 4px 16px calc(20px + env(safe-area-inset-bottom));
   }
 
+
+  /* ── Selector de divisa del movimiento (banderita) ────────
+     Vive junto a la etiqueta Gasto/Ingreso, sobre el selector de cuenta: es
+     una decisión del MISMO nivel que "en qué cuenta", no un ajuste escondido.
+     En su estado normal (divisa = la de la cuenta) es deliberadamente discreto;
+     solo se tiñe de acento cuando el movimiento va en otra divisa, que es
+     cuando el usuario necesita verlo. */
+  .mobile-create-amount-labelrow {
+    align-items: center;
+    display: flex;
+    gap: 8px;
+    min-width: 0;
+  }
+  .mobile-create-currency-flag {
+    align-items: center;
+    background: var(--m-surface-2, var(--track));
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    color: var(--m-muted);
+    display: inline-flex;
+    font-size: 11px;
+    font-weight: 850;
+    gap: 5px;
+    flex-shrink: 0;
+    letter-spacing: .04em;
+    padding: 3px 9px 3px 6px;
+    transition: background .14s, border-color .14s, color .14s;
+  }
+  .mobile-create-currency-flag:active { transform: scale(.96); }
+  .mobile-create-currency-flag.foreign {
+    background: color-mix(in oklab, var(--accent) 16%, transparent);
+    border-color: color-mix(in oklab, var(--accent) 42%, transparent);
+    color: var(--accent);
+  }
+  .mobile-create-currency-flag-emoji { font-size: 13px; line-height: 1; }
+  .mobile-create-currency-flag-code { font-variant-numeric: tabular-nums; }
+
+  /* Conversión en vivo bajo el monto: lo que se le cargará de verdad a la
+     cuenta, más la tasa que se va a congelar. Se muestra la tasa a propósito —
+     si el usuario no la ve al guardar, no puede cuestionarla después. */
+  .mobile-create-amount-converted {
+    color: var(--accent);
+    font-size: 11.5px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -.01em;
+    margin-top: 1px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mobile-create-amount-rate {
+    color: var(--m-muted);
+    font-weight: 700;
+  }
+
+  /* Desglose de cargos bancarios bajo el monto. Linea por linea CON su tasa:
+     un cargo que solo aparece sumado dentro del total es justo lo que hace que
+     un cobro bancario se sienta arbitrario. */
+  .mobile-create-fee-line {
+    color: var(--warn);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 750;
+    white-space: nowrap;
+  }
+  .mobile-create-fee-what { color: var(--m-muted); font-weight: 650; }
+  .mobile-create-fee-total {
+    color: var(--text);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 850;
+    margin-top: 2px;
+    white-space: nowrap;
+  }
+  .mobile-create-advance {
+    align-items: center;
+    align-self: flex-start;
+    background: var(--track);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    color: var(--m-muted);
+    display: inline-flex;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 750;
+    gap: 5px;
+    margin: 6px 0 0;
+    min-height: 32px;
+    padding: 0 12px;
+  }
+  .mobile-create-advance.on {
+    background: color-mix(in oklab, var(--warn) 16%, transparent);
+    border-color: color-mix(in oklab, var(--warn) 45%, transparent);
+    color: var(--warn);
+  }
+  .mobile-create-advance:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

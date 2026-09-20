@@ -1796,3 +1796,147 @@
   }
   .mqr-camera-error p { font-size: 14px; line-height: 1.5; margin: 0; max-width: 30ch; }
   .mqr-overwrite-warning { color: #f59e0b; font-size: 11.5px; line-height: 1.4; margin: 0; max-width: 34ch; }
+
+  /* ── Salud de datos ───────────────────────────────────── */
+  .mhealth-sheet {
+    background: var(--surface);
+    border-radius: 20px 20px 0 0;
+    display: grid;
+    gap: 12px;
+    max-height: 88vh;
+    overflow-y: auto;
+    padding: 14px 16px calc(28px + env(safe-area-inset-bottom, 0px));
+    width: 100%;
+  }
+  .mhealth-header { align-items: center; display: flex; justify-content: space-between; }
+  .mhealth-header > span { color: var(--text); font-size: 16px; font-weight: 850; }
+  .mhealth-header > button {
+    background: var(--track); border: 0; border-radius: 999px; color: var(--text-dim);
+    display: grid; height: 32px; place-items: center; width: 32px;
+  }
+
+  /* El veredicto primero: es la unica pregunta que el usuario vino a hacer. */
+  .mhealth-verdict {
+    align-items: center; border-radius: 14px; display: flex; gap: 12px; padding: 14px;
+  }
+  .mhealth-verdict.ok   { background: color-mix(in oklab, var(--income) 13%, transparent); color: var(--income); }
+  .mhealth-verdict.warn { background: color-mix(in oklab, var(--warn) 13%, transparent);   color: var(--warn); }
+  .mhealth-verdict svg { flex-shrink: 0; }
+  .mhealth-verdict strong { display: block; font-size: 15px; font-weight: 850; }
+  .mhealth-verdict small  { color: var(--text-dim); display: block; font-size: 12.5px; line-height: 17px; margin-top: 2px; }
+
+  .mhealth-drifts { display: grid; gap: 1px; }
+  .mhealth-drift {
+    align-items: center; background: var(--surface-2); border-radius: 12px;
+    display: flex; gap: 10px; padding: 10px 12px;
+  }
+  .mhealth-drift-dot { border-radius: 50%; flex-shrink: 0; height: 9px; width: 9px; }
+  .mhealth-drift-info { display: grid; flex: 1; gap: 1px; min-width: 0; }
+  .mhealth-drift-info strong { color: var(--text); font-size: 14px; font-weight: 750; }
+  .mhealth-drift-info small  { color: var(--text-dim); font-size: 11.5px; }
+  .mhealth-drift-amounts { display: grid; gap: 2px; justify-items: end; }
+  .mhealth-drift-amounts span {
+    font-size: 13px; font-variant-numeric: tabular-nums; font-weight: 800; white-space: nowrap;
+  }
+  .mhealth-drift-amounts .up   { color: var(--income); }
+  .mhealth-drift-amounts .down { color: var(--expense); }
+
+  .mhealth-formula {
+    align-items: flex-start; color: var(--text-dim); display: flex; font-size: 12.5px;
+    gap: 7px; line-height: 17px; margin: 0;
+  }
+  .mhealth-formula svg { flex-shrink: 0; margin-top: 2px; }
+
+  .mhealth-fix {
+    align-items: center; background: var(--accent); border: 0; border-radius: 14px;
+    color: #08201c; display: flex; font-family: inherit; font-size: 15px; font-weight: 850;
+    gap: 8px; justify-content: center; min-height: 48px;
+  }
+  .mhealth-fix:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .mhealth-safe { color: var(--text-dim); font-size: 12px; line-height: 16px; margin: -4px 0 0; text-align: center; }
+  .mhealth-result { color: var(--income); font-size: 13px; font-weight: 750; margin: 0; text-align: center; }
+
+  .mhealth-stats { border-top: 1px solid var(--border); display: grid; gap: 8px; grid-template-columns: repeat(3, 1fr); margin: 4px 0 0; padding-top: 12px; }
+  .mhealth-stats > div { display: grid; gap: 2px; }
+  .mhealth-stats dt { color: var(--text-dim); font-size: 10.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+  .mhealth-stats dd { color: var(--text); font-size: 16px; font-variant-numeric: tabular-nums; font-weight: 850; margin: 0; }
+  .mhealth-meta { color: var(--text-dim); font-size: 11.5px; margin: 0; }
+
+  /* ── Novedades ────────────────────────────────────────── */
+  .mnews-sheet {
+    background: var(--surface);
+    border-radius: 20px 20px 0 0;
+    display: grid;
+    gap: 14px;
+    max-height: 88vh;
+    overflow-y: auto;
+    padding: 14px 16px calc(28px + env(safe-area-inset-bottom, 0px));
+    width: 100%;
+  }
+  .mnews-header { align-items: center; display: flex; gap: 12px; justify-content: space-between; }
+  .mnews-header > span { color: var(--text); font-size: 16px; font-weight: 850; }
+  .mnews-header > button {
+    background: var(--track); border: 0; border-radius: 999px; color: var(--text-dim);
+    display: grid; flex-shrink: 0; height: 32px; place-items: center; width: 32px;
+  }
+  .mnews-intro { color: var(--text-dim); font-size: 13px; line-height: 18px; margin: -6px 0 0; }
+
+  .mnews-list { display: grid; gap: 20px; list-style: none; margin: 0; padding: 0; }
+  .mnews-entry { display: grid; gap: 6px; }
+  /* La version recien instalada se marca con un rail, no con un fondo: el
+     changelog tiene que seguir leyendose como un documento. */
+  .mnews-entry.current { border-left: 2px solid var(--accent); margin-left: -12px; padding-left: 12px; }
+  .mnews-entry-head { align-items: baseline; display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; }
+  .mnews-version {
+    align-items: center; color: var(--text); display: inline-flex; font-size: 15px;
+    font-variant-numeric: tabular-nums; font-weight: 850; gap: 6px;
+  }
+  .mnews-badge {
+    background: color-mix(in oklab, var(--accent) 18%, transparent);
+    border-radius: 999px; color: var(--accent); font-size: 9.5px; font-style: normal;
+    font-weight: 850; letter-spacing: .04em; padding: 1px 6px; text-transform: uppercase;
+  }
+  .mnews-date { color: var(--text-dim); font-size: 11.5px; font-weight: 600; }
+  .mnews-entry-title { color: var(--text); font-size: 14px; font-weight: 750; line-height: 19px; margin: 0; }
+  .mnews-items { color: var(--text-dim); display: grid; gap: 6px; margin: 2px 0 0; padding-left: 18px; }
+  .mnews-items li { font-size: 13px; line-height: 18px; }
+  .mnews-oldest { color: var(--text-dim); font-size: 11.5px; font-style: italic; margin: 8px 0 0; }
+  .mnews-done {
+    background: var(--accent); border: 0; border-radius: 14px; color: #08201c;
+    font-family: inherit; font-size: 15px; font-weight: 850; min-height: 48px;
+  }
+  .mnews-done:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* Filas de confianza en el Perfil */
+  .mpr-trust { display: grid; gap: 2px; }
+  .mpr-trust-row {
+    align-items: center; background: transparent; border: 0; border-radius: 12px;
+    cursor: pointer; display: flex; gap: 12px; min-height: 52px; padding: 8px 4px; text-align: left; width: 100%;
+  }
+  .mpr-trust-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .mpr-trust-icon { border-radius: 10px; display: grid; flex-shrink: 0; height: 36px; place-items: center; width: 36px; }
+  .mpr-trust-icon.health { background: color-mix(in oklab, var(--income) 16%, transparent); color: var(--income); }
+  .mpr-trust-icon.news   { background: color-mix(in oklab, var(--accent) 16%, transparent); color: var(--accent); }
+  .mpr-trust-info { display: grid; flex: 1; gap: 1px; min-width: 0; }
+  .mpr-trust-info b     { color: var(--text); font-size: 14.5px; font-weight: 750; }
+  .mpr-trust-info small { color: var(--text-dim); font-size: 12px; }
+
+  /* Estado del backup dentro de Salud de datos. Es la parte que de verdad
+     decide si se pierde todo: un saldo descuadrado se repara, un backup que
+     nunca corrio no se recupera. */
+  .mhealth-backup { border-radius: 14px; display: grid; gap: 8px; padding: 12px 14px; }
+  .mhealth-backup.ok   { background: color-mix(in oklab, var(--income) 11%, transparent); }
+  .mhealth-backup.warn { background: color-mix(in oklab, var(--expense) 12%, transparent); }
+  .mhealth-backup-head { align-items: center; display: flex; gap: 8px; }
+  .mhealth-backup.ok   .mhealth-backup-head { color: var(--income); }
+  .mhealth-backup.warn .mhealth-backup-head { color: var(--expense); }
+  .mhealth-backup-head strong { font-size: 14px; font-weight: 850; }
+  .mhealth-backup-state { color: var(--text); font-size: 12.5px; line-height: 17px; margin: 0; }
+  .mhealth-backup-action {
+    align-items: center; align-self: flex-start; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 999px; color: var(--text);
+    display: inline-flex; font-family: inherit; font-size: 13px; font-weight: 750;
+    gap: 6px; min-height: 36px; padding: 0 14px;
+  }
+  .mhealth-backup-action[disabled] { cursor: not-allowed; opacity: .5; }
+  .mhealth-backup-action:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

@@ -202,10 +202,14 @@
              no el del splash de la app.
              NOTA: este directorio se regenera con `tauri android init` — si eso
              ocurre, hay que volver a agregar este <activity>. -->
+        <!-- Sin `screenOrientation`: desde Android 16 la restriccion se ignora
+             en pantallas grandes (plegables, tablets), y declararla solo
+             provocaba un aviso en Play Console sin cambiar el comportamiento
+             real. El escaner se adapta a la orientacion del dispositivo. -->
         <activity
             android:name="com.sharky.finanzas.mlkitocr.ScannerActivity"
             android:exported="false"
-            android:screenOrientation="portrait"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
             android:theme="@style/Theme.MlkitScanner" />
 
         <!-- Plugin home-widget: widget de pantalla de inicio con saldo,

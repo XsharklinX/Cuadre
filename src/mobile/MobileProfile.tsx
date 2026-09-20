@@ -1,8 +1,11 @@
 import { useMemo, useRef, useState, type ChangeEvent } from 'react'
+import { APP_VERSION } from '@/data/release'
+import { MobileDataHealth } from './MobileDataHealth'
+import { MobileWhatsNew, shouldShowWhatsNew } from './MobileWhatsNew'
 import { Icon } from '@/components/ui/Icon'
 import { toast } from '@/components/ui/Toast'
 import { projectCashflow } from '@/data/cashflowProjection'
-import { accountBalanceInBase, availableBalanceInBase, localToday, visibleAccounts } from '@/data/helpers'
+import { accountBalanceInBase, accountCurrency, availableBalanceInBase, localToday, visibleAccounts } from '@/data/helpers'
 import { useFmt } from '@/hooks/useFmt'
 import { useT, type LangKey } from '@/i18n'
 import { AvatarCropper } from '@/components/AvatarCropper'
@@ -50,6 +53,11 @@ export function MobileProfile({
   const [editingName, setEditingName] = useState(false)
   const [nameInput, setNameInput] = useState(displayName || userName || '')
   const [photoMenuOpen, setPhotoMenuOpen] = useState(false)
+  const [healthOpen, setHealthOpen] = useState(false)
+  // Tras una actualizacion, las novedades se abren solas una vez. En una
+  // instalacion nueva NO: un changelog de cosas que nunca viste no dice nada.
+  const [autoNews] = useState(() => shouldShowWhatsNew())
+  const [newsOpen, setNewsOpen] = useState(autoNews)
   const [cropSource, setCropSource] = useState<File | string | null>(null)
 
   const effectiveName = displayName || userName || ''
@@ -248,6 +256,31 @@ export function MobileProfile({
         </button>
       </div>
 
+      {/* Confianza y novedades: dos cosas que el usuario busca en el Perfil,
+          no en Ajustes. "Salud de datos" estaba enterrada en Ajustes > Datos y
+          "Novedades" no existia aunque el historial de versiones si. */}
+      <div className="mpr-card mpr-trust">
+        <button className="mpr-trust-row" onClick={() => setHealthOpen(true)}>
+          <span className="mpr-trust-icon health"><Icon name="shield" size={18} /></span>
+          <div className="mpr-trust-info">
+            <b>{t('dataHealthTitle')}</b>
+            <small>{t('dataHealthRowHint')}</small>
+          </div>
+          <Icon name="arrowUp" size={13} className="mpr-inline-link-chevron" />
+        </button>
+        <button className="mpr-trust-row" onClick={() => setNewsOpen(true)}>
+          <span className="mpr-trust-icon news"><Icon name="star" size={18} /></span>
+          <div className="mpr-trust-info">
+            <b>{t('whatsNewTitle')}</b>
+            <small>{t('whatsNewRowHint').replace('{v}', APP_VERSION)}</small>
+          </div>
+          <Icon name="arrowUp" size={13} className="mpr-inline-link-chevron" />
+        </button>
+      </div>
+
+      {healthOpen && <MobileDataHealth onClose={() => setHealthOpen(false)} />}
+      {newsOpen && <MobileWhatsNew onClose={() => setNewsOpen(false)} highlightLatest={autoNews} />}
+
       <div className="mpr-card">
         <div className="mpr-card-header">
           <span>{t('accounts')}</span>
@@ -269,7 +302,7 @@ export function MobileProfile({
                     <b>{account.short || account.name}</b>
                     <small>{accountMeta(account, t)}</small>
                   </div>
-                  <strong>{fmtVal(account.balance, currency)}</strong>
+                  <strong>{fmtVal(account.balance, accountCurrency(account, currency))}</strong>
                 </button>
               ))}
             </div>

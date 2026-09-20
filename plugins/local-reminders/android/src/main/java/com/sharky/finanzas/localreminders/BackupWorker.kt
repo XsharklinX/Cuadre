@@ -33,6 +33,19 @@ internal const val BACKUP_MIME = "application/json"
 /** Margen para no re-ejecutar dentro de la misma semana aunque el worker despierte varias veces. */
 private const val MIN_INTERVAL_MS = 6L * 24 * 60 * 60 * 1000
 
+/**
+ * Pasado este tiempo sin backup exitoso, se copia EN LA PRIMERA oportunidad,
+ * sin esperar al dia elegido.
+ *
+ * El dia/hora del usuario es una PREFERENCIA, no una condicion. Antes era una
+ * condicion: el worker solo copiaba si hoy era exactamente el dia elegido. Como
+ * WorkManager despierta con deriva y Doze agrupa las ejecuciones, si se perdian
+ * todas las ventanas de ese dia se saltaba la SEMANA ENTERA en silencio, y la
+ * siguiente oportunidad era 7 dias despues. Con datos financieros eso es una
+ * perdida real.
+ */
+private const val OVERDUE_MS = 8L * 24 * 60 * 60 * 1000
+
 class BackupWorker(appContext: Context, params: WorkerParameters) : CoroutineWorker(appContext, params) {
 
     override suspend fun doWork(): Result {
@@ -40,14 +53,25 @@ class BackupWorker(appContext: Context, params: WorkerParameters) : CoroutineWor
         val destUri = prefs.getString(BACKUP_DEST_URI_KEY, null)
             ?: return Result.success() // Sin carpeta elegida todavia: nada que hacer.
 
-        // Solo el dia/hora que el usuario configuro, y no mas de una vez por semana.
         val now = Calendar.getInstance()
         val targetDay = prefs.getInt(BACKUP_DAY_KEY, Calendar.MONDAY - 1)
         val targetHour = prefs.getInt(BACKUP_HOUR_KEY, 3)
-        if ((now.get(Calendar.DAY_OF_WEEK) - 1) != targetDay) return Result.success()
-        if (now.get(Calendar.HOUR_OF_DAY) < targetHour) return Result.success()
         val lastSuccess = prefs.getLong(BACKUP_LAST_SUCCESS_KEY, 0L)
-        if (System.currentTimeMillis() - lastSuccess < MIN_INTERVAL_MS) return Result.success()
+        val elapsed = System.currentTimeMillis() - lastSuccess
+
+        // Nunca dos veces en la misma ventana semanal.
+        if (elapsed < MIN_INTERVAL_MS) return Result.success()
+
+        // VENCIDO: se copia ya, caiga el dia que caiga. Es la red de seguridad
+        // que evita perder una semana entera por no haber despertado el dia
+        // exacto. Un backup un dia tarde es infinitamente mejor que ninguno.
+        val overdue = lastSuccess == 0L || elapsed >= OVERDUE_MS
+
+        if (!overdue) {
+            // Camino normal: el dia y la hora que el usuario prefiere.
+            if ((now.get(Calendar.DAY_OF_WEEK) - 1) != targetDay) return Result.success()
+            if (now.get(Calendar.HOUR_OF_DAY) < targetHour) return Result.success()
+        }
 
         // Un backup fallido no debe reintentarse en bucle: se registra el error y
         // se reintenta en la proxima ventana semanal.

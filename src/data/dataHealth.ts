@@ -1,5 +1,5 @@
 import { listRecoverySnapshots } from './recovery'
-import { accountMovementsTotal } from './helpers'
+import { accountMovementsTotal, accountSecondaryMovementsTotal } from './helpers'
 import { isSessionStoredInPlaintext } from '@/lib/secureAuthStorage'
 import type { FinanceState } from '@/store/finance'
 
@@ -16,6 +16,7 @@ export interface DataHealthStatus {
   riskLevel: 'ok' | 'warning'
   warnings: string[]
   driftedAccounts: number
+  driftedSecondary: number
   driftedGoals: number
   sessionStoredInPlaintext: boolean
 }
@@ -39,6 +40,17 @@ export function getDataHealthStatus(state: FinanceState, userId?: string): DataH
     return Math.abs(expected - account.balance) > 0.005 ? n + 1 : n
   }, 0)
   if (driftedAccounts > 0) warnings.push(`${driftedAccounts} cuenta(s) con saldo descuadrado.`)
+
+  // Deriva del SEGUNDO libro de una tarjeta. Se cuenta aparte: una tarjeta
+  // cuyo saldo en dolares derivo pero el de pesos no, tambien esta rota, y
+  // antes no habia forma de verlo.
+  const driftedSecondary = state.accounts.reduce((n, account) => {
+    if (account.type !== 'credit' || !account.secondaryCurrency) return n
+    if (account.secondaryOpeningBalance === undefined) return n
+    const expected = account.secondaryOpeningBalance + accountSecondaryMovementsTotal(account.id, state.transactions)
+    return Math.abs(expected - (account.secondaryBalance ?? 0)) > 0.005 ? n + 1 : n
+  }, 0)
+  if (driftedSecondary > 0) warnings.push(`${driftedSecondary} tarjeta(s) con el saldo en divisa extranjera descuadrado.`)
 
   // Deriva de metas: el ahorro guardado no coincide con apertura + aportes.
   const driftedGoals = state.goals.reduce((n, goal) => {
@@ -70,6 +82,7 @@ export function getDataHealthStatus(state: FinanceState, userId?: string): DataH
     riskLevel: warnings.length ? 'warning' : 'ok',
     warnings,
     driftedAccounts,
+    driftedSecondary,
     driftedGoals,
     sessionStoredInPlaintext,
   }

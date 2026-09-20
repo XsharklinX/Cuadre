@@ -3,7 +3,8 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import { makeDemo, makeEmpty, newId, CURRENCIES } from '@/data/seed'
 import { learnCategoryRule } from '@/data/bankCsv'
 import { convertCurrency } from '@/data/currencies'
-import { accountMovementsTotal, localToday } from '@/data/helpers'
+import { creditUsedInPrimary } from '@/data/creditCard'
+import { accountMovementsTotal, accountSecondaryMovementsTotal, localToday } from '@/data/helpers'
 import { validateEnvelopeTransfer } from '@/data/envelopes'
 import { createRecoverySnapshot } from '@/data/recovery'
 import { tt } from '@/i18n'
@@ -53,6 +54,42 @@ export function sanitizeFinanceData(value: unknown): FinanceData {
     .map(account => account.currency && !CURRENCY_CODES.includes(account.currency)
       ? { ...account, currency: undefined }
       : account)
+    .map((account): Account => {
+      // Campos de tarjeta de crédito: solo válidos en cuentas de crédito, y
+      // cada uno dentro de su rango real. Un `statementDay: 45` o un `apr`
+      // negativo no se "corrigen" a un valor plausible — se borran, porque un
+      // dato financiero inventado es peor que un dato ausente.
+      if (account.type !== 'credit') {
+        const { secondaryCurrency, secondaryBalance, secondaryOpeningBalance,
+          statementDay, paymentDay, apr, minPaymentPct, minPaymentFloor, ...rest } = account
+        const hadCreditFields = secondaryCurrency !== undefined || statementDay !== undefined
+          || paymentDay !== undefined || apr !== undefined || minPaymentPct !== undefined
+          || secondaryBalance !== undefined || secondaryOpeningBalance !== undefined
+          || minPaymentFloor !== undefined
+        return hadCreditFields ? rest : account
+      }
+      const next: Account = { ...account }
+      // El segundo saldo va con su divisa o no va: un monto sin divisa no se
+      // puede ni mostrar ni convertir.
+      const secondaryOk = !!next.secondaryCurrency
+        && CURRENCY_CODES.includes(next.secondaryCurrency)
+        && next.secondaryCurrency !== (next.currency ?? data.currency ?? 'DOP')
+      if (!secondaryOk) {
+        next.secondaryCurrency = undefined
+        next.secondaryBalance = undefined
+        next.secondaryOpeningBalance = undefined
+      } else if (!amount(next.secondaryBalance)) {
+        next.secondaryBalance = 0
+      }
+      const day = (n: unknown) => Number.isInteger(n) && (n as number) >= 1 && (n as number) <= 31
+      if (!day(next.statementDay)) next.statementDay = undefined
+      if (!day(next.paymentDay)) next.paymentDay = undefined
+      // Tasa: por encima de 200% anual es casi seguro un dato mal tecleado.
+      if (!amount(next.apr) || next.apr! <= 0 || next.apr! > 200) next.apr = undefined
+      if (!amount(next.minPaymentPct) || next.minPaymentPct! <= 0 || next.minPaymentPct! > 100) next.minPaymentPct = undefined
+      if (!amount(next.minPaymentFloor) || next.minPaymentFloor! < 0) next.minPaymentFloor = undefined
+      return next
+    })
   const accountIds = new Set(accounts.map(account => account.id))
   const categories = (Array.isArray(data.categories) ? data.categories : []).filter(category =>
     text(category.id) && text(category.name) && /\p{L}/u.test(category.name) && text(category.color)
@@ -80,6 +117,34 @@ export function sanitizeFinanceData(value: unknown): FinanceData {
     // toAmount: solo válido en transferencias, como número positivo.
     if (tx.toAmount !== undefined && (tx.type !== 'transfer' || !amount(tx.toAmount) || tx.toAmount <= 0)) {
       tx = { ...tx, toAmount: undefined }
+    }
+    // Trío FX: o están los tres campos válidos, o se van los tres. Un backup
+    // manipulado con `fxRate: 0`/NaN corrompería el monto mostrado al usuario.
+    const fxOk = tx.originalAmount !== undefined && amount(tx.originalAmount) && tx.originalAmount > 0
+      && CURRENCY_CODES.includes(tx.originalCurrency ?? '')
+      && tx.fxRate !== undefined && amount(tx.fxRate) && tx.fxRate > 0
+    if (!fxOk && (tx.originalAmount !== undefined || tx.originalCurrency !== undefined || tx.fxRate !== undefined)) {
+      tx = { ...tx, originalAmount: undefined, originalCurrency: undefined, fxRate: undefined }
+    }
+    // El marcador de segundo libro solo vale sobre una TARJETA que de verdad
+    // tenga divisa secundaria. Un backup con el marcador sobre una cuenta de
+    // debito enviaria el gasto a un saldo que no existe y el dinero
+    // desapareceria del libro.
+    if (tx.onSecondaryBalance) {
+      const target = accounts.find(a => a.id === tx.accountId)
+      const valid = tx.type !== 'transfer' && target?.type === 'credit' && !!target.secondaryCurrency
+      if (!valid) tx = { ...tx, onSecondaryBalance: undefined }
+    }
+    // Cargos bancarios: cada linea con tipo conocido y monto positivo, y el
+    // total NUNCA puede superar al monto del movimiento (que ya los incluye).
+    // Un desglose que suma mas que el total mentiria sobre la compra.
+    if (tx.fees !== undefined) {
+      const kinds = ['itbis-transfer', 'fx-surcharge', 'cash-advance']
+      const clean = Array.isArray(tx.fees)
+        ? tx.fees.filter(f => f && kinds.includes(f.kind) && amount(f.amount) && f.amount > 0 && amount(f.pct))
+        : []
+      const sum = clean.reduce((t, f) => t + f.amount, 0)
+      tx = { ...tx, fees: clean.length > 0 && sum <= tx.amount + 0.01 ? clean : undefined }
     }
     // Splits: solo válidos si cada parte apunta a una categoría existente con
     // monto positivo y la suma coincide con el total (tolerancia de centavos).
@@ -119,7 +184,17 @@ export function recomputeAccountBalances(
   return accounts.map(account => {
     const opening = account.openingBalance ?? account.balance - accountMovementsTotal(account.id, txns, contributions)
     const balance = opening + accountMovementsTotal(account.id, txns, contributions)
-    return { ...account, openingBalance: opening, balance }
+    const next = { ...account, openingBalance: opening, balance }
+    // El segundo libro se reconcilia con la MISMA invariante que el primero.
+    // Si no se reconstruyera aqui, "Recalcular saldos" arreglaria un libro y
+    // dejaria el otro derivando en silencio.
+    if (account.type === 'credit' && account.secondaryCurrency) {
+      const moves = accountSecondaryMovementsTotal(account.id, txns)
+      const opening2 = account.secondaryOpeningBalance ?? (account.secondaryBalance ?? 0) - moves
+      next.secondaryOpeningBalance = opening2
+      next.secondaryBalance = opening2 + moves
+    }
+    return next
   })
 }
 
@@ -213,6 +288,14 @@ function applyBalance(accounts: Account[], tx: Transaction, sign: 1 | -1): Accou
   }
   return accounts.map(a => {
     if (a.id !== tx.accountId) return a
+    // Segundo libro de una tarjeta: el monto ya esta en la divisa secundaria,
+    // no se convierte, y el saldo principal no se toca.
+    if (tx.onSecondaryBalance) {
+      const current = a.secondaryBalance ?? 0
+      if (tx.type === 'income')  return { ...a, secondaryBalance: current + sign * tx.amount }
+      if (tx.type === 'expense') return { ...a, secondaryBalance: current - sign * tx.amount }
+      return a
+    }
     if (tx.type === 'income')  return { ...a, balance: a.balance + sign * tx.amount }
     if (tx.type === 'expense') return { ...a, balance: a.balance - sign * tx.amount }
     return a
@@ -255,7 +338,13 @@ function normalizeTransaction(tx: Transaction): Transaction {
   const {
     id, type, amount, date, note, categoryId, accountId, splits,
     recurring, recurringStart, recurringEnd, recurringNext, skippedDates, serviceId, generatedFrom, tags,
+    detectedFrom, originalAmount, originalCurrency, fxRate, onSecondaryBalance, fees,
   } = tx
+  // Los 3 campos FX viajan JUNTOS o no viajan: un `originalAmount` sin su
+  // `fxRate` no se puede auditar ni volver a explicar, así que se descarta el
+  // trío entero antes que guardar una conversión a medias.
+  const hasFx = originalAmount !== undefined && Number.isFinite(originalAmount) && originalAmount > 0
+    && !!originalCurrency && fxRate !== undefined && Number.isFinite(fxRate) && fxRate > 0
   return {
     id, type, amount, date, note, categoryId, accountId,
     ...(type === 'expense' && splits && splits.length >= 2 ? { splits } : {}),
@@ -263,6 +352,10 @@ function normalizeTransaction(tx: Transaction): Transaction {
     ...(recurring && serviceId ? { serviceId } : {}),
     ...(!recurring && generatedFrom ? { generatedFrom } : {}),
     ...(tags?.length ? { tags } : {}),
+    ...(detectedFrom ? { detectedFrom } : {}),
+    ...(hasFx ? { originalAmount, originalCurrency, fxRate } : {}),
+    ...(onSecondaryBalance ? { onSecondaryBalance: true } : {}),
+    ...(fees?.length ? { fees } : {}),
   }
 }
 
@@ -281,12 +374,16 @@ function withCrossCurrencyAmount(tx: Transaction, accounts: Account[], base: Cur
   return { ...tx, toAmount: convertCurrency(tx.amount, fromCur, toCur) }
 }
 
-export function assertAvailableBalance(accounts: Account[], accountId: string, amount: number): void {
+export function assertAvailableBalance(accounts: Account[], accountId: string, amount: number, base: CurrencyCode = 'DOP'): void {
   const account = accounts.find(a => a.id === accountId)
   if (!account) throw new Error(tt('errAccountNotExist'))
   if (!Number.isFinite(amount) || amount <= 0) throw new Error(tt('errAmountPositive'))
   if (account.type === 'credit') {
-    if (account.limit !== undefined && account.balance - amount < -account.limit)
+    // El límite lo consumen las DOS deudas de la tarjeta. Medirlo solo contra
+    // el saldo local dejaría pasar un gasto en una tarjeta que ya está al tope
+    // por su deuda en dólares.
+    if (account.limit !== undefined
+      && creditUsedInPrimary(account, base) + amount > account.limit)
       throw new Error(tt('errCreditLimitExceeded', { name: account.name }))
     return
   }
@@ -301,11 +398,11 @@ export function canDeleteCategory(categoryId: string, txns: Transaction[]): bool
   return !txns.some(tx => tx.categoryId === categoryId)
 }
 
-function assertManualExpenseBalance(accounts: Account[], tx: Transaction, policy = useSettings.getState().overdraftPolicy): void {
+function assertManualExpenseBalance(accounts: Account[], tx: Transaction, policy = useSettings.getState().overdraftPolicy, base: CurrencyCode = 'DOP'): void {
   if (tx.type !== 'expense' || !tx.accountId) return
   const accountPolicy = accounts.find(account => account.id === tx.accountId)?.overdraftPolicy ?? policy
   if (accountPolicy !== 'block') return
-  assertAvailableBalance(accounts, tx.accountId, tx.amount)
+  assertAvailableBalance(accounts, tx.accountId, tx.amount, base)
 }
 
 export function applyImportedBalances(accounts: Account[], txs: Transaction[], policy: OverdraftPolicy): Account[] {
@@ -403,8 +500,8 @@ export const useFinance = create<FinanceState>()(
         const full: Transaction = withCrossCurrencyAmount(
           normalizeTransaction({ id: newId(), ...tx } as Transaction), s.accounts, s.currency)
         assertTransactionShape(full, s.accounts, s.categories)
-        if (full.type === 'transfer') assertAvailableBalance(s.accounts, full.fromAccount!, full.amount)
-        assertManualExpenseBalance(s.accounts, full)
+        if (full.type === 'transfer') assertAvailableBalance(s.accounts, full.fromAccount!, full.amount, s.currency)
+        assertManualExpenseBalance(s.accounts, full, undefined, s.currency)
         if (full.type !== 'transfer' && full.categoryId) learnCategoryRule(full.note, full.categoryId)
         return {
           transactions: sortTxns([full, ...s.transactions]),
@@ -437,8 +534,8 @@ export const useFinance = create<FinanceState>()(
         }
         assertTransactionShape(next, s.accounts, s.categories)
         const reverted = applyBalance(s.accounts, old, -1)
-        if (next.type === 'transfer') assertAvailableBalance(reverted, next.fromAccount!, next.amount)
-        assertManualExpenseBalance(reverted, next)
+        if (next.type === 'transfer') assertAvailableBalance(reverted, next.fromAccount!, next.amount, s.currency)
+        assertManualExpenseBalance(reverted, next, undefined, s.currency)
         if (next.type !== 'transfer' && next.categoryId && next.categoryId !== old.categoryId) {
           learnCategoryRule(next.note, next.categoryId)
         }
@@ -459,7 +556,7 @@ export const useFinance = create<FinanceState>()(
 
       transfer: ({ fromAccount, toAccount, amount, date, note }) => set(s => {
         if (fromAccount === toAccount) throw new Error(tt('errSameAccount'))
-        assertAvailableBalance(s.accounts, fromAccount, amount)
+        assertAvailableBalance(s.accounts, fromAccount, amount, s.currency)
         if (!s.accounts.some(a => a.id === toAccount)) throw new Error(tt('errDestAccountNotExist'))
         const tx: Transaction = withCrossCurrencyAmount({
           id: newId(), type: 'transfer',
@@ -612,7 +709,7 @@ export const useFinance = create<FinanceState>()(
       }),
 
       contribute: (goalId, amount, fromAccountId, note, date) => set(s => {
-        assertAvailableBalance(s.accounts, fromAccountId, amount)
+        assertAvailableBalance(s.accounts, fromAccountId, amount, s.currency)
         if (!s.goals.some(g => g.id === goalId)) throw new Error(tt('errGoalNotExist'))
         const contribution: GoalContribution = {
           id: newId('contrib_'),
@@ -731,8 +828,13 @@ export const useFinance = create<FinanceState>()(
         const { accounts, transactions, goals, goalContributions } = get()
         const recomputedAccounts = recomputeAccountBalances(accounts, transactions, goalContributions)
         const recomputedGoals = recomputeGoalsSaved(goals, goalContributions)
-        const driftedAccounts = recomputedAccounts.reduce((n, account, i) =>
-          Math.abs(account.balance - accounts[i].balance) > 0.005 ? n + 1 : n, 0)
+        // Cuenta la deriva de AMBOS libros: una tarjeta cuyo saldo en dolares
+        // derivo pero el de pesos no, tambien esta rota.
+        const driftedAccounts = recomputedAccounts.reduce((n, account, i) => {
+          const primary = Math.abs(account.balance - accounts[i].balance) > 0.005
+          const secondary = Math.abs((account.secondaryBalance ?? 0) - (accounts[i].secondaryBalance ?? 0)) > 0.005
+          return primary || secondary ? n + 1 : n
+        }, 0)
         const driftedGoals = recomputedGoals.reduce((n, goal, i) =>
           Math.abs(goal.saved - goals[i].saved) > 0.005 ? n + 1 : n, 0)
         set({ accounts: recomputedAccounts, goals: recomputedGoals })

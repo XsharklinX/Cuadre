@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Icon } from '@/components/ui/Icon'
-import { dateLocale, fmtCompact, txForMonth } from '@/data/helpers'
+import { dateLocale, fmtCompact, transactionsForTotals, txForMonth } from '@/data/helpers'
 import { advanceRecurrenceDate, firstRecurrenceDate } from '@/hooks/useRecurring'
 import { useFinance } from '@/store/finance'
 import { useSettings } from '@/store/settings'
@@ -40,7 +40,7 @@ export function MobileCalendar({
   onEditTx: (tx: Transaction) => void
   onDeleteTx?: (id: string) => void
 }) {
-  const { transactions, categories, currency } = useFinance()
+  const { transactions, categories, accounts, currency } = useFinance()
   const t = useT()
   const lang = (useSettings(s => s.language) ?? 'es') as 'en' | 'es'
   const locale = dateLocale(lang)
@@ -63,7 +63,9 @@ export function MobileCalendar({
   // al tocar un día). Memoizados sobre [transactions, mk] para no barrer todas
   // las transacciones cada vez que solo cambia la selección.
   const { byDay, monthIncome, monthExpense } = useMemo(() => {
-    const monthTx = txForMonth(transactions, mk)
+    // Los montos se convierten a la divisa base ANTES de sumar: sin esto un
+    // gasto de US$25 contaba como 25 PESOS en el total del dia y del mes.
+    const monthTx = txForMonth(transactionsForTotals(transactions, accounts, currency), mk)
     const grouped = monthTx.reduce<Record<number, Transaction[]>>((acc, tx) => {
       const d = Number(tx.date.slice(8, 10))
       ;(acc[d] ??= []).push(tx)
@@ -75,7 +77,7 @@ export function MobileCalendar({
       else if (tx.type === 'expense') exp += tx.amount
     }
     return { byDay: grouped, monthIncome: inc, monthExpense: exp }
-  }, [transactions, mk])
+  }, [transactions, accounts, currency, mk])
 
   // Cobros PREVISTOS del mes: ocurrencias futuras de los pagos recurrentes que
   // caen en el mes mostrado. Es lo que faltaba — el calendario ahora mira hacia

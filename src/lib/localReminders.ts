@@ -1,3 +1,4 @@
+import { tt } from '@/i18n'
 import { isTauri } from '@/hooks/useTauri'
 import { useFinance } from '@/store/finance'
 import { useSettings } from '@/store/settings'
@@ -148,6 +149,28 @@ function buildReminderSnapshot(): string {
   return JSON.stringify({
     dismissedAlerts,
     lastTransactionDate,
+    // Los TEXTOS viajan ya traducidos al worker. Antes estaban escritos en
+    // espanol dentro del Kotlin, asi que un usuario en ingles recibia sus
+    // notificaciones en espanol. El worker solo sustituye los {placeholders}.
+    strings: {
+      budgetOverTitle:    tt('notifBudgetOverTitle'),
+      budgetOverText:     tt('notifBudgetOverText'),
+      budgetNearTitle:    tt('notifBudgetNearTitle'),
+      budgetNearText:     tt('notifBudgetNearText'),
+      recurringTodayTitle: tt('notifRecurringTodayTitle'),
+      recurringSoonTitle: tt('notifRecurringSoonTitle'),
+      recurringText:      tt('notifRecurringText'),
+      lowFundsTitle:      tt('notifLowFundsTitle'),
+      lowFundsText:       tt('notifLowFundsText'),
+      goalTitle:          tt('notifGoalTitle'),
+      goalText:           tt('notifGoalText'),
+      weeklyTitle:        tt('notifWeeklyTitle'),
+      fxTitle:            tt('notifFxTitle'),
+      fxText:             tt('notifFxText'),
+      anomalyTitle:       tt('notifAnomalyTitle'),
+      anomalyText:        tt('notifAnomalyText'),
+      today:              tt('notifToday'),
+    },
     categories: categoriesSnapshot,
     recurring: recurringSnapshot,
     goals: goalsSnapshot,

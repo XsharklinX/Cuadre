@@ -2,9 +2,10 @@ import { useMemo, useState } from 'react'
 import { Icon } from '@/components/ui/Icon'
 import { toast } from '@/components/ui/Toast'
 import { dateLocale, fmt } from '@/data/helpers'
-import { useFinance } from '@/store/finance'
 import { useSettings } from '@/store/settings'
 import { useFmt } from '@/hooks/useFmt'
+import { useFinance } from '@/store/finance'
+import { creditCardsAsDebts } from '@/data/creditCard'
 import { useDebt, simulatePayoff, debtProgress, monthlyPaymentPlan, payoffTargetId, freedomDate, type Debt, type PayoffMethod } from '@/store/debt'
 import { playConfirmSound, playDeleteSound, playSuccessHaptic } from '@/lib/sound'
 import { deleteWithUndo } from '@/lib/undoDelete'
@@ -22,7 +23,23 @@ export function MobileDebt() {
   const fmtVal = useFmt()
   const t = useT()
   const lang = useSettings(s => s.language)
-  const { debts, extraPayment, addDebt, updateDebt, deleteDebt, restoreDebt, registerPayment, setExtraPayment } = useDebt()
+  const { debts: manualDebts, extraPayment, addDebt, updateDebt, deleteDebt, restoreDebt, registerPayment, setExtraPayment } = useDebt()
+  const accounts = useFinance(s => s.accounts)
+  const baseCurrency = useFinance(s => s.currency)
+
+  // Las tarjetas de credito entran al simulador como deudas derivadas. Antes,
+  // `store/debt.ts` y las cuentas de credito eran dos silos que no se hablaban:
+  // habia un motor de snowball/avalanche completo que no podia leer ni una
+  // tarjeta, y el usuario tenia que teclear su deuda dos veces.
+  const cardDebts = useMemo(
+    () => creditCardsAsDebts(accounts, baseCurrency),
+    [accounts, baseCurrency],
+  )
+  // Las derivadas van primero: son las que el usuario ya no mantiene a mano.
+  const debts = useMemo(() => [...cardDebts, ...manualDebts], [cardDebts, manualDebts])
+  // Una deuda derivada de una tarjeta NO se edita ni se borra aqui: su fuente
+  // de verdad es la cuenta. Se cambia en la cuenta, no en esta pantalla.
+  const isDerived = (id: string) => id.startsWith('card:')
   const [method, setMethod] = useState<PayoffMethod>('avalanche')
   const [editing, setEditing] = useState<Debt | 'new' | null>(null)
   const [paying, setPaying] = useState<Debt | null>(null)
@@ -161,19 +178,32 @@ export function MobileDebt() {
           const prog = Math.round(debtProgress(debt) * 100)
           return (
             <div key={debt.id} className={`mdebt-debt${debt.id === targetId ? ' target' : ''}`}>
-              <button className="mdebt-debt-main" onClick={() => setEditing(debt)}>
+              <button
+                className="mdebt-debt-main"
+                onClick={() => { if (!isDerived(debt.id)) setEditing(debt) }}
+                disabled={isDerived(debt.id)}
+              >
                 <div className="mdebt-debt-top">
                   <span className="mdebt-row-dot" style={{ background: debt.color }} />
                   <b>{debt.name}</b>
+                  {isDerived(debt.id) && <span className="mdebt-card-badge">{t('fromCardBadge')}</span>}
                   <span className="mdebt-debt-rate">{debt.rate}%</span>
                   <strong>{fmtVal(debt.balance, currency)}</strong>
                 </div>
                 <div className="mdebt-debt-bar"><i style={{ width: `${Math.max(2, prog)}%`, background: debt.color }} /></div>
-                <div className="mdebt-debt-sub">{t('paidOfOriginal').replace('{pct}', String(prog))}</div>
+                <div className="mdebt-debt-sub">
+                  {isDerived(debt.id)
+                    ? t('editOnAccountHint')
+                    : t('paidOfOriginal').replace('{pct}', String(prog))}
+                </div>
               </button>
-              <button className="mdebt-debt-pay" onClick={() => setPaying(debt)} aria-label={t('registerPaymentLabel')}>
-                <Icon name="check" size={15} /> {t('payLabel')}
-              </button>
+              {/* Una tarjeta se "paga" registrando una transferencia real hacia
+                  ella, no tocando un numero aqui: su saldo sale del libro. */}
+              {!isDerived(debt.id) && (
+                <button className="mdebt-debt-pay" onClick={() => setPaying(debt)} aria-label={t('registerPaymentLabel')}>
+                  <Icon name="check" size={15} /> {t('payLabel')}
+                </button>
+              )}
             </div>
           )
         })}

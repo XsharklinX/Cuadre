@@ -1,3 +1,4 @@
+import { CURRENCIES as CURRENCY_UNITS } from './seed'
 import type { CurrencyCode } from '@/types'
 
 export interface CurrencyMeta {
@@ -39,4 +40,39 @@ export function fmtConversion(amount: number, from: CurrencyCode, to: CurrencyCo
   if (result >= 1_000_000) return `${meta.symbol}${(result / 1_000_000).toFixed(1)}M`
   if (result >= 1_000)     return `${meta.symbol}${(result / 1_000).toFixed(1)}k`
   return `${meta.symbol}${result.toFixed(2)}`
+}
+
+/**
+ * Lo que hay que apuntarle a un movimiento tecleado en una divisa distinta a
+ * la de su cuenta. Devuelve el `amount` YA convertido a la divisa de la cuenta
+ * (la fuente de verdad del libro) más el trío de auditoría con la tasa
+ * CONGELADA en este instante.
+ *
+ * Si ambas divisas coinciden no hay nada que recordar: devuelve solo el monto,
+ * sin campos FX, para no ensuciar el 99% de los movimientos normales.
+ */
+export interface ConvertedEntry {
+  amount:            number
+  originalAmount?:   number
+  originalCurrency?: CurrencyCode
+  fxRate?:           number
+}
+
+export function entryInAccountCurrency(
+  typedAmount: number,
+  typedCurrency: CurrencyCode,
+  accountCur: CurrencyCode,
+): ConvertedEntry {
+  if (typedCurrency === accountCur) return { amount: typedAmount }
+  // La tasa se saca de una unidad, no del monto: así queda el factor puro que
+  // se guarda y permite reconstruir la conversión (monto = original × fxRate).
+  const fxRate = convertCurrency(1, typedCurrency, accountCur)
+  const decimals = CURRENCY_UNITS[accountCur]?.decimals ?? 2
+  const factor = 10 ** decimals
+  return {
+    amount: Math.round(typedAmount * fxRate * factor) / factor,
+    originalAmount: typedAmount,
+    originalCurrency: typedCurrency,
+    fxRate,
+  }
 }

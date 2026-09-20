@@ -81,3 +81,91 @@
   .macc-recent-list { border-radius: 14px; overflow: hidden; }
   .macc-recent-list .mobile-tx-row:last-child { border-bottom: 0; }
   .macc-empty { color: var(--m-muted); font-size: 13px; padding: 8px 0; text-align: center; }
+
+  /* ── Tarjeta de credito: doble saldo, ciclo y aviso de interes ──
+     Todo en tokens: este bloque reemplaza los hex sueltos (#ff6b8a, #f59e0b,
+     #35d0a2) que tenia la barra de utilizacion, para que sobreviva al
+     rediseno de paleta. */
+
+  /* Los dos saldos a peso IGUAL: columnas iguales, mismo tamano. Una tarjeta
+     dominicana arrastra dos deudas reales y ninguna es secundaria. */
+  .macc-dual {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: 1fr 1fr;
+    margin-top: 12px;
+  }
+  .macc-dual-cell {
+    background: var(--surface-2);
+    border-radius: 12px;
+    display: grid;
+    gap: 2px;
+    padding: 10px 12px;
+  }
+  .macc-dual-label {
+    align-items: center;
+    color: var(--text-dim);
+    display: flex;
+    font-size: 11px;
+    font-weight: 800;
+    gap: 4px;
+    letter-spacing: .07em;
+  }
+  .macc-dual-cell strong {
+    font-size: 18px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 800;
+  }
+  .macc-dual-debt { color: var(--expense); }
+  .macc-dual-zero { color: var(--text-dim); }
+
+  /* Tramos de utilizacion por riesgo crediticio, no por estetica: pasar del
+     30% ya golpea el score, mucho antes de acercarse al limite. */
+  .macc-util-fill { border-radius: inherit; height: 100%; transition: width .2s; }
+  .macc-util-fill.band-ok    { background: var(--income); }
+  .macc-util-fill.band-watch { background: var(--warn); }
+  .macc-util-fill.band-high  { background: var(--expense); }
+
+  .macc-cycle {
+    border-top: 1px solid var(--border);
+    display: grid;
+    gap: 10px;
+    grid-template-columns: repeat(3, 1fr);
+    margin: 14px 0 0;
+    padding-top: 12px;
+  }
+  .macc-cycle > div { display: grid; gap: 2px; min-width: 0; }
+  .macc-cycle dt {
+    color: var(--text-dim);
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: .07em;
+  }
+  .macc-cycle dd {
+    color: var(--text);
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 750;
+    margin: 0;
+  }
+  /* Ambar, no rojo: rojo es dinero que ya salio, no una fecha que se acerca. */
+  .macc-cycle dd.urgent { color: var(--warn); }
+
+  .macc-interest-warn {
+    align-items: flex-start;
+    background: color-mix(in oklab, var(--warn) 13%, transparent);
+    border-radius: 12px;
+    color: var(--warn);
+    display: flex;
+    font-size: 12.5px;
+    font-weight: 700;
+    gap: 8px;
+    line-height: 17px;
+    margin: 12px 0 0;
+    padding: 10px 12px;
+  }
+  .macc-interest-warn svg { flex-shrink: 0; margin-top: 1px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .macc-util-fill { transition-duration: 0ms; }
+  }

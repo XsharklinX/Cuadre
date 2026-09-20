@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Area, AreaChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Icon } from '@/components/ui/Icon'
 import { projectCashflow, safeToSpend } from '@/data/cashflowProjection'
-import { currentMonthKey, dateLocale, fmtCompact, localToday, txForMonth } from '@/data/helpers'
+import { currentMonthKey, dateLocale, fmtCompact, localToday, transactionsForTotals, txForMonth } from '@/data/helpers'
 import { useFinance } from '@/store/finance'
 import { useSettings } from '@/store/settings'
 import { useFmt } from '@/hooks/useFmt'
@@ -69,7 +69,9 @@ export function MobileCashflow() {
   // ritmo de este mes y se deja simular un recorte, para responder «¿y si
   // aprieto?» en vez de solo mostrar un número fijo.
   const scenario = useMemo(() => {
-    const monthTx = txForMonth(transactions, currentMonthKey())
+    // Conversion a divisa base antes de medir el ritmo de gasto: el error no
+    // solo desplaza el numero de hoy, se PROPAGA a toda la proyeccion.
+    const monthTx = txForMonth(transactionsForTotals(transactions, accounts, currency), currentMonthKey())
     // Discrecional = gasto de este mes que NO viene de una plantilla recurrente
     // (esos ya los cuenta la proyección). Solo hasta hoy, para medir el ritmo.
     const spentSoFar = monthTx
@@ -86,7 +88,7 @@ export function MobileCashflow() {
     const paceEnd = projection.endBalance - remaining
     const scenarioEnd = paceEnd + remaining * (cutPct / 100)
     return { remaining, paceEnd, scenarioEnd, daysLeft, hasData: remaining > 0 }
-  }, [transactions, today, projection.endBalance, cutPct])
+  }, [transactions, accounts, currency, today, projection.endBalance, cutPct])
   const chartData = projection.series.map(point => ({
     date: point.date,
     balance: Math.round(point.balance * 100) / 100,

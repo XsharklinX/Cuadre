@@ -67,6 +67,50 @@ export interface Account {
    * el motor de tasas en vivo. `undefined` = divisa base (compatibilidad).
    */
   currency?: CurrencyCode
+
+  /**
+   * Banco al que pertenece la cuenta (`BANK_PROFILES` en `data/bankFees.ts`).
+   * Define qué comisiones se sugieren al registrar un movimiento. Se adivina
+   * por el nombre al crear la cuenta, pero SIEMPRE es editable: adivinar mal
+   * el banco significaría sugerir cargos ajenos.
+   */
+  bankId?: string
+
+  // ── Solo tarjetas de crédito (type === 'credit') ───────
+  /**
+   * SEGUNDO SALDO. Una tarjeta dominicana casi siempre arrastra dos deudas a
+   * la vez: uno en la divisa local y otro en dólares, que se pagan por
+   * separado y se liquidan por separado. `balance` es el saldo en `currency`;
+   * esto es el saldo en la divisa secundaria, en SU propia divisa.
+   *
+   * Ausente = tarjeta de una sola divisa (lo normal fuera de RD). NO se crea
+   * en cero automáticamente: una tarjeta que nunca operó en dólares no debe
+   * mostrar `US$ 0.00`.
+   */
+  secondaryCurrency?: CurrencyCode
+  secondaryBalance?:  number
+  /** Saldo de apertura de la divisa secundaria, con el mismo rol que `openingBalance`. */
+  secondaryOpeningBalance?: number
+
+  /**
+   * CICLO. Sin estas fechas el saldo de una tarjeta es un número sin
+   * consecuencia. Son días del mes (1-31), no fechas: el ciclo se repite.
+   * `statementDay` = día de corte; `paymentDay` = día límite de pago.
+   */
+  statementDay?: number
+  paymentDay?:   number
+
+  /**
+   * COSTO DEL FINANCIAMIENTO. `apr` es la tasa ANUAL en porcentaje (ej. 24 =
+   * 24% anual) sobre el saldo financiado. Se guarda solo si el usuario la
+   * configura: NUNCA se asume una tasa por defecto, porque una proyección de
+   * interés inventada es peor que ninguna.
+   */
+  apr?: number
+  /** Pago mínimo como % del saldo al corte (ej. 10 = 10%). */
+  minPaymentPct?: number
+  /** Piso absoluto del pago mínimo, en la divisa de la tarjeta. */
+  minPaymentFloor?: number
 }
 
 export interface Category {
@@ -83,6 +127,13 @@ export interface Category {
    * anterior se suma (o resta) al presupuesto disponible de este mes.
    */
   rolloverEnabled?: boolean
+}
+
+/** Un cargo bancario aplicado a un movimiento, con su tasa para poder auditarlo. */
+export interface TxFee {
+  kind:   'itbis-transfer' | 'fx-surcharge' | 'cash-advance'
+  pct:    number
+  amount: number
 }
 
 /** Parte de una transacción dividida: cuánto del total va a cada categoría. */
@@ -134,6 +185,50 @@ export interface Transaction {
    *  bancario detectado. Se usa para marcarlo con un badge "automático" y para que
    *  el usuario pueda revisarlo/deshacerlo con confianza. */
   detectedFrom?: 'notification'
+  /**
+   * MULTI-MONEDA. `amount` SIEMPRE está en la divisa de la cuenta — es la
+   * fuente de verdad del libro y lo que usan saldos, presupuestos, reportes y
+   * proyecciones. Estos tres campos son la memoria de lo que el usuario tecleó
+   * de verdad cuando gastó en OTRA divisa (ej. compra en US$ con tarjeta en
+   * RD$): sirven para mostrarlo tal cual y para auditar la conversión.
+   *
+   * `fxRate` se CONGELA al crear el movimiento (1 originalCurrency = fxRate de
+   * la divisa de la cuenta). No se recalcula nunca con la tasa de hoy: si se
+   * recalculara, el historial cambiaría solo cada día y los reportes de meses
+   * cerrados dejarían de cuadrar.
+   *
+   * Ausentes = el movimiento se tecleó en la divisa de su cuenta (lo normal).
+   */
+  originalAmount?:   number
+  originalCurrency?: CurrencyCode
+  fxRate?:           number
+
+  /**
+   * SEGUNDO LIBRO DE UNA TARJETA. Cuando es true, este movimiento afecta
+   * `Account.secondaryBalance` en vez de `Account.balance`, y su `amount` está
+   * en `Account.secondaryCurrency` — no se convierte.
+   *
+   * Es un campo EXPLÍCITO y congelado al crear, no algo que se deduzca de la
+   * cuenta al leer. Si se dedujera, agregar o quitar la divisa secundaria de
+   * una tarjeta re-enrutaría movimientos viejos y los saldos cambiarían solos
+   * — justo el movimiento silencioso de dinero que la app promete no hacer.
+   *
+   * Nunca va en transferencias: mover dinero entre los dos saldos de una misma
+   * tarjeta no es una transferencia, es un pago al banco.
+   */
+  onSecondaryBalance?: boolean
+
+  /**
+   * CARGOS BANCARIOS desglosados (comisión por divisa, ITBIS 0.15%, avance de
+   * efectivo). `amount` YA LOS INCLUYE: es lo que de verdad golpeó la cuenta,
+   * así que el saldo cuadra contra el estado de cuenta del banco sin restas
+   * mentales.
+   *
+   * El desglose se guarda aparte para poder mostrarlo. Un cargo que solo
+   * aparece sumado dentro del total es justo lo que hace que un cobro
+   * bancario se sienta arbitrario.
+   */
+  fees?: TxFee[]
 }
 
 export interface GoalAutoContribute {

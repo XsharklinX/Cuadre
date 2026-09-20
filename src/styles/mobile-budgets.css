@@ -851,3 +851,19 @@
     text-transform: uppercase;
     vertical-align: middle;
   }
+
+  /* Badge de divisa: marca los movimientos tecleados en otra moneda que la de
+     su cuenta. Usa el token de acento (no un hex suelto como el badge "auto"
+     de arriba) para que sobreviva al rediseño de la paleta. */
+  .mobile-fx-badge {
+    background: color-mix(in oklab, var(--accent) 16%, transparent);
+    border-radius: 6px;
+    color: var(--accent);
+    font-size: 9.5px;
+    font-weight: 850;
+    letter-spacing: .04em;
+    margin-left: 6px;
+    padding: 1px 5px;
+    vertical-align: middle;
+    white-space: nowrap;
+  }

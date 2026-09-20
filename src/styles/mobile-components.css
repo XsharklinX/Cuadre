@@ -2260,3 +2260,158 @@
       transition-duration: 1ms !important;
     }
   }
+
+  /* ── Hojas numericas: dia del mes y porcentaje ── */
+  .mnum-sheet {
+    background: var(--surface);
+    border-radius: 20px 20px 0 0;
+    display: grid;
+    gap: 12px;
+    max-height: 85vh;
+    overflow-y: auto;
+    padding: 14px 16px calc(24px + env(safe-area-inset-bottom, 0px));
+    width: 100%;
+  }
+  .mnum-sheet > header {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+  }
+  .mnum-sheet > header > span { color: var(--text); font-size: 16px; font-weight: 800; }
+  .mnum-sheet > header > button {
+    background: var(--track); border: 0; border-radius: 999px; color: var(--text-dim);
+    display: grid; height: 32px; place-items: center; width: 32px;
+  }
+  .mnum-hint { color: var(--text-dim); font-size: 13px; line-height: 18px; margin: 0; }
+
+  /* Rejilla de dias, no un calendario: el ciclo de una tarjeta se repite cada
+     mes, asi que lo que se elige es un DIA, no una fecha. */
+  .mnum-daygrid { display: grid; gap: 6px; grid-template-columns: repeat(7, 1fr); }
+  .mnum-day {
+    background: var(--surface-2);
+    border: 1px solid transparent;
+    border-radius: 10px;
+    color: var(--text);
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    min-height: 40px;
+  }
+  .mnum-day.on {
+    background: color-mix(in oklab, var(--accent) 18%, transparent);
+    border-color: color-mix(in oklab, var(--accent) 45%, transparent);
+    color: var(--accent);
+  }
+  .mnum-day:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .mnum-pctfield {
+    align-items: center;
+    background: var(--surface-2);
+    border-radius: 12px;
+    display: flex;
+    gap: 6px;
+    padding: 12px 16px;
+  }
+  .mnum-pctfield input {
+    background: transparent; border: 0; color: var(--text); flex: 1;
+    font-family: inherit; font-size: 28px; font-variant-numeric: tabular-nums;
+    font-weight: 800; min-width: 0; outline: none; width: 100%;
+  }
+  .mnum-pctfield > span { color: var(--text-dim); font-size: 22px; font-weight: 800; }
+
+  .mnum-warn {
+    align-items: center; color: var(--warn); display: flex; font-size: 12.5px;
+    font-weight: 700; gap: 6px; line-height: 17px; margin: 0;
+  }
+  .mnum-warn-error { color: var(--expense); }
+  .mnum-warn svg { flex-shrink: 0; }
+
+  .mnum-actions { display: grid; gap: 8px; grid-template-columns: 1fr 1fr; }
+  .mnum-clear {
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px;
+    color: var(--text-dim); font-family: inherit; font-size: 15px; font-weight: 750; min-height: 44px;
+  }
+  .mnum-done {
+    background: var(--accent); border: 0; border-radius: 12px; color: #08201c;
+    font-family: inherit; font-size: 15px; font-weight: 800; min-height: 44px;
+  }
+  .mnum-done[disabled] { cursor: not-allowed; opacity: .4; }
+  .mnum-clear:focus-visible, .mnum-done:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* Badge de deuda derivada de una tarjeta: su fuente de verdad es la cuenta,
+     asi que la fila no es editable aqui. */
+  .mdebt-card-badge {
+    background: color-mix(in oklab, var(--accent) 16%, transparent);
+    border-radius: 999px;
+    color: var(--accent);
+    font-size: 9.5px;
+    font-weight: 850;
+    letter-spacing: .04em;
+    padding: 1px 6px;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .mdebt-debt-main[disabled] { cursor: default; }
+
+  /* ── Valorar la app ───────────────────────────────────── */
+  .mrate-overlay { align-items: center; justify-content: center; padding: 24px; }
+  .mrate-sheet {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    box-shadow: 0 30px 80px rgba(0,0,0,.5);
+    display: grid;
+    gap: 10px;
+    justify-items: center;
+    max-width: 360px;
+    padding: 8px 22px 22px;
+    text-align: center;
+    width: 100%;
+  }
+
+  /* El unico sitio de la app donde la marca se muestra por si misma. */
+  .mrate-art { display: grid; height: 116px; place-items: center; position: relative; width: 100%; }
+  .mrate-glow {
+    background: radial-gradient(circle, color-mix(in oklab, var(--accent) 30%, transparent), transparent 68%);
+    border-radius: 50%; height: 130px; position: absolute; width: 130px;
+  }
+  .mrate-mark {
+    align-items: center; background: color-mix(in oklab, var(--accent) 18%, transparent);
+    border-radius: 24px; color: var(--accent); display: grid; height: 76px;
+    place-items: center; position: relative; width: 76px;
+  }
+  .mrate-stars { bottom: 4px; color: var(--warn); display: flex; gap: 3px; position: absolute; }
+  .mrate-stars i {
+    animation: mrate-pop .32s cubic-bezier(.2,1.5,.4,1) backwards;
+    display: grid; place-items: center;
+  }
+  @keyframes mrate-pop {
+    from { opacity: 0; transform: scale(.4) translateY(6px); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  .mrate-title { color: var(--text); font-size: 19px; font-weight: 850; line-height: 25px; margin: 0; text-wrap: balance; }
+  .mrate-body  { color: var(--text-dim); font-size: 14px; line-height: 20px; margin: 0; max-width: 30ch; }
+
+  .mrate-actions { display: grid; gap: 8px; margin-top: 6px; width: 100%; }
+  .mrate-primary {
+    align-items: center; background: var(--accent); border: 0; border-radius: 14px;
+    color: #08201c; display: flex; font-family: inherit; font-size: 15px; font-weight: 850;
+    gap: 8px; justify-content: center; min-height: 48px; width: 100%;
+  }
+  .mrate-secondary {
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 14px;
+    color: var(--text); font-family: inherit; font-size: 15px; font-weight: 750;
+    min-height: 48px; width: 100%;
+  }
+  .mrate-dismiss {
+    background: transparent; border: 0; color: var(--text-dim); font-family: inherit;
+    font-size: 13.5px; font-weight: 700; min-height: 40px; padding: 0 12px;
+  }
+  .mrate-primary:focus-visible, .mrate-secondary:focus-visible, .mrate-dismiss:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mrate-stars i { animation: none; }
+  }

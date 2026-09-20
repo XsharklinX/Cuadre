@@ -106,7 +106,7 @@ function SavingsRing({ rate, amount, t, fmtAmount }: { rate: number; amount: num
   const pct = Math.max(0, Math.min(100, rate))
   const dash = 2 * Math.PI * 36
   const fill = dash * pct / 100
-  const color = amount > 0 ? '#35d0a2' : '#8a93a6'
+  const color = amount > 0 ? 'var(--income)' : 'var(--text-dim)'
   return (
     <div className="man-ring">
       <svg viewBox="0 0 80 80" width={80} height={80}>
@@ -175,13 +175,13 @@ function NetWorthHistoryChart({ history, projected, currency, lang, fmtAmount }:
         <path d={areaPath} fill="url(#nwGrad)" stroke="none" />
         <defs>
           <linearGradient id="nwGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#35d0a2" stopOpacity="0.28" />
-            <stop offset="100%" stopColor="#35d0a2" stopOpacity="0" />
+            <stop offset="0%" stopColor="var(--income)" stopOpacity="0.28" />
+            <stop offset="100%" stopColor="var(--income)" stopOpacity="0" />
           </linearGradient>
         </defs>
-        <polyline points={historyPoints} fill="none" stroke="#35d0a2" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-        <polyline points={projectedPoints} fill="none" stroke="#35d0a2" strokeWidth={1.6} strokeDasharray="3 3" strokeLinecap="round" strokeLinejoin="round" opacity={0.55} />
-        <circle cx={xOf(history.length - 1)} cy={yOf(current.value)} r={3} fill="#35d0a2" />
+        <polyline points={historyPoints} fill="none" stroke="var(--income)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+        <polyline points={projectedPoints} fill="none" stroke="var(--income)" strokeWidth={1.6} strokeDasharray="3 3" strokeLinecap="round" strokeLinejoin="round" opacity={0.55} />
+        <circle cx={xOf(history.length - 1)} cy={yOf(current.value)} r={3} fill="var(--income)" />
       </svg>
       <div className="man-networth-legend">
         <div>
@@ -201,6 +201,24 @@ function NetWorthHistoryChart({ history, projected, currency, lang, fmtAmount }:
       </div>
     </div>
   )
+}
+
+/**
+ * Colores de los formatos de exportacion. Son CATEGORICOS (distinguir PDF de
+ * Excel de CSV), no semanticos: no significan bueno ni malo. Viven juntos aqui
+ * en vez de dispersos como hex sueltos para que el rediseno de paleta tenga un
+ * solo sitio que tocar.
+ */
+const EXPORT_COLORS = {
+  pdf:    '#e8b13d',
+  excel:  '#35a06f',
+  csv:    '#4a80c4',
+  import: '#8b6fd4',
+} as const
+
+/** Icono de exportacion: relleno al 13% del color y el trazo a color pleno. */
+function exportIcon(color: string): React.CSSProperties {
+  return { background: `color-mix(in oklab, ${color} 13%, transparent)`, color }
 }
 
 export function MobileAnalytics({ mkey, onBudgets, onImport, onEditTx, initialPeriod }: { mkey: string; onBudgets?: () => void; onImport?: () => void; onEditTx?: (tx: Transaction) => void; initialPeriod?: AnalyticsPeriod }) {
@@ -621,7 +639,7 @@ export function MobileAnalytics({ mkey, onBudgets, onImport, onEditTx, initialPe
 
         <article className="man-hero-net">
           <small>{t('netLabel')}</small>
-          <strong style={{ color: summary.net >= 0 ? '#35d0a2' : '#ff6b8a' }}>
+          <strong style={{ color: summary.net >= 0 ? 'var(--income)' : 'var(--expense)' }}>
             <AnimatedMoney value={summary.net} compact={compactNumbers} />
           </strong>
         </article>
@@ -750,7 +768,7 @@ export function MobileAnalytics({ mkey, onBudgets, onImport, onEditTx, initialPe
                 <span
                   style={{
                     width: `${Math.min(100, budgetPct)}%`,
-                    background: budgetPct >= 100 ? '#ff6b8a' : budgetPct >= 80 ? '#f59e0b' : '#35d0a2',
+                    background: budgetPct >= 100 ? 'var(--expense)' : budgetPct >= 80 ? 'var(--warn)' : 'var(--income)',
                   }}
                 />
               </div>
@@ -911,8 +929,8 @@ export function MobileAnalytics({ mkey, onBudgets, onImport, onEditTx, initialPe
 
         {(period !== 'week' || barData.some(d => d.income > 0)) && (
           <div className="man-bar-legend">
-            <span><i style={{ background: '#35d0a2' }} />{t('incomes')}</span>
-            <span><i style={{ background: '#ff6b8a' }} />{t('expenses')}</span>
+            <span><i style={{ background: 'var(--income)' }} />{t('incomes')}</span>
+            <span><i style={{ background: 'var(--expense)' }} />{t('expenses')}</span>
           </div>
         )}
       </AnalyticsFold>
@@ -994,20 +1012,20 @@ export function MobileAnalytics({ mkey, onBudgets, onImport, onEditTx, initialPe
                 <button aria-label={t('close')} onClick={() => setExportOpen(false)}><Icon name="close" size={18} /></button>
               </header>
               <button className="man-export-row" disabled={exporting !== null} onClick={() => void runExport('pdf')}>
-                <span className="man-export-ic" style={{ background: '#ffdd3d22', color: '#ffdd3d' }}><Icon name="book" size={20} /></span>
+                <span className="man-export-ic" style={exportIcon(EXPORT_COLORS.pdf)}><Icon name="book" size={20} /></span>
                 <div><b>{t('monthStatementPdf')}</b><small>{exporting === 'pdf' ? t('generatingPdf') : monthLabel(mkey, dateLocale(lang))}</small></div>
               </button>
               <button className="man-export-row" disabled={exporting !== null} onClick={() => void runExport('excel')}>
-                <span className="man-export-ic" style={{ background: '#35d0a222', color: '#35d0a2' }}><Icon name="trend" size={20} /></span>
+                <span className="man-export-ic" style={{ background: '#35d0a222', color: 'var(--income)' }}><Icon name="trend" size={20} /></span>
                 <div><b>{t('fullReportExcelTitle')}</b><small>{exporting === 'excel' ? t('generatingExcel') : t('movementsAccountsCategories')}</small></div>
               </button>
               <button className="man-export-row" disabled={exporting !== null} onClick={() => void runExport('csv')}>
-                <span className="man-export-ic" style={{ background: '#5b9bff22', color: '#5b9bff' }}><Icon name="fileJson" size={20} /></span>
+                <span className="man-export-ic" style={exportIcon(EXPORT_COLORS.csv)}><Icon name="fileJson" size={20} /></span>
                 <div><b>{t('fullReportCsvTitle')}</b><small>{exporting === 'csv' ? t('generatingCsv') : t('csvReportReady')}</small></div>
               </button>
               {onImport && (
                 <button className="man-export-row" onClick={() => { setExportOpen(false); onImport() }}>
-                  <span className="man-export-ic" style={{ background: '#a78bfa22', color: '#a78bfa' }}><Icon name="upload" size={20} /></span>
+                  <span className="man-export-ic" style={exportIcon(EXPORT_COLORS.import)}><Icon name="upload" size={20} /></span>
                   <div><b>{t('importBankStatement')}</b><small>{t('csvOfxFromBanks')}</small></div>
                 </button>
               )}

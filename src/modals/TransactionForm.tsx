@@ -3,7 +3,7 @@ import { Icon } from '@/components/ui/Icon'
 import { toast } from '@/components/ui/Toast'
 import { useDialogs } from '@/components/ui/DialogProvider'
 import { isDuplicateTransaction } from '@/data/bankCsv'
-import { dateLocale, fmt } from '@/data/helpers'
+import { accountCurrency, dateLocale, fmt } from '@/data/helpers'
 import { CURRENCIES } from '@/data/seed'
 import { useFinance } from '@/store/finance'
 import { useSettings } from '@/store/settings'
@@ -520,7 +520,7 @@ export function TransactionForm({ value, mkey, onClose, onDelete }: {
                     <Icon name={ACCT_ICONS[a.type]} size={22} />
                   </span>
                   <b>{a.name}</b>
-                  <small>{fmt(a.balance, a.currency ?? currency)}</small>
+                  <small>{fmt(a.balance, accountCurrency(a, currency))}</small>
                   {a.id === accountId && <Icon name="check" size={16} style={{ color: 'var(--accent, #ffdd3d)', marginLeft: 4 }} />}
                 </button>
               ))}
@@ -552,7 +552,7 @@ export function TransactionForm({ value, mkey, onClose, onDelete }: {
                       <Icon name={ACCT_ICONS[a.type]} size={22} />
                     </span>
                     <b>{a.name}</b>
-                    <small>{fmt(a.balance, a.currency ?? currency)}</small>
+                    <small>{fmt(a.balance, accountCurrency(a, currency))}</small>
                     {a.id === current && <Icon name="check" size={16} style={{ color: 'var(--accent, #ffdd3d)', marginLeft: 4 }} />}
                   </button>
                 )

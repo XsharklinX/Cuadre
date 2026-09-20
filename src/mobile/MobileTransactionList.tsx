@@ -5,6 +5,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { BrandMark } from '@/components/ui/BrandMark'
 import { Icon } from '@/components/ui/Icon'
 import { dateLocale, fmt, fmtCompact, localToday } from '@/data/helpers'
+import { getCurrencyMeta } from '@/data/currencies'
 import { translateCategoryName, useT } from '@/i18n'
 import { playDeleteHaptic, playSoftHaptic } from '@/lib/sound'
 import { deleteWithUndo } from '@/lib/undoDelete'
@@ -343,6 +344,11 @@ export function MobileTransactionList({
               {tx.detectedFrom === 'notification' && (
                 <span className="mobile-auto-badge">{t('autoBadge')}</span>
               )}
+              {tx.originalCurrency && (
+                <span className="mobile-fx-badge" title={`${tx.originalAmount} ${tx.originalCurrency}`}>
+                  {getCurrencyMeta(tx.originalCurrency).flag} {tx.originalCurrency}
+                </span>
+              )}
             </b>
             <small>{subtitle}</small>
           </span>
@@ -570,6 +576,18 @@ export function MobileTransactionList({
                 ? `${mapGet(accountMap, selected.fromAccount)?.name ?? t('origin')} -> ${mapGet(accountMap, selected.toAccount)?.name ?? t('destination')}`
                 : mapGet(accountMap, selected.accountId)?.name ?? t('noAccountLabel')}</dd></div>
               <div><dt>{t('exactAmountLabel')}</dt><dd>{fmt(selected.amount, currency)}</dd></div>
+              {selected.originalCurrency && selected.originalAmount !== undefined && (
+                <>
+                  <div><dt>{t('originalAmountLabel')}</dt><dd>
+                    {getCurrencyMeta(selected.originalCurrency).flag} {fmt(selected.originalAmount, selected.originalCurrency)}
+                  </dd></div>
+                  {/* La tasa usada se muestra explícita: es la que se congeló al
+                      guardar, no la de hoy, y el usuario tiene derecho a verla. */}
+                  <div><dt>{t('fxRateLabel')}</dt><dd>
+                    1 {selected.originalCurrency} = {selected.fxRate?.toLocaleString('en-US', { maximumFractionDigits: 4 })}
+                  </dd></div>
+                </>
+              )}
             </dl>
 
             <div className="mobile-detail-actions">

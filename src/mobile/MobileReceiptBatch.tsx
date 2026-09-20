@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Icon } from '@/components/ui/Icon'
 import { toast } from '@/components/ui/Toast'
-import { fmt, localToday } from '@/data/helpers'
+import { accountCurrency, fmt, localToday } from '@/data/helpers'
 import { recognizeReceipt } from '@/lib/receiptOcr'
 import { useFinance } from '@/store/finance'
 import { useSettings } from '@/store/settings'
@@ -322,7 +322,7 @@ export function MobileReceiptBatch({
                   >
                     <span style={{ color: account.color }}><Icon name={ACCT_ICONS[account.type]} size={22} /></span>
                     <b>{account.name}</b>
-                    <small>{fmt(account.balance, currency)}</small>
+                    <small>{fmt(account.balance, accountCurrency(account, currency))}</small>
                     {account.id === editingItem.accountId && <Icon name="check" size={16} style={{ color: 'var(--accent, #ffdd3d)', marginLeft: 4 }} />}
                   </button>
                 ))}

@@ -5,10 +5,13 @@ import { deleteWithUndo } from '@/lib/undoDelete'
 import { useDialogs } from '@/components/ui/DialogProvider'
 import { OPERATORS, cleanAmount, evaluateExpression, lastOperatorIndex, lastSegment } from '@/data/amountExpression'
 import { isDuplicateTransaction } from '@/data/bankCsv'
-import { fmt, fmtCompact, localToday } from '@/data/helpers'
+import { accountCurrency, fmt, fmtCompact, localToday } from '@/data/helpers'
 import { ACCENT_COLORS } from '@/constants'
 import { dateLocale } from '@/data/helpers'
 import { CURRENCIES } from '@/data/seed'
+import { CURRENCIES as CURRENCY_METAS, entryInAccountCurrency, getCurrencyMeta } from '@/data/currencies'
+import { hasSecondaryBalance } from '@/data/creditCard'
+import { computeFees, findBankProfile, guessBankProfile, totalFees } from '@/data/bankFees'
 import { advanceRecurrenceDate } from '@/hooks/useRecurring'
 import { isTauri } from '@/hooks/useTauri'
 import { useFinance } from '@/store/finance'
@@ -22,7 +25,7 @@ import { useQuickAdds } from '@/store/quickAdds'
 import { openNativeScanner } from '@/lib/mlkitOcr'
 import { recognizeReceipt, type ReceiptOcrResult } from '@/lib/receiptOcr'
 import { MobileDatePicker } from './MobileDatePicker'
-import type { Category, IconName, RecurrenceFrequency, Transaction } from '@/types'
+import type { Category, CurrencyCode, IconName, RecurrenceFrequency, Transaction } from '@/types'
 import type { BatchReceiptInput } from './MobileReceiptBatch'
 import { useMobileBackDismiss } from './useMobileBackDismiss'
 import { useDialogA11y } from './useDialogA11y'
@@ -80,6 +83,13 @@ const CATEGORY_ICONS: IconName[] = [
   'key', 'tool', 'brush', 'graduation', 'stethoscope', 'salad', 'wine',
   'crown', 'trophy', 'shield', 'map', 'package',
 ]
+
+/** Etiqueta i18n de cada tipo de cargo bancario. */
+const FEE_LABEL = {
+  'fx-surcharge':   'feeFxSurcharge',
+  'itbis-transfer': 'feeItbis',
+  'cash-advance':   'feeCashAdvance',
+} as const
 
 const ACCT_ICONS: Record<string, IconName> = {
   cash: 'wallet', debit: 'cards', savings: 'piggy', credit: 'cards',
@@ -161,6 +171,47 @@ export function MobileCreateFlow({
   const activeAccount = activeAccountId ? accounts.find(a => a.id === activeAccountId) : null
   const fromAccountObj = accounts.find(a => a.id === fromAccount)
   const toAccountObj = accounts.find(a => a.id === toAccount)
+
+  // ── Divisa del movimiento ──────────────────────────────
+  // Se teclea en la divisa de la cuenta por defecto; el usuario puede cambiarla
+  // con la banderita para registrar un gasto en otra divisa (ej. compra en US$
+  // con una tarjeta en RD$). `null` = seguir a la cuenta, así al cambiar de
+  // cuenta la divisa se re-sincroniza sola mientras no se toque el selector.
+  const [entryCurrency, setEntryCurrency] = useState<CurrencyCode | null>(null)
+  const [currencyPicker, setCurrencyPicker] = useState(false)
+  const accountCur = activeAccount ? accountCurrency(activeAccount, currency) : currency
+
+  // ¿Este movimiento va al SEGUNDO libro de la tarjeta? Solo si la cuenta es
+  // una tarjeta con divisa secundaria Y se está tecleando justo en esa divisa.
+  // Entonces el monto NO se convierte: golpea el saldo en dólares tal cual.
+  const toSecondary = !!activeAccount
+    && hasSecondaryBalance(activeAccount)
+    && (entryCurrency ?? accountCur) === activeAccount.secondaryCurrency
+
+  // El libro destino define contra qué divisa se compara y se convierte.
+  const targetCurrency = toSecondary ? activeAccount!.secondaryCurrency! : accountCur
+  const typedCurrency = entryCurrency ?? accountCur
+  const isForeign = typedCurrency !== targetCurrency
+
+  // ── Cargos bancarios ───────────────────────────────────
+  const [isCashAdvance, setIsCashAdvance] = useState(false)
+  const bankProfile = useMemo(
+    () => activeAccount ? (findBankProfile(activeAccount.bankId) ?? guessBankProfile(activeAccount.name)) : null,
+    [activeAccount],
+  )
+  // Se calculan sobre el monto YA en la divisa del libro: el recargo del banco
+  // se cobra sobre lo que de verdad carga a la cuenta.
+  const feeLines = useMemo(() => {
+    if (mode === 'transfer' || amount <= 0 || !bankProfile) return []
+    const base = entryInAccountCurrency(amount, typedCurrency, targetCurrency).amount
+    return computeFees(base, {
+      profile: bankProfile,
+      typedCurrency,
+      accountCurrency: targetCurrency,
+      isCashAdvance,
+    })
+  }, [mode, amount, bankProfile, typedCurrency, targetCurrency, isCashAdvance])
+  const feeTotal = totalFees(feeLines)
   const validTransfer = mode === 'transfer' && !!fromAccount && !!toAccount && fromAccount !== toAccount
 
   // Notas anteriores únicas para el modo + categoría actual (autocompletar)
@@ -446,9 +497,21 @@ export function MobileCreateFlow({
         transfer({ fromAccount, toAccount, amount, date, note: note.trim() || t('transfer') })
       } else {
         const finalNote = note.trim() || activeCategory!.name
-        duplicate = isDuplicateTransaction(transactions, { date, amount, note: finalNote, accountId: activeAccountId! })
+        // El libro guarda SIEMPRE el monto en la divisa de la cuenta; si se
+        // tecleó en otra, `entry` trae además la tasa congelada de este momento
+        // para poder mostrar y auditar lo que el usuario realmente gastó.
+        const entry = entryInAccountCurrency(amount, typedCurrency, targetCurrency)
+        // El monto guardado INCLUYE los cargos: es lo que de verdad golpea la
+        // cuenta, así que el saldo cuadra contra el estado de cuenta del banco
+        // sin restas mentales. El desglose viaja aparte para poder mostrarlo.
+        const withFees = Math.round((entry.amount + feeTotal) * 100) / 100
+        duplicate = isDuplicateTransaction(transactions, { date, amount: withFees, note: finalNote, accountId: activeAccountId! })
         addTx({
-          type: mode, amount, date,
+          type: mode, date,
+          ...entry,
+          amount: withFees,
+          ...(feeLines.length ? { fees: feeLines } : {}),
+          ...(toSecondary ? { onSecondaryBalance: true as const } : {}),
           note: finalNote,
           categoryId: activeCategory!.id,
           accountId: activeAccountId!,
@@ -576,7 +639,14 @@ export function MobileCreateFlow({
   })
 
   const amountColor = mode === 'income' ? '#35d0a2' : mode === 'transfer' ? '#ffdd3d' : '#f65574'
-  const currencyPrefix = CURRENCIES[currency].symbol
+  // El teclado muestra SIEMPRE el símbolo de la divisa en que se está
+  // tecleando, no el de la divisa base: si no, escribir 25 US$ se vería "RD$ 25".
+  const currencyPrefix = CURRENCIES[typedCurrency].symbol
+  // Previsualización de lo que se le cargará de verdad a la cuenta.
+  const converted = useMemo(
+    () => isForeign && amount > 0 ? entryInAccountCurrency(amount, typedCurrency, targetCurrency) : null,
+    [amount, isForeign, typedCurrency, targetCurrency],
+  )
   const showFirstMovementHint = transactions.length === 0 && !settings.dismissedAlerts.includes('create-first-movement')
 
   return (
@@ -776,7 +846,7 @@ export function MobileCreateFlow({
                 <strong>{activeAccount ? activeAccount.name : t('selectAccount')}</strong>
                 <small>
                   {activeAccount
-                    ? `${fmtCompact(activeAccount.balance, currency)} · ${t(activeAccount.type)}`
+                    ? `${fmtCompact(activeAccount.balance, accountCurrency(activeAccount, currency))} · ${t(activeAccount.type)}`
                     : accounts.length > 0
                       ? t('selectAccountHint')
                       : t('noAccountsYet')}
@@ -828,7 +898,7 @@ export function MobileCreateFlow({
                   <Icon name={ACCT_ICONS[fromAccountObj?.type ?? 'cash']} size={26} />
                 </span>
                 <b>{fromAccountObj?.name ?? t('origin')}</b>
-                <small>{fromAccountObj ? fmtCompact(fromAccountObj.balance, currency) : '—'}</small>
+                <small>{fromAccountObj ? fmtCompact(fromAccountObj.balance, accountCurrency(fromAccountObj, currency)) : '—'}</small>
                 <em>{t('from')}</em>
               </button>
               <div className="mobile-transfer-arrow">→</div>
@@ -837,7 +907,7 @@ export function MobileCreateFlow({
                   <Icon name={ACCT_ICONS[toAccountObj?.type ?? 'cash']} size={26} />
                 </span>
                 <b>{toAccountObj?.name ?? t('destination')}</b>
-                <small>{toAccountObj ? fmtCompact(toAccountObj.balance, currency) : '—'}</small>
+                <small>{toAccountObj ? fmtCompact(toAccountObj.balance, accountCurrency(toAccountObj, currency)) : '—'}</small>
                 <em>{t('to')}</em>
               </button>
             </div>
@@ -850,8 +920,21 @@ export function MobileCreateFlow({
         {/* Amount display */}
         <div className={`mobile-create-amount-row${shaking ? ' shake' : ''}`}>
           <div className="mobile-create-amount-left">
-            <span className="mobile-create-amount-label">
-              {mode === 'expense' ? t('expense') : mode === 'income' ? t('income') : t('amount')}
+            <span className="mobile-create-amount-labelrow">
+              <span className="mobile-create-amount-label">
+                {mode === 'expense' ? t('expense') : mode === 'income' ? t('income') : t('amount')}
+              </span>
+              {mode !== 'transfer' && (
+              <button
+                className={`mobile-create-currency-flag${isForeign ? ' foreign' : ''}`}
+                onClick={() => setCurrencyPicker(true)}
+                type="button"
+                aria-label={t('currency')}
+              >
+                <span className="mobile-create-currency-flag-emoji">{getCurrencyMeta(typedCurrency).flag}</span>
+                <span className="mobile-create-currency-flag-code">{typedCurrency}</span>
+              </button>
+              )}
             </span>
             {mode !== 'transfer' && (
               <button
@@ -887,6 +970,28 @@ export function MobileCreateFlow({
                     : `${currencyPrefix} ${amount.toLocaleString('en-US', { minimumFractionDigits: amountText.includes('.') ? 2 : 0, maximumFractionDigits: amountText.includes('.') ? 2 : 0 })}`)
                 : `${currencyPrefix} 0`}
             </strong>
+            {converted && (
+              <small className="mobile-create-amount-converted">
+                ≈ {fmt(converted.amount, targetCurrency)}
+                <span className="mobile-create-amount-rate">
+                  {' '}· 1 {typedCurrency} = {converted.fxRate!.toLocaleString('en-US', { maximumFractionDigits: 4 })} {targetCurrency}
+                </span>
+              </small>
+            )}
+            {/* Desglose de cargos: LÍNEA POR LÍNEA con su tasa, nunca un total
+                agregado. Un cargo que solo aparece sumado dentro del monto es
+                justo lo que hace que un cobro bancario se sienta arbitrario. */}
+            {feeLines.map(line => (
+              <small key={line.kind} className="mobile-create-fee-line">
+                + {fmt(line.amount, targetCurrency)}
+                <span className="mobile-create-fee-what"> {t(FEE_LABEL[line.kind])} · {line.pct}%</span>
+              </small>
+            ))}
+            {feeTotal > 0 && (
+              <small className="mobile-create-fee-total">
+                {t('totalWithFees')}: {fmt(Math.round(((converted?.amount ?? amount) + feeTotal) * 100) / 100, targetCurrency)}
+              </small>
+            )}
           </span>
         </div>
         {formError && (
@@ -894,6 +999,20 @@ export function MobileCreateFlow({
             <Icon name="alert" size={13} />
             {formError}
           </div>
+        )}
+
+        {/* Avance de efectivo: cambia los cargos, así que vive junto al monto y
+            solo aparece cuando el banco de la cuenta cobra por ello. */}
+        {mode === 'expense' && bankProfile?.rules.some(r => r.kind === 'cash-advance') && (
+          <button
+            type="button"
+            className={`mobile-create-advance${isCashAdvance ? ' on' : ''}`}
+            onClick={() => setIsCashAdvance(v => !v)}
+            aria-pressed={isCashAdvance}
+          >
+            <Icon name="banknote" size={13} />
+            {t('cashAdvanceLabel')}
+          </button>
         )}
 
         {/* Quick row: account · note · date — kept inside this same compact panel */}
@@ -986,6 +1105,56 @@ export function MobileCreateFlow({
       </div>
 
       {/* Single account picker */}
+      {currencyPicker && (
+        <SheetPortal>
+          <div className="mobile-detail-sheet" role="dialog" aria-modal="true" onClick={() => setCurrencyPicker(false)}>
+            <section className="mcur-sheet" onClick={e => e.stopPropagation()}>
+              <header>
+                <span>{t('currency')}</span>
+                <button aria-label={t('close')} onClick={() => setCurrencyPicker(false)}><Icon name="close" size={18} /></button>
+              </header>
+              <p className="mcur-subtitle">
+                {getCurrencyMeta(targetCurrency).flag} {activeAccount?.name ?? t('account')} · {targetCurrency}
+              </p>
+              <div className="mcur-list">
+                {CURRENCY_METAS.map(c => {
+                  const selected = c.code === typedCurrency
+                  // Lo que costaría 1 unidad de esta divisa en la divisa de la
+                  // cuenta: el dato que de verdad importa al elegir.
+                  const rate = c.code === targetCurrency
+                    ? null
+                    : entryInAccountCurrency(1, c.code, targetCurrency).fxRate
+                  return (
+                    <button
+                      key={c.code}
+                      className={`mcur-row${selected ? ' on' : ''}`}
+                      onClick={() => {
+                        // Volver a la divisa de la cuenta = dejar de forzar una,
+                        // para que siga siguiendo a la cuenta al cambiarla.
+                        setEntryCurrency(c.code === targetCurrency ? null : c.code)
+                        setCurrencyPicker(false)
+                      }}
+                    >
+                      <span className="mcur-flag">{c.flag}</span>
+                      <div className="mcur-info">
+                        <strong>{c.code}</strong>
+                        <small>{c.name}</small>
+                      </div>
+                      <div className="mcur-right">
+                        {rate !== null
+                          ? <span className="mcur-rate">{getCurrencyMeta(targetCurrency).symbol}{rate!.toLocaleString('en-US', { maximumFractionDigits: 2 })}</span>
+                          : <span className="mcur-current">{t('account')}</span>}
+                        {selected && <Icon name="check" size={16} style={{ color: 'var(--accent)' }} />}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </section>
+          </div>
+        </SheetPortal>
+      )}
+
       {accountPicker && (
         <SheetPortal>
         <div ref={accountPickerRef} className="mobile-detail-sheet" role="dialog" aria-modal="true" onClick={() => setAccountPicker(false)}>
@@ -1008,7 +1177,7 @@ export function MobileCreateFlow({
                       <Icon name={ACCT_ICONS[account.type] ?? 'wallet'} size={22} />
                     </span>
                     <b>{account.name}</b>
-                    <small>{fmtCompact(account.balance, currency)}</small>
+                    <small>{fmtCompact(account.balance, accountCurrency(account, currency))}</small>
                     {account.id === activeAccountId && <Icon name="check" size={16} style={{ color: 'var(--accent, #ffdd3d)', marginLeft: 4 }} />}
                   </button>
                 ))}
@@ -1042,7 +1211,7 @@ export function MobileCreateFlow({
                       <Icon name={ACCT_ICONS[account.type] ?? 'wallet'} size={22} />
                     </span>
                     <b>{account.name}</b>
-                    <small>{fmtCompact(account.balance, currency)}</small>
+                    <small>{fmtCompact(account.balance, accountCurrency(account, currency))}</small>
                     {selected && <Icon name="check" size={16} style={{ color: 'var(--accent, #ffdd3d)', marginLeft: 4 }} />}
                   </button>
                 )

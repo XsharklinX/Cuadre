@@ -27,20 +27,39 @@ private const val NOTIFIED_KEY = "notified_ids"
 private const val MAX_NOTIFIED = 300
 private const val HISTORY_FILE = "notification_history.json"
 private const val MAX_HISTORY = 100
-private const val CHANNEL_BUDGET = "sharky_budget_alerts"
-private const val CHANNEL_RECURRING = "sharky_payment_reminders"
-private const val CHANNEL_ACTIVITY = "sharky_activity_reminders"
-private const val CHANNEL_LOWFUNDS = "sharky_lowfunds_alerts"
-private const val CHANNEL_GOALS = "sharky_goal_reminders"
-private const val CHANNEL_WEEKLY = "sharky_weekly_summary"
-private const val CHANNEL_FX = "sharky_fx_alerts"
-private const val CHANNEL_ANOMALY = "sharky_anomaly_alerts"
+/**
+ * IDs de canal en v2.
+ *
+ * Android IGNORA un cambio de importancia sobre un canal que ya existe: una
+ * vez creado, solo el usuario puede bajarlo o subirlo desde Ajustes. Como la
+ * correccion de esta version es justamente reasignar importancias, los canales
+ * viejos (todos en DEFAULT) tienen que quedar atras y crearse unos nuevos. Los
+ * antiguos se borran en `ensureChannels` para no dejar duplicados en la lista
+ * de notificaciones del sistema.
+ */
+private const val CHANNEL_BUDGET = "sharky_budget_alerts_v2"
+private const val CHANNEL_RECURRING = "sharky_payment_reminders_v2"
+private const val CHANNEL_ACTIVITY = "sharky_activity_reminders_v2"
+private const val CHANNEL_LOWFUNDS = "sharky_lowfunds_alerts_v2"
+private const val CHANNEL_GOALS = "sharky_goal_reminders_v2"
+private const val CHANNEL_WEEKLY = "sharky_weekly_summary_v2"
+private const val CHANNEL_FX = "sharky_fx_alerts_v2"
+private const val CHANNEL_ANOMALY = "sharky_anomaly_alerts_v2"
+
+/** Canales de la v1, borrados al arrancar para no duplicar la lista. */
+private val LEGACY_CHANNELS = listOf(
+    "sharky_budget_alerts", "sharky_payment_reminders", "sharky_activity_reminders",
+    "sharky_lowfunds_alerts", "sharky_goal_reminders", "sharky_weekly_summary",
+    "sharky_fx_alerts", "sharky_anomaly_alerts",
+)
 private const val DUE_SOON_DAYS = 3
 private const val EVENING_HOUR = 19
 private const val INACTIVITY_DAYS = 3
 // Acento de $harky: mismo azul del punto en el ícono de la app (public/icon.svg),
 // para que todas las notificaciones se tiñan igual sin importar qué las genera.
 private val ACCENT_COLOR = 0xFF4D82FF.toInt()
+/** Tamano al que Android dibuja el icono grande de una notificacion. */
+private const val LARGE_ICON_DP = 64f
 
 class ReminderWorker(appContext: Context, params: WorkerParameters) : CoroutineWorker(appContext, params) {
 
@@ -58,6 +77,17 @@ class ReminderWorker(appContext: Context, params: WorkerParameters) : CoroutineW
         val cal = Calendar.getInstance()
         cal.add(Calendar.DAY_OF_MONTH, DUE_SOON_DAYS)
         val limitStr = sdf.format(cal.time)
+
+        // Textos ya traducidos por el lado JS. Antes estaban escritos en espanol
+        // aqui dentro, asi que un usuario en ingles recibia sus notificaciones
+        // en espanol. El fallback conserva el texto viejo por si llega un
+        // snapshot de una version anterior a este cambio.
+        val strings = snapshot.optJSONObject("strings")
+        fun s(key: String, fallback: String, vararg pairs: Pair<String, String>): String {
+            var out = strings?.optString(key)?.takeIf { it.isNotBlank() } ?: fallback
+            for ((k, v) in pairs) out = out.replace("{$k}", v)
+            return out
+        }
 
         val dismissed = jsonArrayToSet(snapshot.optJSONArray("dismissedAlerts"))
         val notified = loadNotified()
@@ -82,9 +112,13 @@ class ReminderWorker(appContext: Context, params: WorkerParameters) : CoroutineW
             val spentLabel = cat.optString("spentLabel")
             val budgetLabel = cat.optString("budgetLabel")
             val (title, text) = if (threshold == 100) {
-                "🚨 Te pasaste en $name" to "Llevas $spentLabel de $budgetLabel ($pct%). Ojo con lo que queda del mes."
+                s("budgetOverTitle", "Te pasaste en {name}", "name" to name) to
+                    s("budgetOverText", "Llevas {spent} de {budget} ({pct}%).",
+                        "spent" to spentLabel, "budget" to budgetLabel, "pct" to pct.toString())
             } else {
-                "📊 $name va en $pct%" to "Llevas $spentLabel de $budgetLabel este mes."
+                s("budgetNearTitle", "{name} va en {pct}%", "name" to name, "pct" to pct.toString()) to
+                    s("budgetNearText", "Llevas {spent} de {budget} este mes.",
+                        "spent" to spentLabel, "budget" to budgetLabel)
             }
             notify(CHANNEL_BUDGET, alertId, title, text, "budget")
             notified.add(alertId)
@@ -102,11 +136,15 @@ class ReminderWorker(appContext: Context, params: WorkerParameters) : CoroutineW
             val alertId = "recurring:${item.optString("id")}:$next"
             if (alertId in dismissed || alertId in notified) continue
 
-            val whenLabel = if (next == todayStr) "hoy" else item.optString("dateLabel")
-            val note = item.optString("note").ifBlank { "Sin nota" }
+            val whenLabel = if (next == todayStr) s("today", "hoy") else item.optString("dateLabel")
+            val note = item.optString("note").ifBlank { "—" }
             val amountLabel = item.optString("amountLabel")
-            val title = if (next == todayStr) "🔔 Hoy se cobra $note" else "🔔 Se acerca: $note"
-            val text = "$amountLabel · vence $whenLabel. Ten el saldo listo."
+            val title = if (next == todayStr)
+                s("recurringTodayTitle", "Hoy se cobra {note}", "note" to note)
+            else
+                s("recurringSoonTitle", "Se acerca: {note}", "note" to note)
+            val text = s("recurringText", "{amount} · vence {when}. Ten el saldo listo.",
+                "amount" to amountLabel, "when" to whenLabel)
 
             notify(CHANNEL_RECURRING, alertId, title, text, "recurring")
             notified.add(alertId)
@@ -116,8 +154,9 @@ class ReminderWorker(appContext: Context, params: WorkerParameters) : CoroutineW
                 val lowFundsId = "lowfunds:${item.optString("id")}:$next"
                 if (lowFundsId !in dismissed && lowFundsId !in notified) {
                     val accountName = item.optString("accountName").ifBlank { "tu cuenta" }
-                    val lfTitle = "⚠️ Saldo bajo para $note"
-                    val lfText = "$accountName no alcanza para $amountLabel (vence $whenLabel). Muévelo antes del cobro."
+                    val lfTitle = s("lowFundsTitle", "Saldo bajo para {note}", "note" to note)
+                    val lfText = s("lowFundsText", "{account} no alcanza para {amount} (vence {when}).",
+                        "account" to accountName, "amount" to amountLabel, "when" to whenLabel)
                     notify(CHANNEL_LOWFUNDS, lowFundsId, lfTitle, lfText, "lowfunds")
                     notified.add(lowFundsId)
                     notifiedChanged = true
@@ -138,7 +177,12 @@ class ReminderWorker(appContext: Context, params: WorkerParameters) : CoroutineW
 
             val name = goal.optString("name").ifBlank { "tu meta" }
             val amountLabel = goal.optString("amountLabel")
-            notify(CHANNEL_GOALS, alertId, "🎯 Hora de ahorrar", "Aporta $amountLabel a \"$name\" y sigue acercándote.", "goal")
+            notify(
+                CHANNEL_GOALS, alertId,
+                s("goalTitle", "Hora de ahorrar"),
+                s("goalText", "Aporta {amount} a \"{name}\".", "amount" to amountLabel, "name" to name),
+                "goal",
+            )
             notified.add(alertId)
             notifiedChanged = true
         }
@@ -158,7 +202,7 @@ class ReminderWorker(appContext: Context, params: WorkerParameters) : CoroutineW
                     if (topCat.isNotBlank()) append(". Lo que más pesó: $topCat ($topLabel)")
                     append(". Toca para ver el detalle.")
                 }
-                notify(CHANNEL_WEEKLY, alertId, "📊 Tu semana en \$harky", text, "weekly")
+                notify(CHANNEL_WEEKLY, alertId, s("weeklyTitle", "Tu semana en Sharky"), text, "weekly")
                 notified.add(alertId)
                 notifiedChanged = true
             }
@@ -193,7 +237,13 @@ class ReminderWorker(appContext: Context, params: WorkerParameters) : CoroutineW
             val note = item.optString("note").ifBlank { "un gasto" }
             val amountLabel = item.optString("amountLabel")
             val baselineLabel = item.optString("baselineLabel")
-            notify(CHANNEL_ANOMALY, alertId, "👀 Gasto fuera de lo normal", "$note: $amountLabel, y sueles gastar ~$baselineLabel. ¿Todo bien?", "anomaly")
+            notify(
+                CHANNEL_ANOMALY, alertId,
+                s("anomalyTitle", "Gasto fuera de lo normal"),
+                s("anomalyText", "{note}: {amount}, y sueles gastar ~{baseline}.",
+                    "note" to note, "amount" to amountLabel, "baseline" to baselineLabel),
+                "anomaly",
+            )
             notified.add(alertId)
             notifiedChanged = true
         }
@@ -255,26 +305,64 @@ class ReminderWorker(appContext: Context, params: WorkerParameters) : CoroutineW
             .edit().putString(NOTIFIED_KEY, arr.toString()).apply()
     }
 
+    /**
+     * Los ocho canales, cada uno con la importancia que MERECE.
+     *
+     * Antes los ocho eran IMPORTANCE_DEFAULT: el resumen semanal interrumpia
+     * con sonido y banner exactamente igual de fuerte que "te quedaste sin
+     * saldo para un pago de manana". Cuando todo grita igual, el usuario
+     * aprende a ignorarlo todo — y entonces el aviso que si importaba tampoco
+     * se ve.
+     *
+     * HIGH  = actua hoy o te cuesta dinero.
+     * DEFAULT = te conviene saberlo, suena una vez.
+     * LOW   = informativo: aparece en la bandeja, sin sonido ni banner.
+     */
     private fun ensureChannels() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = applicationContext.getSystemService(NotificationManager::class.java)
-        manager.createNotificationChannel(NotificationChannel(
-            CHANNEL_BUDGET, "Alertas de presupuesto", NotificationManager.IMPORTANCE_DEFAULT))
-        manager.createNotificationChannel(NotificationChannel(
-            CHANNEL_RECURRING, "Pagos recurrentes", NotificationManager.IMPORTANCE_DEFAULT))
-        manager.createNotificationChannel(NotificationChannel(
-            CHANNEL_ACTIVITY, "Recordatorios de actividad", NotificationManager.IMPORTANCE_DEFAULT))
-        manager.createNotificationChannel(NotificationChannel(
-            CHANNEL_LOWFUNDS, "Fondos insuficientes", NotificationManager.IMPORTANCE_DEFAULT))
-        manager.createNotificationChannel(NotificationChannel(
-            CHANNEL_GOALS, "Aportes de metas", NotificationManager.IMPORTANCE_DEFAULT))
-        manager.createNotificationChannel(NotificationChannel(
-            CHANNEL_WEEKLY, "Resumen semanal", NotificationManager.IMPORTANCE_DEFAULT))
-        manager.createNotificationChannel(NotificationChannel(
-            CHANNEL_FX, "Alertas de tasa de cambio", NotificationManager.IMPORTANCE_DEFAULT))
-        manager.createNotificationChannel(NotificationChannel(
-            CHANNEL_ANOMALY, "Gastos inusuales", NotificationManager.IMPORTANCE_DEFAULT))
+
+        // Los canales v1 se van: si se quedaran, el usuario veria cada canal
+        // dos veces en los ajustes de notificaciones del sistema.
+        for (old in LEGACY_CHANNELS) {
+            try { manager.deleteNotificationChannel(old) } catch (e: Exception) { /* ya no existe */ }
+        }
+
+        fun channel(id: String, name: String, importance: Int, description: String? = null) {
+            val ch = NotificationChannel(id, name, importance)
+            if (description != null) ch.description = description
+            // Solo los urgentes vibran. Un resumen semanal que vibra es ruido.
+            ch.enableVibration(importance >= NotificationManager.IMPORTANCE_HIGH)
+            manager.createNotificationChannel(ch)
+        }
+
+        // Cuesta dinero si no actuas hoy.
+        channel(CHANNEL_LOWFUNDS, "Fondos insuficientes", NotificationManager.IMPORTANCE_HIGH,
+            "Cuando un pago que vence no tiene saldo que lo cubra.")
+        channel(CHANNEL_RECURRING, "Pagos recurrentes", NotificationManager.IMPORTANCE_HIGH,
+            "Cuando se acerca o vence un pago programado.")
+
+        // Conviene saberlo, suena una vez.
+        channel(CHANNEL_BUDGET, "Alertas de presupuesto", NotificationManager.IMPORTANCE_DEFAULT,
+            "Cuando una categoria se acerca o pasa su presupuesto.")
+        channel(CHANNEL_ANOMALY, "Gastos inusuales", NotificationManager.IMPORTANCE_DEFAULT,
+            "Cuando un gasto se sale mucho de tu patron habitual.")
+
+        // Informativo: bandeja, sin sonido ni banner.
+        channel(CHANNEL_GOALS, "Aportes de metas", NotificationManager.IMPORTANCE_LOW,
+            "Recordatorio suave para aportar a una meta.")
+        channel(CHANNEL_WEEKLY, "Resumen semanal", NotificationManager.IMPORTANCE_LOW,
+            "Tu resumen de la semana.")
+        channel(CHANNEL_FX, "Alertas de tasa de cambio", NotificationManager.IMPORTANCE_LOW,
+            "Cuando una divisa cruza el limite que fijaste.")
+        // "Vuelve a la app" nunca es urgente. Es el canal que mas molesta y el
+        // que menos valor da, asi que entra en lo mas bajo que existe.
+        channel(CHANNEL_ACTIVITY, "Recordatorios de actividad", NotificationManager.IMPORTANCE_MIN,
+            "Recordatorio de que hace dias que no registras nada.")
     }
+
+    /** Agrupa por canal para que varios avisos no llenen la bandeja por separado. */
+    private fun groupOf(channelId: String): String = "sharky.$channelId"
 
     /**
      * @param type Categoría del aviso ("budget", "weekly", etc.) — viaja como
@@ -299,6 +387,13 @@ class ReminderWorker(appContext: Context, params: WorkerParameters) : CoroutineW
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
+            // Agrupados por canal: tres avisos de presupuesto se apilan en uno
+            // en vez de ocupar tres filas de la bandeja.
+            .setGroup(groupOf(channelId))
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            // Los no urgentes no suenan aunque el canal lo permitiera en una
+            // instalacion antigua (los canales ya creados no cambian solos).
+            .setSilent(channelId != CHANNEL_LOWFUNDS && channelId != CHANNEL_RECURRING)
 
         appIconBitmap()?.let { builder.setLargeIcon(it) }
 
@@ -358,13 +453,28 @@ class ReminderWorker(appContext: Context, params: WorkerParameters) : CoroutineW
     }
 
     /** Icono a todo color de la app, para mostrarlo grande a la derecha del aviso. */
+    /**
+     * Icono grande del aviso, escalado al tamano que Android realmente usa.
+     *
+     * Antes se cargaba a resolucion completa: en un telefono xxxhdpi el icono
+     * de la app puede ser 432x432 y se retenia entero en memoria por cada
+     * notificacion, para dibujarse a ~64dp. Ahora se rasteriza directamente al
+     * tamano de destino, que es la version de `inSampleSize` que aplica cuando
+     * la fuente es un drawable y no un archivo.
+     */
     private fun appIconBitmap(): Bitmap? = try {
+        val density = applicationContext.resources.displayMetrics.density
+        val target = (LARGE_ICON_DP * density).toInt().coerceAtLeast(1)
         val drawable = applicationContext.packageManager
             .getApplicationIcon(applicationContext.packageName)
-        (drawable as? BitmapDrawable)?.bitmap ?: run {
-            val width = drawable.intrinsicWidth.coerceAtLeast(1)
-            val height = drawable.intrinsicHeight.coerceAtLeast(1)
-            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+
+        val source = (drawable as? BitmapDrawable)?.bitmap
+        if (source != null && (source.width > target || source.height > target)) {
+            Bitmap.createScaledBitmap(source, target, target, true)
+        } else if (source != null) {
+            source
+        } else {
+            val bitmap = Bitmap.createBitmap(target, target, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(bitmap)
             drawable.setBounds(0, 0, canvas.width, canvas.height)
             drawable.draw(canvas)

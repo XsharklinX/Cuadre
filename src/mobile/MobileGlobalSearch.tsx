@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Icon } from '@/components/ui/Icon'
 import { CatBadge } from '@/views/shared'
-import { dateLocale, fmt, getAccount, getCategory } from '@/data/helpers'
+import { accountCurrency, dateLocale, fmt, getAccount, getCategory } from '@/data/helpers'
 import { matchSynonymCategoryIds, normalizeSearchText, parseSearchQuery } from '@/data/searchQuery'
 import { useFinance } from '@/store/finance'
 import { useSettings } from '@/store/settings'
@@ -225,7 +225,7 @@ export function MobileGlobalSearch({
                   <Icon name={ACCOUNT_TYPE_ICON[account.type]} size={18} />
                 </span>
                 <span className="mset-label">{account.name}</span>
-                <span className="mset-value">{fmt(account.balance, currency)}</span>
+                <span className="mset-value">{fmt(account.balance, accountCurrency(account, currency))}</span>
               </button>
             ))}
           </div>

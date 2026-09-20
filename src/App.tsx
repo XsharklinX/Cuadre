@@ -33,6 +33,8 @@ import { MobileBiometricGate } from '@/mobile/MobileBiometricGate'
 import { MobilePinGate } from '@/mobile/MobilePinGate'
 import { MobilePatternGate } from '@/mobile/MobilePatternGate'
 import { MobileShell } from '@/mobile/MobileShell'
+import { MobileRatingPrompt } from '@/mobile/MobileRatingPrompt'
+import { useRatingPrompt } from '@/hooks/useRatingPrompt'
 import { useExitConfirm } from '@/mobile/useExitConfirm'
 import { MobileSplash } from '@/mobile/MobileSplash'
 import { useMobileBackDismiss } from '@/mobile/useMobileBackDismiss'
@@ -120,6 +122,9 @@ export default function App() {
   useCloudWorkspace()
   useAutoCloudSync()
   useLiveExchangeRates()
+  // Valoracion: se evalua una vez por sesion, con retraso, y solo si el usuario
+  // ya lleva tiempo usando la app de verdad (ver `data/ratingPrompt.ts`).
+  const rating = useRatingPrompt()
 
   const overlayOpen = !!txForm || settingsOpen
   useMobileBackDismiss(overlayOpen, () => {
@@ -241,6 +246,13 @@ export default function App() {
           onConsumeNotificationTarget={consumeNotificationTarget}
         />
         <ToastHost />
+        {rating.open && (
+          <MobileRatingPrompt
+            onRated={rating.rated}
+            onSnooze={rating.close}
+            onFeedback={() => { setSettingsInitialSheet('comments'); setSettingsOpen(true) }}
+          />
+        )}
         <Suspense fallback={null}>
           {availableUpdate && !s.dismissedAlerts.includes(`update-${availableUpdate.version}`) && (
             <MobileUpdateDialog update={availableUpdate} onDismiss={() => s.dismissAlert(`update-${availableUpdate.version}`)} />

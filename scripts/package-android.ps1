@@ -6,6 +6,11 @@ param(
   [ValidateSet('apk', 'aab', 'both')]
   [string]$Package = 'apk',
   [switch]$Debug,
+  # Salta el auto-incremento del PATCH. Se usa cuando la version ya se fijo a
+  # mano para un release menor o mayor (ej. 1.8.18 -> 1.9.0): sin esto el
+  # script la convertiria en 1.9.1 y el changelog dejaria de coincidir con la
+  # version que se publica.
+  [switch]$SkipVersionBump,
   [string]$SdkRoot = "$env:LOCALAPPDATA\Android\Sdk",
   [string]$JavaHome = 'C:\Program Files\Android\Android Studio\jbr',
   [string]$NdkVersion = '29.0.14206865'
@@ -132,8 +137,12 @@ if ($Mode -eq 'build') {
   # Sube el patch (X.Y.Z -> X.Y.Z+1) en package.json/tauri.conf.json/Cargo.toml
   # antes de generar el paquete, para que la version visible en la app suba
   # sola con cada build. No toca el versionCode interno de Android (abajo).
-  npm run version:bump
-  if ($LASTEXITCODE -ne 0) { throw 'No se pudo actualizar la version antes del build.' }
+  if ($SkipVersionBump) {
+    Write-Host 'Version fijada a mano: se omite el auto-incremento de patch.'
+  } else {
+    npm run version:bump
+    if ($LASTEXITCODE -ne 0) { throw 'No se pudo actualizar la version antes del build.' }
+  }
 
   # VersionCode: se sigue leyendo del archivo generado (gen/android/.../tauri.properties)
   # + el ultimo build empaquetado, porque ese contador NUNCA debe bajar ni

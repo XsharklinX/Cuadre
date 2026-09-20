@@ -5,7 +5,11 @@ import { AnimatedMoney } from '@/components/ui/AnimatedMoney'
 import { CatBadge } from '@/views/shared'
 import { ACCENT_COLORS } from '@/constants'
 import { accountActivity, accountBalanceInBase, accountCurrency, dateLocale, fmt, getAccount, getCategory, monthlyAccountSeries, visibleAccounts } from '@/data/helpers'
-import { CURRENCIES as CURRENCY_LIST } from '@/data/currencies'
+import { CURRENCIES as CURRENCY_LIST, getCurrencyMeta } from '@/data/currencies'
+import {
+  creditCycle, creditUsedInPrimary, creditUtilization, hasSecondaryBalance,
+  minimumPayment, projectMinimumPayoff, utilizationBand,
+} from '@/data/creditCard'
 import { useFinance } from '@/store/finance'
 import { useSettings } from '@/store/settings'
 import { useFmt } from '@/hooks/useFmt'
@@ -16,6 +20,7 @@ import { useDialogA11y } from './useDialogA11y'
 import { useMobileBackDismiss } from './useMobileBackDismiss'
 import { useSubmitGuard } from './useSubmitGuard'
 import { MobileAmountSheet } from './MobileAmountSheet'
+import { DayOfMonthSheet, PercentSheet } from './MobileNumberSheets'
 import { MobileTextSheet } from './MobileTextSheet'
 import { MobileDigitSheet } from './MobileDigitSheet'
 import { MobileTransactionList } from './MobileTransactionList'
@@ -218,7 +223,7 @@ export function MobileAccounts({ mkey, createRequest, onEditTx, onDeleteTx }: {
                             }} />
                           </div>
                           <span className={utilPct >= 90 ? 'text-expense' : utilPct >= 70 ? 'text-warn' : ''}>
-                            {t('pctUsedAvailable').replace('{pct}', String(Math.round(utilPct))).replace('{amount}', fmtVal(a.limit - used!, currency))}
+                            {t('pctUsedAvailable').replace('{pct}', String(Math.round(utilPct))).replace('{amount}', fmtVal(a.limit - used!, accountCurrency(a, currency)))}
                           </span>
                         </div>
                       )}
@@ -355,8 +360,16 @@ function AccountDetailSheet({ account, mkey, onClose, onEdit, onViewAll }: { acc
   )
 
   const maxVal = Math.max(1, ...series.flatMap(s => [s.inflow, s.outflow]))
-  const used    = account.type === 'credit' && account.limit ? Math.abs(Math.min(0, account.balance)) : null
-  const utilPct = used !== null && account.limit ? Math.min(100, used / account.limit * 100) : null
+  // La utilizacion cuenta AMBAS deudas de la tarjeta (local + divisa
+  // extranjera): el limite es uno solo y lo consumen las dos.
+  const used    = account.type === 'credit' && account.limit ? creditUsedInPrimary(account, currency) : null
+  const utilFrac = creditUtilization(account, currency)
+  const utilPct = utilFrac !== null ? utilFrac * 100 : null
+  const band    = utilFrac !== null ? utilizationBand(utilFrac) : null
+  const cycle   = account.type === 'credit' ? creditCycle(account) : null
+  const minPay  = account.type === 'credit' ? minimumPayment(account) : null
+  const payoff  = account.type === 'credit' ? projectMinimumPayoff(account) : null
+  const secondary = hasSecondaryBalance(account)
 
   return (
     <>
@@ -382,18 +395,79 @@ function AccountDetailSheet({ account, mkey, onClose, onEdit, onViewAll }: { acc
             </div>
           </div>
 
+          {/* Segundo saldo: al mismo peso que el principal, no como nota al
+              pie. Son dos deudas reales y se pagan por separado. */}
+          {secondary && (
+            <div className="macc-dual">
+              <div className="macc-dual-cell">
+                <span className="macc-dual-label">
+                  {getCurrencyMeta(accountCurrency(account, currency)).flag} {accountCurrency(account, currency)}
+                </span>
+                <strong className={account.balance < 0 ? 'macc-dual-debt' : 'macc-dual-zero'}>
+                  {fmtVal(account.balance, accountCurrency(account, currency))}
+                </strong>
+              </div>
+              <div className="macc-dual-cell">
+                <span className="macc-dual-label">
+                  {getCurrencyMeta(account.secondaryCurrency!).flag} {account.secondaryCurrency}
+                </span>
+                <strong className={(account.secondaryBalance ?? 0) < 0 ? 'macc-dual-debt' : 'macc-dual-zero'}>
+                  {fmtVal(account.secondaryBalance ?? 0, account.secondaryCurrency!)}
+                </strong>
+              </div>
+            </div>
+          )}
+
           {utilPct !== null && account.limit && (
             <div className="mrep-util-wrap">
               <div className="mrep-util-bar">
-                <div style={{
-                  width: `${utilPct}%`,
-                  background: utilPct >= 90 ? '#ff6b8a' : utilPct >= 70 ? '#f59e0b' : '#35d0a2',
-                }} />
+                {/* Deja un 2% visible con deuda cero: un canal totalmente
+                    vacio se lee como un componente que no cargo. */}
+                <div className={`macc-util-fill band-${band}`} style={{ width: `${Math.max(2, utilPct)}%` }} />
               </div>
-              <span className={utilPct >= 90 ? 'text-expense' : utilPct >= 70 ? 'text-warn' : ''}>
-                {t('pctUsedAvailable').replace('{pct}', String(Math.round(utilPct))).replace('{amount}', fmtVal(account.limit - used!, currency))}
+              <span className={band === 'high' ? 'text-expense' : band === 'watch' ? 'text-warn' : ''}>
+                {t('pctUsedAvailable')
+                  .replace('{pct}', String(Math.round(utilPct)))
+                  .replace('{amount}', fmtVal(account.limit - used!, accountCurrency(account, currency)))}
               </span>
             </div>
+          )}
+
+          {/* El ciclo es lo que convierte un saldo en una TARJETA: sin corte y
+              fecha de pago, el numero no tiene consecuencia. */}
+          {cycle && (cycle.statementDate || cycle.paymentDate || minPay !== null) && (
+            <dl className="macc-cycle">
+              <div>
+                <dt>{t('cycleStatement')}</dt>
+                <dd>{cycle.statementDate ? formatCycleDate(cycle.statementDate, lang) : '—'}</dd>
+              </div>
+              <div>
+                <dt>{t('cyclePayment')}</dt>
+                <dd className={cycle.paymentSoon ? 'urgent' : ''}>
+                  {cycle.paymentDate ? formatCycleDate(cycle.paymentDate, lang) : '—'}
+                </dd>
+              </div>
+              <div>
+                <dt>{t('cycleMinimum')}</dt>
+                {/* Un dato ausente es '—', nunca 0: minimo cero y minimo
+                    desconocido son cosas distintas. */}
+                <dd>{minPay !== null ? fmtVal(minPay, accountCurrency(account, currency)) : '—'}</dd>
+              </div>
+            </dl>
+          )}
+
+          {/* Solo con saldo Y tasa configurada. El aviso dice el costo en
+              dinero y tiempo, no el porcentaje: "24% anual" no significa nada
+              al leerlo de pasada; "4 anos y RD$14,209" si. */}
+          {payoff && used !== null && used > 0 && (
+            <p className="macc-interest-warn">
+              <Icon name="alert" size={14} />
+              {payoff.never
+                ? t('minOnlyNever')
+                : t('minOnlyWarning')
+                    .replace('{time}', humanMonths(payoff.months, t))
+                    .replace('{interest}', fmtVal(payoff.totalInterest, accountCurrency(account, currency)))}
+            </p>
           )}
 
           {/* Trend chart */}
@@ -521,7 +595,9 @@ function getOverdraftOptions(t: ReturnType<typeof useT>): { value: OverdraftPoli
   ]
 }
 
-type SubSheet = 'balance' | 'limit' | 'short' | 'last4' | 'accCurrency' | null
+type SubSheet = 'balance' | 'limit' | 'short' | 'last4' | 'accCurrency'
+  | 'secondCurrency' | 'secondBalance' | 'statementDay' | 'paymentDay'
+  | 'apr' | 'minPct' | null
 
 function AccountEditorSheet({
   account,
@@ -639,6 +715,35 @@ function AccountEditorSheet({
                 fields.limit ? fmt(fields.limit, fields.currency ?? currency) : t('noLimitLabel'),
                 !fields.limit, 'limit')}
 
+              {/* Segundo saldo: una tarjeta dominicana casi siempre arrastra
+                  una deuda en pesos y otra en dolares, y se pagan aparte. */}
+              {fields.type === 'credit' && row(t('secondCurrencyLabel'), 'dollar',
+                fields.secondaryCurrency
+                  ? `${getCurrencyMeta(fields.secondaryCurrency).flag} ${fields.secondaryCurrency}`
+                  : t('noneLabel'),
+                !fields.secondaryCurrency, 'secondCurrency')}
+
+              {fields.type === 'credit' && fields.secondaryCurrency && row(
+                t('secondBalanceLabel'), 'coins',
+                fmt(fields.secondaryBalance ?? 0, fields.secondaryCurrency),
+                !fields.secondaryBalance, 'secondBalance')}
+
+              {fields.type === 'credit' && row(t('statementDayLabel'), 'calendar',
+                fields.statementDay ? t('dayOfMonth').replace('{d}', String(fields.statementDay)) : t('notSetLabel'),
+                !fields.statementDay, 'statementDay')}
+
+              {fields.type === 'credit' && row(t('paymentDayLabel'), 'calendar',
+                fields.paymentDay ? t('dayOfMonth').replace('{d}', String(fields.paymentDay)) : t('notSetLabel'),
+                !fields.paymentDay, 'paymentDay')}
+
+              {fields.type === 'credit' && row(t('aprLabel'), 'trend',
+                fields.apr ? `${fields.apr}%` : t('notSetLabel'),
+                !fields.apr, 'apr')}
+
+              {fields.type === 'credit' && row(t('minPaymentPctLabel'), 'receipt',
+                fields.minPaymentPct ? `${fields.minPaymentPct}%` : t('notSetLabel'),
+                !fields.minPaymentPct, 'minPct')}
+
               {row(t('labelField'), 'edit',
                 fields.short || t('add'),
                 !fields.short, 'short')}
@@ -735,6 +840,106 @@ function AccountEditorSheet({
           onClose={() => setSub(null)}
         />
       )}
+      {sub === 'secondBalance' && fields.secondaryCurrency && (
+        <MobileAmountSheet
+          title={t('secondBalanceTitle')}
+          value={Math.abs(fields.secondaryBalance ?? 0)}
+          currency={fields.secondaryCurrency}
+          onDone={v => {
+            // La deuda de tarjeta se guarda NEGATIVA, igual que `balance`: el
+            // usuario teclea 312 y el libro guarda -312.
+            patch('secondaryBalance', v ? -Math.abs(v) : 0)
+            setSub(null)
+          }}
+          onClose={() => setSub(null)}
+        />
+      )}
+      {sub === 'statementDay' && (
+        <DayOfMonthSheet
+          title={t('statementDayTitle')}
+          hint={t('statementDayHint')}
+          value={fields.statementDay}
+          onDone={v => { patch('statementDay', v); setSub(null) }}
+          onClose={() => setSub(null)}
+        />
+      )}
+      {sub === 'paymentDay' && (
+        <DayOfMonthSheet
+          title={t('paymentDayTitle')}
+          hint={t('paymentDayHint')}
+          value={fields.paymentDay}
+          onDone={v => { patch('paymentDay', v); setSub(null) }}
+          onClose={() => setSub(null)}
+        />
+      )}
+      {sub === 'apr' && (
+        <PercentSheet
+          title={t('aprTitle')}
+          hint={t('aprHint')}
+          value={fields.apr}
+          max={200}
+          onDone={v => { patch('apr', v); setSub(null) }}
+          onClose={() => setSub(null)}
+        />
+      )}
+      {sub === 'minPct' && (
+        <PercentSheet
+          title={t('minPaymentPctTitle')}
+          hint={t('minPaymentPctHint')}
+          value={fields.minPaymentPct}
+          max={100}
+          onDone={v => { patch('minPaymentPct', v); setSub(null) }}
+          onClose={() => setSub(null)}
+        />
+      )}
+      {sub === 'secondCurrency' && (
+        <SheetPortal>
+        <div className="mobile-detail-sheet" style={{ zIndex: 420 }} role="dialog" aria-modal="true" onClick={() => setSub(null)}>
+          <section className="mcur-sheet" onClick={e => e.stopPropagation()}>
+            <header>
+              <span>{t('secondCurrencyTitle')}</span>
+              <button aria-label={t('close')} onClick={() => setSub(null)}><Icon name="close" size={18} /></button>
+            </header>
+            <p className="mcur-subtitle">{t('secondCurrencyHint')}</p>
+            <div className="mcur-list">
+              <button
+                className={`mcur-row${!fields.secondaryCurrency ? ' on' : ''}`}
+                onClick={() => {
+                  patch('secondaryCurrency', undefined)
+                  patch('secondaryBalance', undefined)
+                  setSub(null)
+                }}
+              >
+                <span className="mcur-flag"><Icon name="close" size={16} /></span>
+                <div className="mcur-info"><strong>{t('noneLabel')}</strong><small>{t('singleCurrencyCardHint')}</small></div>
+              </button>
+              {CURRENCY_LIST
+                // La divisa principal de la tarjeta no puede ser tambien la
+                // secundaria: serian el mismo saldo dos veces.
+                .filter(c => c.code !== (fields.currency ?? currency))
+                .map(c => {
+                  const selected = fields.secondaryCurrency === c.code
+                  return (
+                    <button
+                      key={c.code}
+                      className={`mcur-row${selected ? ' on' : ''}`}
+                      onClick={() => {
+                        patch('secondaryCurrency', c.code)
+                        if (fields.secondaryBalance === undefined) patch('secondaryBalance', 0)
+                        setSub(null)
+                      }}
+                    >
+                      <span className="mcur-flag">{c.flag}</span>
+                      <div className="mcur-info"><strong>{c.code}</strong><small>{c.name}</small></div>
+                      <div className="mcur-right">{selected && <Icon name="check" size={16} style={{ color: 'var(--accent)' }} />}</div>
+                    </button>
+                  )
+                })}
+            </div>
+          </section>
+        </div>
+        </SheetPortal>
+      )}
       {sub === 'accCurrency' && (
         <SheetPortal>
         <div className="mobile-detail-sheet" style={{ zIndex: 420 }} role="dialog" aria-modal="true" onClick={() => setSub(null)}>
@@ -790,4 +995,22 @@ function AccountEditorSheet({
       )}
     </>
   )
+}
+
+/** Fecha del ciclo en formato corto ("25 sep"): el ano sobra, el ciclo es mensual. */
+function formatCycleDate(date: string, lang: string): string {
+  return new Date(`${date}T00:00:00`).toLocaleDateString(dateLocale(lang), { day: 'numeric', month: 'short' })
+}
+
+/**
+ * Meses como tiempo humano. "50 meses" obliga a dividir mentalmente; "4 anos y
+ * 2 meses" se entiende de golpe, y esa comprension inmediata es todo el punto
+ * del aviso de interes.
+ */
+function humanMonths(months: number, t: ReturnType<typeof useT>): string {
+  const years = Math.floor(months / 12)
+  const rest = months % 12
+  return years > 0
+    ? t('yearsMonths').replace('{y}', String(years)).replace('{m}', String(rest))
+    : t('monthsOnly').replace('{m}', String(months))
 }

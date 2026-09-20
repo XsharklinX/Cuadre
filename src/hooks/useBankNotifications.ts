@@ -2,7 +2,10 @@ import { useEffect } from 'react'
 import { toast } from '@/components/ui/Toast'
 import { guessCategoryId } from '@/data/bankCsv'
 import { movementDedupKey, resolveDetectedAccount } from '@/data/bankIngest'
-import { fmt, localToday } from '@/data/helpers'
+import { accountCurrency, fmt, localToday } from '@/data/helpers'
+import { entryInAccountCurrency } from '@/data/currencies'
+import { hasSecondaryBalance } from '@/data/creditCard'
+import type { Account, CurrencyCode } from '@/types'
 import { newId } from '@/data/seed'
 import { isTauri } from '@/hooks/useTauri'
 import { tt } from '@/i18n'
@@ -75,8 +78,20 @@ export function useBankNotifications() {
           if (bank.autoCreate && account) {
             const categoryId = guessCategoryId(tx.note, finance.categories, tx.type, false)
             const id = newId('tx_')
+            // El aviso trae SU divisa, y antes se ignoraba: un aviso de US$25
+            // creaba un gasto de 25 PESOS. Se enruta igual que en el flujo
+            // manual — segundo libro si coincide con la divisa secundaria de la
+            // tarjeta, y si no, conversion con la tasa congelada de ahora.
+            //
+            // Los cargos del banco NO se agregan aqui: el monto del aviso ya es
+            // el cobro final, asi que sumarlos los contaria dos veces.
+            const entry = routeDetectedAmount(account, tx.amount, tx.currency, finance.currency)
             try {
-              finance.addTx({ id, type: tx.type, amount: tx.amount, date, note: tx.note, accountId: account.id, categoryId, detectedFrom: 'notification' })
+              finance.addTx({
+                id, type: tx.type, date, note: tx.note,
+                accountId: account.id, categoryId, detectedFrom: 'notification',
+                ...entry,
+              })
               record({ pkg, title, text, postTime, verdict: 'auto-added' })
               // Red de seguridad: aviso con DESHACER. Si la app está en primer
               // plano el usuario lo ve al instante y puede revertir de un toque;
@@ -118,4 +133,32 @@ export function useBankNotifications() {
       document.removeEventListener('visibilitychange', onVisible)
     }
   }, [enabled])
+}
+
+
+/**
+ * A que libro va un movimiento detectado y en que monto, segun la divisa que
+ * traia el aviso.
+ *
+ * Espeja la decision del flujo manual de crear: si la divisa del aviso es la
+ * divisa secundaria de la tarjeta, el monto va tal cual al segundo libro; si
+ * no coincide con la divisa de la cuenta, se convierte congelando la tasa.
+ */
+export function routeDetectedAmount(
+  account: Account,
+  amount: number,
+  detectedCurrency: CurrencyCode,
+  base: CurrencyCode,
+): {
+  amount: number
+  onSecondaryBalance?: true
+  originalAmount?: number
+  originalCurrency?: CurrencyCode
+  fxRate?: number
+} {
+  if (hasSecondaryBalance(account) && account.secondaryCurrency === detectedCurrency) {
+    return { amount, onSecondaryBalance: true }
+  }
+  const target = accountCurrency(account, base)
+  return entryInAccountCurrency(amount, detectedCurrency, target)
 }

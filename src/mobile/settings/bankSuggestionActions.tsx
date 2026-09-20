@@ -3,7 +3,7 @@ import { Icon } from '@/components/ui/Icon'
 import { toast } from '@/components/ui/Toast'
 import { guessCategoryId } from '@/data/bankCsv'
 import { resolveDetectedAccount } from '@/data/bankIngest'
-import { fmtCompact, visibleAccounts } from '@/data/helpers'
+import { accountCurrency, fmtCompact, visibleAccounts } from '@/data/helpers'
 import { useBankSuggestions, type BankSuggestion } from '@/store/bankSuggestions'
 import { useFinance } from '@/store/finance'
 import { useSettings } from '@/store/settings'
@@ -193,7 +193,7 @@ function AccountPickerSheet({ item, accounts, currency, onChoose, onClose }: {
                     <Icon name={ACCT_ICONS[account.type] ?? 'wallet'} size={22} />
                   </span>
                   <b>{account.name}</b>
-                  <small>{fmtCompact(account.balance, currency)}</small>
+                  <small>{fmtCompact(account.balance, accountCurrency(account, currency))}</small>
                 </button>
               ))}
             </div>

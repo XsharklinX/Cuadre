@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Icon } from '@/components/ui/Icon'
 import { BrandLogo } from '@/components/ui/BrandLogo'
 import { toast } from '@/components/ui/Toast'
-import { currentMonthKey, dateLocale, fmt, localToday } from '@/data/helpers'
+import { accountCurrency, currentMonthKey, dateLocale, fmt, localToday } from '@/data/helpers'
 import { detectSubscriptions, subscriptionInsightKey as insightKey, type SubscriptionInsight } from '@/data/financeIntelligence'
 import { deleteWithUndo } from '@/lib/undoDelete'
 import { CURRENCIES } from '@/data/seed'
@@ -915,7 +915,7 @@ function RecurringTxForm({
                     <Icon name={ACCT_ICONS[a.type]} size={22} />
                   </span>
                   <b>{a.name}</b>
-                  <small>{fmt(a.balance, currency)}</small>
+                  <small>{fmt(a.balance, accountCurrency(a, currency))}</small>
                   {a.id === accountId && <Icon name="check" size={16} style={{ color: 'var(--accent, #ffdd3d)', marginLeft: 4 }} />}
                 </button>
               ))}

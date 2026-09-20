@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { toast } from '@/components/ui/Toast'
 import { resolveConflict, useCloudSync, type SyncConflict } from '@/data/cloudSync'
-import { fmt } from '@/data/helpers'
+import { accountCurrency, fmt } from '@/data/helpers'
 import { useFinance } from '@/store/finance'
 import { useT } from '@/i18n'
 import type { Account, Category, Goal, GoalContribution, Transaction } from '@/types'
@@ -39,7 +39,7 @@ function describeEntity(table: SyncConflict['table'], entity: SyncConflict['loca
       return [
         { label: t('name'), value: a.name },
         { label: t('type'), value: accountTypeLabel[a.type] },
-        { label: t('balance'), value: fmt(a.balance, currency) },
+        { label: t('balance'), value: fmt(a.balance, accountCurrency(a, currency)) },
       ]
     }
     case 'categories': {

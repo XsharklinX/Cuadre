@@ -224,18 +224,33 @@ export function netWorthBreakdown(accounts: Account[], base: CurrencyCode): NetW
 export function convertTxAmountsToBase(
   transactions: Transaction[], accounts: Account[], base: CurrencyCode,
 ): Transaction[] {
-  const foreign = new Map(accounts
+  // Divisa del LIBRO PRINCIPAL de cada cuenta.
+  const primary = new Map(accounts
     .filter(a => a.currency && a.currency !== base)
     .map(a => [a.id, a.currency!]))
-  if (foreign.size === 0) return transactions
+  // Divisa del SEGUNDO libro de una tarjeta. Va aparte porque un movimiento
+  // marcado `onSecondaryBalance` esta en ESTA divisa, no en la de la cuenta:
+  // sin este mapa, un gasto de US$25 en una tarjeta en pesos se sumaba a los
+  // presupuestos como 25 PESOS.
+  const secondary = new Map(accounts
+    .filter(a => a.type === 'credit' && a.secondaryCurrency && a.secondaryCurrency !== base)
+    .map(a => [a.id, a.secondaryCurrency!]))
+
+  if (primary.size === 0 && secondary.size === 0) return transactions
+
   return transactions.map(tx => {
-    const cur = tx.accountId ? foreign.get(tx.accountId) : undefined
+    if (!tx.accountId) return tx
+    const cur = tx.onSecondaryBalance ? secondary.get(tx.accountId) : primary.get(tx.accountId)
     if (!cur) return tx
     const rate = convertCurrency(1, cur, base)
     return {
       ...tx,
       amount: tx.amount * rate,
       splits: tx.splits?.map(split => ({ ...split, amount: split.amount * rate })),
+      // Los cargos viajan DENTRO de `amount`, asi que se convierten con el
+      // mismo factor: dejarlos en la divisa vieja haria que el desglose
+      // dejara de cuadrar con el total.
+      fees: tx.fees?.map(fee => ({ ...fee, amount: fee.amount * rate })),
     }
   })
 }
@@ -306,6 +321,11 @@ export function accountMovementsTotal(
 ): number {
   let total = 0
   for (const t of txns) {
+    // Los movimientos del SEGUNDO libro de una tarjeta no tocan el saldo
+    // principal: viven en su propia divisa y se suman aparte
+    // (`accountSecondaryMovementsTotal`). Sin este filtro, un gasto de US$25
+    // restaria 25 PESOS del saldo en pesos.
+    if (t.onSecondaryBalance) continue
     if (t.type === 'income' && t.accountId === accountId) total += t.amount
     else if (t.type === 'expense' && t.accountId === accountId) total -= t.amount
     else if (t.type === 'transfer') {
@@ -315,6 +335,27 @@ export function accountMovementsTotal(
   }
   for (const c of contributions) {
     if (c.fromAccountId === accountId) total -= c.amount
+  }
+  return total
+}
+
+/**
+ * Suma de los movimientos del SEGUNDO libro de una tarjeta, en la divisa
+ * secundaria. Es el espejo exacto de `accountMovementsTotal` para el otro
+ * saldo, y juntos mantienen la invariante por libro:
+ *
+ *   saldo        = apertura          + accountMovementsTotal
+ *   saldo 2ยบ     = apertura 2ยบ       + accountSecondaryMovementsTotal
+ *
+ * Las transferencias nunca entran aqui: no se puede transferir al segundo
+ * saldo de una tarjeta, eso es un pago al banco.
+ */
+export function accountSecondaryMovementsTotal(accountId: string, txns: Transaction[]): number {
+  let total = 0
+  for (const t of txns) {
+    if (!t.onSecondaryBalance || t.accountId !== accountId) continue
+    if (t.type === 'income') total += t.amount
+    else if (t.type === 'expense') total -= t.amount
   }
   return total
 }

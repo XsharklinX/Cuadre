@@ -62,6 +62,10 @@ android {
                 signingConfig = signingConfigs.getByName("releaseLocal")
             }
             isMinifyEnabled = true
+            // Reduccion de recursos: quita drawables, layouts y strings que
+            // R8 demostro que nadie referencia. Play Console la pedia y solo
+            // tiene sentido junto a `isMinifyEnabled`, que ya estaba activo.
+            isShrinkResources = true
             proguardFiles(
                 *fileTree(".") { include("**/*.pro") }
                     .plus(getDefaultProguardFile("proguard-android-optimize.txt"))
