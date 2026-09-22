@@ -1,3 +1,4 @@
+import { APP_NAME } from '@/data/release'
 import { isTauri } from '@/hooks/useTauri'
 
 export interface BiometricStatus {
@@ -29,7 +30,7 @@ export async function authenticateBiometric(reason = 'Verificar tu identidad'): 
   if (!isTauri()) throw new Error('Biometric not available outside Tauri')
   const { authenticate } = await import('@tauri-apps/plugin-biometric')
   await authenticate(reason, {
-    title: '$harky',
+    title: APP_NAME,
     subtitle: reason,
     cancelTitle: 'Cancelar',
     fallbackTitle: 'Usar PIN o patrón',

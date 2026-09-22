@@ -1,3 +1,4 @@
+import { APP_NAME } from '@/data/release'
 import { useState } from 'react'
 import { Icon } from '@/components/ui/Icon'
 import { playDoneSound, playWarningHaptic } from '@/lib/sound'
@@ -30,7 +31,7 @@ export function MobilePatternGate({ pattern, onUnlocked }: { pattern: string; on
         <div className="mbio-icon">
           <Icon name="grid" size={48} />
         </div>
-        <h2>$harky</h2>
+        <h2>{APP_NAME}</h2>
         <p>{error || 'Dibuja tu patrón para continuar'}</p>
 
         <PatternPad onComplete={handleComplete} shake={shake} success={success} />

@@ -1,0 +1,23 @@
+<es-419>
+Tarjetas de crédito, arregladas de verdad:
+
+• El saldo que escribías se guardaba al revés: la tarjeta decía "no debes nada" con la deuda encima.
+• Al editar una cuenta, "Detalles" se recortaba y no dejaba cambiar nada.
+• Ya puedes pagar la línea en dólares por separado.
+• La detección de transacciones se reconecta sola al abrir la app, y te avisa si lleva días sin capturar.
+• Volvieron los centavos en Movimientos.
+• Calendario, buscador y notificaciones más claros.
+• Nueva animación al abrir.
+</es-419>
+
+<en-US>
+Credit cards, properly fixed:
+
+• The balance you typed was stored inverted: the card said "you owe nothing" while the debt was right there.
+• When editing an account, "Details" collapsed on its own and let you change nothing.
+• You can now pay the dollar line separately.
+• Transaction detection reconnects itself on launch, and warns you if it has captured nothing for days.
+• Cents are back in Transactions.
+• Clearer calendar, search and notifications.
+• New launch animation.
+</en-US>

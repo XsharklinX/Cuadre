@@ -95,7 +95,7 @@ export function MobileOnboarding({ onDone, onBack }: { onDone: () => void; onBac
         {step === 'cash' && (
           <>
             <div className="mob-onboard-header">
-              <span className="mob-onboard-mark"><Icon name="shark" size={30} /></span>
+              <span className="mob-onboard-mark"><Icon name="brand" size={30} /></span>
               <h2>{t('onboardCashTitle')}</h2>
               <p>{t('onboardCashHint')}</p>
             </div>

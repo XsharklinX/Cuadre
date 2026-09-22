@@ -1,3 +1,4 @@
+import { APP_NAME } from '@/data/release'
 import { Component, type ErrorInfo, type ReactNode } from 'react'
 import { Icon } from './Icon'
 import { APP_VERSION } from '@/data/release'
@@ -45,7 +46,7 @@ export class ErrorBoundary extends Component<Props, State> {
   render() {
     if (!this.state.failed) return this.props.children
     return <main className="fatal-error">
-      <span className="empty-ico"><Icon name="shark" size={30} /></span>
+      <span className="empty-ico"><Icon name="brand" size={30} /></span>
       <h1>{tt('fatalErrorTitle')}</h1>
       <p>{tt('fatalErrorBody')}</p>
       {this.state.diagnostic && <small className="diagnostic-code">{tt('diagnosticLabel')}: {this.state.diagnostic}</small>}
@@ -122,7 +123,7 @@ function makeDetails(error: Error, info: ErrorInfo): string {
 
 function buildClipboardReport(diagnostic: string | null, details: string | null): string {
   return [
-    '$harky error report',
+    `${APP_NAME} error report`,
     `Version: ${APP_VERSION}`,
     diagnostic ? `Diagnostic: ${diagnostic}` : null,
     details,

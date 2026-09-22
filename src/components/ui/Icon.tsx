@@ -142,13 +142,28 @@ interface IconProps {
 }
 
 export function Icon({ name, size = 20, stroke = 2, fill = 'none', style, className }: IconProps) {
-  // ícono personalizado para el logo
-  if (name === 'shark') {
+  /*
+   * LA MARCA, en un solo trazo.
+   *
+   * `shark` era el tiburon del nombre viejo, y seguia apareciendo en el
+   * onboarding, en el dialogo de valoracion, en la pantalla de error, en los
+   * estados vacios y como icono por DEFECTO de todos los avisos. El nombre de
+   * la clave no se toca: esta en la lista de iconos que puede llevar una
+   * categoria del usuario (`store/finance.ts`), y renombrarla borraria el
+   * icono de quien lo tuviera puesto. Lo que cambia es el dibujo.
+   *
+   * Dos tarjetas superpuestas, con las mismas inclinaciones que el logo, pero
+   * de trazo y en `currentColor`: aqui tiene que heredar el color de donde se
+   * pinte, no traer el suyo.
+   */
+  if (name === 'shark' || name === 'brand') {
     return (
       <svg width={size} height={size} viewBox="0 0 24 24" fill={fill}
         stroke="currentColor" strokeWidth={stroke} strokeLinecap="round"
         strokeLinejoin="round" style={style} className={className} aria-hidden="true">
-        <path d="M2 12c4-1 6-4 11-4 4 0 7 2 9 4-2 2-5 4-9 4-2 0-3-.5-4-1l-3 3 .5-3.5C4 14 3 13 2 12z" />
+        <rect x="2.2" y="5.1" width="14.5" height="9.6" rx="2.4" transform="rotate(-9 9.45 9.9)" />
+        <rect x="7.3" y="9.3" width="14.5" height="9.6" rx="2.4" transform="rotate(7 14.55 14.1)" />
+        <path d="M10 14.6h5" transform="rotate(7 14.55 14.1)" />
       </svg>
     )
   }

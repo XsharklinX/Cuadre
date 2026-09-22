@@ -3,6 +3,17 @@
 export const APP_VERSION = __APP_VERSION__
 
 /**
+ * Nombre de la app, en UN solo sitio.
+ *
+ * Estaba escrito a mano en la pantalla "Acerca de", en la politica de
+ * privacidad, en los terminos y en la notificacion fija. Al cambiar la marca
+ * de "$harky" a "Cuadre" quedaron mitad y mitad: la tienda decia un nombre, la
+ * app otra, y los documentos legales un tercero. Un documento legal que nombra
+ * un producto que no existe no sirve de nada.
+ */
+export const APP_NAME = 'Cuadre'
+
+/**
  * Una entrada del changelog.
  *
  * Los items se escriben con un PREFIJO opcional que dice de qué tipo son, y
@@ -68,6 +79,60 @@ export function countByKind(items: ReleaseItem[]): Record<ReleaseItemKind, numbe
 }
 
 export const RELEASE_NOTES: ReleaseNote[] = [
+  {
+    version: '1.9.5',
+    date: '2026-09-20',
+    title: 'Tu tarjeta, como la lee tu banco',
+    items: [
+      'arreglo: GRAVE - una tarjeta con el disponible escrito en el saldo salia como si no se hubiera usado: el cupo entero libre y el boton de pagar ofreciendo cero.',
+      'nuevo: Ya puedes escribir lo que te queda DISPONIBLE en la tarjeta, que es lo que muestra tu banco. La app calcula sola lo que debes.',
+      'arreglo: La fila de saldo a favor mostraba RD$ 0.00 teniendo dinero a favor.',
+      'arreglo: Desde la notificacion fija, "Gasto" no abria nada si era lo ultimo que habias abierto. "Ingreso" si. Ahora los dos.',
+      'arreglo: Tocar dos veces el mismo aviso ya no se queda sin hacer nada la segunda.',
+      'arreglo: "Escribenos" en Sobre nosotros dejaba la app en una pantalla de error.',
+      'arreglo: Un aviso detectado con la fecha daniada mostraba "Invalid Date".',
+      'arreglo: La app seguia llamandose por su nombre viejo en la pantalla de bienvenida, en los PDF y Excel exportados, en los respaldos y al desbloquear con huella.',
+      'arreglo: El tiburon de la marca vieja seguia en el onboarding, en los avisos, en las pantallas vacias y en la de error.',
+      'mejor: Editar una cuenta se rehizo entera: ya no flota con un hueco negro debajo, no se desliza por dos sitios a la vez y deja mas sitio a los campos que a la decoracion.',
+      'mejor: Las notificaciones ocupan menos pantalla, entran con mas calma y cada aviso cabe entero. Antes el monto y el boton de agregar se salian por el borde.',
+      'mejor: Se acabo el menu de copiar al dejar pulsado en cualquier sitio. Ahora solo se copia lo que es un dato: montos y conceptos.',
+      'mejor: Cuentas es solo Cuentas. Metas se abre desde el menu, y la pantalla gana el espacio del selector.',
+    ],
+  },
+  {
+    version: '1.9.4',
+    date: '2026-09-20',
+    title: 'Las tarjetas, cuadrando de verdad',
+    items: [
+      'arreglo: GRAVE - en una tarjeta de credito, el saldo que escribias se guardaba al reves: tecleabas lo que debias y la app entendia que el banco te debia a ti. La tarjeta decia "no debes nada" y el boton de pagar ofrecia RD$ 0.00.',
+      'arreglo: GRAVE - al editar una cuenta, "Detalles" se recortaba solo y dejaba visible una sola fila: no se podia cambiar ni el limite, ni el banco, ni el ciclo, ni nada.',
+      'nuevo: Ya puedes pagar la linea en dolares de tu tarjeta por separado, con su propio saldo y su propio boton.',
+      'arreglo: Los centavos volvieron a la franja de Movimientos.',
+      'mejor: Las notificaciones abren desde el lateral derecho, sin tapar la barra de abajo.',
+      'arreglo: En el calendario, el dia que tocas se marca de verdad. Y "hoy" ya no desaparece al seleccionar otro dia.',
+      'mejor: El buscador mantiene la barra a la vista al desplazar, marca el foco y trae boton para borrar.',
+      'nuevo: "Acerca de" cuenta que es la app, no solo su version.',
+      'arreglo: Cuadre se llama Cuadre en todas partes: la notificacion fija, los terminos y la politica de privacidad seguian con el nombre viejo.',
+      'arreglo: Con la letra grande, los avisos y el carrusel de tarjetas se salian de la pantalla — la X de cerrar quedaba fuera.',
+      'arreglo: La deteccion de transacciones se reconecta sola al abrir la app. Android la soltaba al actualizar y quedaba muerta en silencio.',
+      'nuevo: Si la deteccion lleva dias sin capturar nada, la campanita te lo dice y te lleva a arreglarlo. Antes podias pasar meses sin enterarte.',
+      'arreglo: La ficha de la tarjeta decia "Utilizado 40%" y al lado ponia el cupo DISPONIBLE, no lo usado.',
+      'arreglo: Un saldo a favor en una tarjeta se leia como deuda. Ahora lo dice.',
+    ],
+  },
+  {
+    version: '1.9.2',
+    date: '2026-09-20',
+    title: 'Cuadre: nombre e icono nuevos',
+    items: [
+      'nuevo: La app se llama Cuadre y estrena icono: dos tarjetas, no una pirámide.',
+      'arreglo: Analisis comparaba el mes a medias contra el mes pasado entero, asi que casi siempre decia que ibas mejor de lo que ibas.',
+      'arreglo: En el carrusel, los dos saldos de una tarjeta se montaban encima de sus ultimos 4 digitos.',
+      'arreglo: Cifras cortadas con puntos suspensivos en Metas, en el resumen de la semana y en los saldos de la ficha.',
+      'mejor: El aviso de "ponle un PIN" ya no aprieta su texto en una columna de seis palabras.',
+      'mejor: Los datos de demostracion enseñan la app completa: red de la tarjeta, deuda en dolares, ciclo y tasa.',
+    ],
+  },
   {
     version: '1.9.1',
     date: '2026-09-20',

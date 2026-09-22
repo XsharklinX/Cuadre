@@ -24,6 +24,15 @@
     <!-- Vibración corta al auto-capturar en la cámara en vivo de recibos
          (Fase 4 del roadmap) — permiso "normal", sin diálogo al usuario. -->
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- FACTURACION de Google Play (Cuadre VIP, compra unica).
+         La libreria de Play Billing ya declara este permiso y el mezclador de
+         manifiestos lo arrastraria solo, pero se pone EXPLICITO porque Play
+         Console solo habilita la seccion de "productos unicos" cuando ve el
+         permiso en un artefacto YA SUBIDO: si el mezclador fallara en
+         silencio, el bloqueo no diria por que.
+         NOTA: este directorio se regenera con `tauri android init` — si eso
+         ocurre, hay que volver a agregar esta linea. -->
+    <uses-permission android:name="com.android.vending.BILLING" />
     <!-- La cámara no es obligatoria: dispositivos sin cámara pueden instalar la app. -->
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />

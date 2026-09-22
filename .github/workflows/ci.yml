@@ -4,8 +4,10 @@ name: CI
 # typecheck, tests o el build web fallan. cargo check corre aparte porque
 # necesita el toolchain de Rust y valida que el lado Tauri compile.
 on:
+  # TODAS las ramas, no solo main. El trabajo del dia a dia ocurre en ramas de
+  # feature y se empuja a mano: con el filtro a `main`, la puerta se abria
+  # justo despues de que ya fuera tarde para cerrarla.
   push:
-    branches: [main]
   pull_request:
 
 concurrency:
@@ -28,6 +30,22 @@ jobs:
       - run: npm run test:coverage
       - run: npm run build
 
+  e2e:
+    name: Pruebas de extremo a extremo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      # Aqui vive la guardia de desbordamiento (320px con la letra al 135%),
+      # que es la que ha cazado los fallos que los tests unitarios no ven:
+      # controles fuera de pantalla, imposibles de tocar.
+      - run: npm run test:e2e
+
   cargo-check:
     name: cargo check (Tauri desktop)
     runs-on: windows-latest
@@ -38,3 +56,24 @@ jobs:
         with:
           workspaces: src-tauri -> target
       - run: cargo check --manifest-path src-tauri/Cargo.toml
+
+  android-kotlin:
+    name: Compilar los plugins de Android
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@v3
+      # EL HUECO que dejo pasar la rotura de Play Billing 7 -> 8: el lado
+      # Kotlin no lo compilaba NADIE hasta que se empaquetaba la app, y eso
+      # solo pasa a mano. `cargo check` no lo cubre: los plugins son
+      # `#![cfg(target_os = "android")]`, asi que en escritorio compilan a
+      # nada. Esto compila solo el Kotlin de los plugins, sin Rust ni NDK,
+      # que es barato y detecta exactamente ese tipo de fallo.
+      - name: assembleRelease de cada plugin
+        working-directory: src-tauri/gen/android
+        run: |
+          ./gradlew --no-daemon             :tauri-plugin-play-billing:assembleRelease             :tauri-plugin-bank-notifications:assembleRelease             :tauri-plugin-local-reminders:assembleRelease             :tauri-plugin-home-widget:assembleRelease             :tauri-plugin-keystore:assembleRelease             :tauri-plugin-mlkit-ocr:assembleRelease

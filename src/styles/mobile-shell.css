@@ -1,4 +1,46 @@
   /* Native mobile architecture */
+  /*
+   * SELECCION DE TEXTO: apagada por defecto, encendida donde se copia.
+   *
+   * Una app nativa no deja seleccionar su interfaz. Dejar pulsado sobre un
+   * titulo, una etiqueta o un boton sacaba el menu de copiar y las asas azules
+   * de seleccion, y eso convierte la pantalla en un documento de texto: se
+   * dispara al desplazar, al arrastrar una tarjeta del carrusel, al mantener
+   * pulsado para borrar. Parece rota, no potente.
+   *
+   * Lo que SI se puede copiar esta marcado a mano abajo: montos, nombres de
+   * movimientos, notas y los campos de diagnostico. Son los unicos sitios
+   * donde alguien de verdad quiere llevarse el texto.
+   */
+  .mobile-app,
+  .mobile-app * {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  /* Donde el texto es un DATO, no interfaz. */
+  .mobile-app input,
+  .mobile-app textarea,
+  .mobile-app [contenteditable],
+  /* Fila de movimiento: el concepto y el monto. La fila entera no — si no,
+     arrastrar la lista empieza a seleccionar. */
+  .mobile-app .mobile-tx-row > span > b,
+  .mobile-app .mobile-tx-row > strong,
+  .mobile-app .sacc-row-amount,
+  .mobile-app .sacc-bal-value,
+  .mobile-app .sacc-detail-balance,
+  .mobile-app .sacc-plastic-fig b,
+  .mobile-app .sacc-pay-owed strong,
+  .mobile-app .mobile-summary-strip .mini-stat strong,
+  .mobile-app .mset-dev-facts b,
+  .mobile-app .mset-dev-json,
+  .mobile-app .mset-dev-queue {
+    -webkit-user-select: text;
+    user-select: text;
+    -webkit-touch-callout: default;
+  }
+
   .mobile-app {
     /* Alias themed CSS vars → --m-* so all mobile elements respond to theme */
     --m-bg:      var(--bg,      #121212);
@@ -1224,8 +1266,31 @@
     width: 100%;
   }
   .mcal-day.over { background: color-mix(in oklab, #ff453a 12%, transparent); }
-  .mcal-day.today { outline: 2px solid var(--accent); }
-  .mcal-day.selected { outline: 2px solid #5bc0ff; }
+
+  /*
+   * HOY y SELECCIONADO se marcaban los dos con `outline: 2px`. Dos problemas:
+   * un elemento solo puede tener UN outline, asi que al tocar el dia de hoy
+   * una de las dos marcas desaparecia; y un filete de 2px en una celda de
+   * 44px dentro de una rejilla de siete columnas sencillamente no se ve — el
+   * usuario tocaba y la app no parecia responder.
+   *
+   * Ahora son dos marcas de naturaleza distinta y ninguna puede tapar a la
+   * otra: HOY es un anillo interior (box-shadow, que no lo recorta nadie) y
+   * SELECCIONADO es relleno solido. Se pueden llevar a la vez.
+   */
+  .mcal-day.today {
+    box-shadow: inset 0 0 0 2px var(--accent);
+  }
+  .mcal-day.today .mcal-day-num { color: var(--accent); }
+  .mcal-day.selected {
+    background: var(--accent);
+    box-shadow: inset 0 0 0 2px var(--accent), 0 6px 16px -6px var(--accent);
+  }
+  .mcal-day.selected .mcal-day-num { color: #08201c; font-weight: 850; }
+  /* Sobre el relleno del acento, los puntos de color se pierden: se les da
+     un borde del mismo fondo para que recorten en vez de mezclarse. */
+  .mcal-day.selected .mcal-dot { box-shadow: 0 0 0 1.5px var(--accent); }
+  .mcal-day:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .mcal-day-num { font-size: 13px; font-weight: 700; }
   /* Totales del mes: un vistazo a lo que entró y salió sin sumar celdas. */
   .mcal-totals {
@@ -1500,7 +1565,7 @@
   .mobile-summary-strip .mini-stat {
     background: transparent;
     border: 0;
-    padding: 8px 4px;
+    padding: 8px 2px;
     text-align: center;
   }
   .mobile-summary-strip .mini-stat-button {
@@ -1543,7 +1608,13 @@
   }
   .mobile-summary-strip-movements .mini-stat strong {
     display: block;
-    font-size: 15px;
+    /* 13.5px y no 15: son TRES cifras en tres columnas de ~115px, y a 15px un
+       ingreso de cinco digitos CON centavos no entraba — el ellipsis se comia
+       los decimales y la franja mostraba "RD$ 65,132.". Una app de dinero no
+       puede recortar una cifra de dinero, asi que encoge la letra, no el
+       numero. */
+    font-size: 13.5px;
+    letter-spacing: -.02em;
     line-height: 1.15;
     /* max-width:100% es imprescindible: sin él, con ellipsis pero sin límite de
        ancho el número toma su ancho completo y, centrado en la columna, se sale
@@ -1877,12 +1948,20 @@
     color: var(--m-text);
     font-size: 17px;
   }
+  /*
+   * El buscador aparecia de golpe, y al desplazar los resultados se llevaba
+   * por delante la cabecera y el propio campo: te quedabas mirando una lista
+   * sin ver que habias buscado ni como salir. Ahora entra con una transicion
+   * corta y la cabecera + el campo quedan fijos arriba.
+   */
   .mobile-search-overlay {
+    animation: mobile-search-in var(--m-duration) var(--m-ease-out) both;
     background: var(--m-bg);
     bottom: 0;
     color: var(--m-text);
     left: 0;
     overflow-y: auto;
+    overscroll-behavior: contain;
     padding-bottom: calc(20px + env(safe-area-inset-bottom));
     position: fixed;
     right: 0;
@@ -1890,12 +1969,22 @@
     top: 0;
     z-index: 130;
   }
+  @keyframes mobile-search-in {
+    from { opacity: 0; transform: translateY(10px); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .mobile-search-overlay { animation: none; }
+  }
   .mobile-search-head {
     align-items: center;
+    background: var(--m-bg);
     display: grid;
     grid-template-columns: 90px 1fr 90px;
     padding: calc(14px + env(safe-area-inset-top)) 16px 14px;
+    position: sticky;
     text-align: center;
+    top: 0;
+    z-index: 2;
   }
   .mobile-search-head strong {
     font-size: 17px;
@@ -1918,6 +2007,16 @@
     gap: 9px;
     margin: 0 16px 16px;
     padding: 0 13px;
+    position: sticky;
+    top: calc(52px + env(safe-area-inset-top));
+    transition: border-color .15s ease, box-shadow .15s ease;
+    z-index: 2;
+  }
+  /* El campo no tenia NINGUNA marca de foco (`outline: 0` y nada en su
+     lugar): con el teclado cerrado no habia forma de saber si estaba activo. */
+  .mobile-search-input:focus-within {
+    border-color: var(--m-primary);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--m-primary) 18%, transparent);
   }
   .mobile-search-input input {
     background: transparent;
@@ -1926,7 +2025,30 @@
     flex: 1;
     font-size: 16px;
     min-height: 50px;
+    min-width: 0;
     outline: 0;
+  }
+  /* Borrar lo escrito sin tener que mantener pulsado el retroceso. */
+  .mobile-search-wipe {
+    align-items: center;
+    background: color-mix(in oklab, var(--m-text) 10%, transparent);
+    border: 0;
+    border-radius: 999px;
+    color: var(--m-muted);
+    display: grid;
+    flex-shrink: 0;
+    height: 24px;
+    place-items: center;
+    width: 24px;
+  }
+  /* La franja fija necesita fondo propio: sin el, los resultados se veian
+     pasar por debajo del campo. */
+  .mobile-search-input::before {
+    background: var(--m-bg);
+    content: '';
+    inset: -8px -16px -10px;
+    position: absolute;
+    z-index: -1;
   }
   /* Botón "Limpiar" del encabezado de búsqueda (columna derecha del grid) */
   .mobile-search-clear { text-align: right !important; }
@@ -2230,20 +2352,68 @@
      siente como una pantalla, no un panel flotando encima de Movimientos),
      y cada tarjeta tiene su propia jerarquía en vez de pelear por una sola
      fila de 56px. */
+  /*
+   * PANEL LATERAL, no hoja inferior.
+   *
+   * Subiendo desde abajo, el centro de notificaciones entraba por donde entra
+   * todo lo demas —crear un gasto, elegir divisa, pagar una tarjeta— y ademas
+   * tapaba la barra de navegacion justo donde esta la campanita que acabas de
+   * tocar. Un cajon que entra desde el borde derecho dice "esto viene de
+   * fuera, no es un paso de lo que estabas haciendo", deja la barra a la
+   * vista y se cierra con el mismo gesto con el que se abrio.
+   */
   .mnc-wrap {
-    align-items: flex-end;
+    align-items: stretch;
+    justify-content: flex-end;
   }
+  /* El VELO se aclara con el panel: entrar de golpe sobre negro pleno es lo
+     que se siente brusco. Se atenua solo mientras el cajon entra. */
+  .mnc-wrap { animation: mnc-veil-in calc(var(--m-duration) * 1.3) var(--m-ease-out) both; }
+  @keyframes mnc-veil-in { from { background: rgba(0,0,0,0); } }
+
   .mnc-sheet {
+    /* Un pelin mas lento que el resto de hojas y con curva de salida suave:
+       un cajon que cruza media pantalla necesita mas recorrido temporal que
+       un dialogo que solo aparece. */
+    animation: mnc-slide-in calc(var(--m-duration) * 1.4) cubic-bezier(.16, .84, .3, 1) both;
     background: var(--m-bg);
     border: 0;
-    border-radius: 26px 26px 0 0;
+    border-left: 1px solid var(--m-border);
+    border-radius: 22px 0 0 22px;
+    box-shadow: -24px 0 60px rgba(0, 0, 0, .5);
     display: flex;
     flex-direction: column;
-    max-height: min(92dvh, 880px);
-    min-height: 62dvh;
+    height: 100%;
+    max-height: none;
+    max-width: 440px;
+    min-height: 0;
     overflow: hidden;
     padding: 0;
-    width: 100%;
+    /* Un dedo tiene que poder alcanzar el fondo de detras para cerrarlo: el
+       panel nunca ocupa la pantalla entera. */
+    /* 78vw y no 88: con las tarjetas compactas el contenido cabe, y un cajon
+       que tapa casi toda la pantalla no se lee como un cajon — se lee como
+       otra pantalla. Dejar ver lo que hay detras es lo que dice "esto es
+       temporal, toca fuera y se va". */
+    width: min(calc(78vw / var(--fs, 1)), 380px);
+  }
+  @keyframes mnc-slide-in {
+    from { transform: translateX(100%); }
+  }
+  /* El contenido entra un paso por detras del panel, no pegado a el: si todo
+     llega a la vez, el cajon se lee como una imagen que aparece de golpe. */
+  .mnc-body > * {
+    animation: mnc-content-in calc(var(--m-duration) * 1.6) var(--m-ease-out) both;
+    animation-delay: 60ms;
+  }
+  @keyframes mnc-content-in {
+    from { opacity: 0; transform: translateX(14px); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .mnc-wrap, .mnc-body > * { animation: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .mnc-sheet { animation: none; }
   }
   /* Cabecera con gradiente de marca (misma familia que el héroe del Perfil):
      una banda con glow que le da identidad al panel en vez de una fila plana.
@@ -2256,12 +2426,50 @@
     flex-shrink: 0;
     position: relative;
   }
-  .mnc-handle {
-    background: var(--m-brand-layer-strong);
+  /* El tirador era el asa de una hoja que subia desde abajo. En un cajon
+     lateral no significa nada, asi que se reserva el sitio como respiro
+     bajo la barra de estado y nada mas. */
+  /* Aviso de deteccion muerta: rojo, arriba del todo y accionable. No es un
+     mensaje informativo — lleva al sitio donde se arregla. */
+  .mnc-health {
+    align-items: center;
+    background: color-mix(in oklab, #ff5470 14%, transparent);
+    border: 1px solid color-mix(in oklab, #ff5470 34%, transparent);
+    border-radius: 14px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 11px;
+    margin: 14px 14px 4px;
+    padding: 13px 14px;
+    text-align: left;
+    width: calc(100% - 28px);
+  }
+  .mnc-health-ico {
+    align-items: center;
+    background: color-mix(in oklab, #ff5470 22%, transparent);
+    border-radius: 10px;
+    color: #ff5470;
+    display: grid;
+    flex-shrink: 0;
+    height: 32px;
+    place-items: center;
+    width: 32px;
+  }
+  .mnc-health-text { display: grid; flex: 1 1 150px; gap: 3px; min-width: 0; }
+  .mnc-health-text strong { color: var(--m-text); font-size: 13.5px; font-weight: 800; line-height: 1.3; }
+  .mnc-health-text small { color: var(--m-muted); font-size: 12px; line-height: 1.45; }
+  .mnc-health-cta {
+    background: #ff5470;
     border-radius: 999px;
-    height: 4px;
-    margin: 10px auto 0;
-    width: 36px;
+    color: #15070b;
+    font-size: 12px;
+    font-weight: 850;
+    padding: 7px 14px;
+    white-space: nowrap;
+  }
+
+  .mnc-handle {
+    height: max(10px, env(safe-area-inset-top));
   }
   .mnc-header {
     align-items: center;
@@ -2318,6 +2526,7 @@
   }
   .mnc-close:active { background: var(--m-brand-layer-strong); }
   .mnc-body {
+    scroll-behavior: smooth;
     display: flex;
     flex-direction: column;
     gap: 22px;
@@ -2354,32 +2563,64 @@
     padding: 1px 7px;
     text-align: center;
   }
+  /*
+   * `min-width: 0` en TODA la cadena hasta la tarjeta.
+   *
+   * Un hijo de rejilla o de flex tiene tamaño minimo automatico igual a su
+   * contenido: la lista se estiraba a 476px dentro de un grupo de 267 y las
+   * tarjetas salian por la derecha del cajon — el monto y el boton de agregar
+   * quedaban fuera de la pantalla, sin forma de tocarlos. Poner el ellipsis
+   * en el titulo no bastaba: nadie le habia dicho al contenedor que podia
+   * encoger.
+   */
+  .mnc-group,
+  .mnc-card-list { min-width: 0; }
+  .mnc-body { overflow-x: hidden; }
+
   .mnc-card-list {
     display: flex;
     flex-direction: column;
     gap: 10px;
   }
 
-  /* Tarjeta de transacción detectada */
+  /*
+   * TARJETA DE TRANSACCION DETECTADA — compacta.
+   *
+   * Cada una ocupaba ~170px: icono de 40, titulo, chips sangrados 51px y dos
+   * botones de 40 de alto. En un cajon lateral eso son DOS tarjetas por
+   * pantalla, y el contenido se salia por la derecha — el concepto, el monto y
+   * el boton principal llegaban cortados.
+   *
+   * Ahora cabe en ~120px sin perder nada: el icono baja a 34, el monto se va
+   * a su propia linea junto a los chips (donde no compite con el concepto por
+   * el ancho) y los botones son mas bajos.
+   *
+   * `min-width: 0` en todo lo que es flexible: sin eso, un concepto largo
+   * empuja la tarjeta mas alla del panel en vez de recortarse.
+   */
   .mnc-card {
     background: var(--m-surface);
-    border-radius: 18px;
+    border: 1px solid var(--m-border);
+    border-radius: 16px;
     box-shadow: 0 1px 0 color-mix(in oklab, #fff 4%, transparent) inset;
-    padding: 14px 14px 12px;
+    min-width: 0;
+    overflow: hidden;
+    padding: 12px;
   }
   .mnc-card-top {
-    align-items: flex-start;
+    align-items: center;
     display: flex;
-    gap: 11px;
+    gap: 10px;
+    min-width: 0;
   }
   .mnc-card-icon {
     align-items: center;
-    border-radius: 12px;
+    border-radius: 11px;
     display: flex;
     flex-shrink: 0;
-    height: 40px;
+    height: 34px;
     justify-content: center;
-    width: 40px;
+    width: 34px;
   }
   .mnc-card-title {
     display: flex;
@@ -2391,23 +2632,37 @@
   }
   .mnc-card-title b {
     color: var(--m-text);
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 750;
+    line-height: 1.25;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .mnc-card-title small { color: var(--m-muted); font-size: 12.5px; }
+  .mnc-card-title small { color: var(--m-muted); font-size: 11.5px; }
+  /* Fecha a la izquierda, monto a la derecha, en su propia linea: el concepto
+     se queda con el ancho entero de la tarjeta. */
+  .mnc-card-meta {
+    align-items: baseline;
+    display: flex;
+    gap: 10px;
+    justify-content: space-between;
+    min-width: 0;
+  }
+  /* El monto NO encoge y nunca se parte: es el dato. Lo que cede es el
+     concepto, que ya lleva puntos suspensivos. */
   .mnc-card-amount {
     flex-shrink: 0;
     font-size: 15px;
     font-variant-numeric: tabular-nums;
-    font-weight: 800;
-    padding-top: 1px;
+    font-weight: 850;
+    white-space: nowrap;
   }
   .mnc-card-amount.income { color: var(--m-income); }
   .mnc-card-amount.expense { color: var(--m-expense); }
-  .mnc-card-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0 51px; }
+  /* Sin sangria de 51px: alineaba los chips bajo el titulo pero les robaba
+     justo el ancho que necesitan para no partirse en un cajon estrecho. */
+  .mnc-card-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0; min-width: 0; }
   .mnc-card-account,
   .mnc-card-chip {
     align-items: center;
@@ -2416,10 +2671,15 @@
     border-radius: 999px;
     color: var(--m-muted);
     display: inline-flex;
-    font-size: 12px;
+    font-size: 11.5px;
     font-weight: 700;
-    gap: 5px;
-    padding: 5px 10px 5px 9px;
+    gap: 4px;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    padding: 4px 9px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   /* Chip de categoría sugerida: tinte del color de la propia categoría. */
   .mnc-card-cat { background: color-mix(in oklab, currentColor 14%, transparent); }
@@ -2429,25 +2689,31 @@
   .mnc-card-actions {
     display: flex;
     gap: 8px;
-    margin-top: 12px;
+    margin-top: 10px;
+    min-width: 0;
   }
   .mnc-card-dismiss,
   .mnc-card-accept {
     align-items: center;
     border: 0;
-    border-radius: 12px;
+    border-radius: 11px;
     display: flex;
-    font-size: 13px;
+    font-size: 12.5px;
     font-weight: 800;
-    gap: 6px;
-    height: 40px;
+    gap: 5px;
+    height: 36px;
     justify-content: center;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
   }
+  /* "Descartar" cede ancho; "Agregar" manda. Con `width: 40%` fijo, en un
+     cajon estrecho el boton principal se quedaba sin sitio para su texto. */
   .mnc-card-dismiss {
     background: color-mix(in oklab, var(--m-text) 7%, transparent);
     color: var(--m-muted);
-    flex: none;
-    width: 40%;
+    flex: 0 1 auto;
+    padding: 0 12px;
   }
   .mnc-card-dismiss:active { background: color-mix(in oklab, var(--m-text) 12%, transparent); }
   .mnc-card-accept {

@@ -1,4 +1,5 @@
 import { CURRENCIES } from './seed'
+import { devDate } from './devClock'
 import { convertCurrency } from './currencies'
 import type {
   Transaction, Category, Account, GoalContribution,
@@ -28,7 +29,19 @@ export function dateLocale(lang: string): string {
 
 export function monthKey(dateStr: string): string { return dateStr.slice(0, 7) }
 
-export function localToday(now = new Date()): string {
+/**
+ * "Hoy" segun la app, en fecha local.
+ *
+ * El valor por defecto pasa por `devDate()`, no por `new Date()`: con el modo
+ * desarrollador se puede mover el reloj de la app unos dias para probar
+ * cortes de tarjeta, recurrentes y cierres de mes sin esperarlos (ver
+ * `data/devClock.ts`). Sin desfase —el caso de todo el mundo— devuelve
+ * exactamente lo mismo que antes.
+ *
+ * Quien pasa una fecha explicita manda: el viaje en el tiempo solo afecta al
+ * "ahora" implicito.
+ */
+export function localToday(now = devDate()): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 }
 
@@ -340,7 +353,11 @@ export function accountMovementsTotal(
     if (t.type === 'income' && t.accountId === accountId) total += t.amount
     else if (t.type === 'expense' && t.accountId === accountId) total -= t.amount
     else if (t.type === 'transfer') {
-      if (t.toAccount === accountId) total += t.toAmount ?? t.amount
+      // Un pago marcado `toSecondary` entra en el OTRO libro
+      // (`accountSecondaryMovementsTotal`). Sin este filtro, pagar US$ 39.80
+      // de la linea en dolares sumaba 39.80 al saldo en PESOS, y "recalcular"
+      // daba por buena esa cifra.
+      if (t.toAccount === accountId && !t.toSecondary) total += t.toAmount ?? t.amount
       if (t.fromAccount === accountId) total -= t.amount
     }
   }
@@ -358,12 +375,18 @@ export function accountMovementsTotal(
  *   saldo        = apertura          + accountMovementsTotal
  *   saldo 2ยบ     = apertura 2ยบ       + accountSecondaryMovementsTotal
  *
- * Las transferencias nunca entran aqui: no se puede transferir al segundo
- * saldo de una tarjeta, eso es un pago al banco.
+ * SI entran las transferencias marcadas con `toSecondary`: son el pago de la
+ * linea en divisa extranjera. Una tarjeta dominicana arrastra dos deudas que
+ * se liquidan por separado, y sin esto la unica forma de bajar la deuda en
+ * dolares era editar el saldo a mano.
  */
 export function accountSecondaryMovementsTotal(accountId: string, txns: Transaction[]): number {
   let total = 0
   for (const t of txns) {
+    if (t.type === 'transfer') {
+      if (t.toSecondary && t.toAccount === accountId) total += t.toAmount ?? t.amount
+      continue
+    }
     if (!t.onSecondaryBalance || t.accountId !== accountId) continue
     if (t.type === 'income') total += t.amount
     else if (t.type === 'expense') total -= t.amount

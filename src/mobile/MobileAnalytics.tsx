@@ -1,3 +1,4 @@
+import { APP_NAME } from '@/data/release'
 import { useMemo, useState } from 'react'
 import { Icon } from '@/components/ui/Icon'
 import { AnimatedMoney } from '@/components/ui/AnimatedMoney'
@@ -209,7 +210,7 @@ export function MobileAnalytics({ mkey, onBudgets, onImport, onEditTx, initialPe
   // visual local (no filtra datos ni muta nada), así que es 100% reversible.
   const [focusCat, setFocusCat] = useState<string | null>(null)
   const finance = useFinance()
-  const ownerName = useSettings(s => s.displayName) || '$harky'
+  const ownerName = useSettings(s => s.displayName) || APP_NAME
   const [exportOpen, setExportOpen] = useState(false)
   const [exporting, setExporting] = useState<'pdf' | 'excel' | 'csv' | 'png' | null>(null)
   useMobileBackDismiss(exportOpen, () => setExportOpen(false))

@@ -1,3 +1,4 @@
+import { APP_NAME } from '@/data/release'
 import type { CurrencyCode, IconName } from '@/types'
 
 /**
@@ -147,7 +148,7 @@ export function noteShareText(
     }
   }
 
-  if (options.brand ?? true) lines.push('\nHecho con $harky')
+  if (options.brand ?? true) lines.push('\nHecho con ' + APP_NAME)
   return lines.join('\n')
 }
 

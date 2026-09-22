@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { APP_NAME } from '@/data/release'
 import { itemLineTotal, noteProgress, noteShareText, noteTotals, orderedItems, type Note, type NoteItem } from './notes'
 
 const item = (over: Partial<NoteItem>): NoteItem => ({ id: over.id ?? 'i', text: 'x', done: false, ...over })
@@ -92,7 +93,7 @@ describe('noteShareText', () => {
     expect(text).toContain('☑ Arroz 5 lb — RD$380')
     expect(text).toContain('▢ Café ×3 — RD$540')
     expect(text).toContain('Total estimado: RD$920')
-    expect(text).toContain('Hecho con $harky')
+    expect(text).toContain(`Hecho con ${APP_NAME}`)
   })
 
   it('sin precios: solo nombres, sin total', () => {

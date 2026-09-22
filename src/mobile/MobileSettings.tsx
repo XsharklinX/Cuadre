@@ -5,6 +5,7 @@ import { isTauri } from '@/hooks/useTauri'
 import { AvatarCropper } from '@/components/AvatarCropper'
 import { canPickImageNative, pickImageNative } from '@/lib/nativeFiles'
 import { useFinance } from '@/store/finance'
+import { useDev } from '@/store/dev'
 import { useSettings } from '@/store/settings'
 import { useT, type LangKey } from '@/i18n'
 import type { IconName } from '@/types'
@@ -15,7 +16,9 @@ import { SettingsCategories } from './settings/SettingsCategories'
 import { SettingsData } from './settings/SettingsData'
 import { SettingsSecurity } from './settings/SettingsSecurity'
 import { SettingsBankNotifications } from './settings/SettingsBankNotifications'
+import { SettingsDev } from './settings/SettingsDev'
 import { SettingsLegal } from './settings/SettingsLegal'
+import { SettingsVip } from './settings/SettingsVip'
 import { SettingsSyncConflicts } from './settings/SettingsSyncConflicts'
 
 // ── Estructura tipo "hub" (Opción A) ────────────────────────────────────────
@@ -103,6 +106,7 @@ export function MobileSettings({
   const settings = useSettings()
   const { currency } = useFinance()
   const t = useT()
+  const devUnlocked = useDev(d => d.unlocked)
   // Un `initialSheet` (ej. abrir directo en "PIN" desde el atajo) se consume una
   // vez, en el montaje: se sitúa la sub-pantalla de su categoría y se abre.
   const [section, setSection] = useState<Category | null>(() =>
@@ -301,6 +305,14 @@ export function MobileSettings({
             {section === 'security' && <SettingsSecurity {...sheetProps} grouped />}
             {section === 'bank' && <SettingsBankNotifications {...sheetProps} grouped />}
             {section === 'about' && <SettingsLegal {...sheetProps} />}
+            {/* Solo con el modo desarrollador abierto. Ni la fila ni las hojas
+                existen para el resto: no es un permiso, es que no estan. */}
+            {section === 'about' && devUnlocked && (
+              <>
+                <SettingsVip {...sheetProps} />
+                <SettingsDev {...sheetProps} />
+              </>
+            )}
           </>
         )}
       </div>

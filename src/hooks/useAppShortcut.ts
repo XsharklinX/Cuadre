@@ -33,8 +33,28 @@ function firstShortcut(urls: string[] | null | undefined): AppShortcut | null {
  *     ya usa "compartir recibo" (probado fiable). Se consulta al montar y cada
  *     vez que la app recupera el foco.
  */
-export function useAppShortcut(): [AppShortcut | null, () => void] {
-  const [shortcut, setShortcut] = useState<AppShortcut | null>(null)
+/**
+ * Cada entrega lleva un NUMERO DE SERIE, no solo el id.
+ *
+ * React descarta un `setState` que guarda el mismo valor que ya habia, asi que
+ * pedir "add-expense" dos veces seguidas no repintaba nada y el efecto que
+ * abre la pantalla no se volvia a ejecutar. Sintoma exacto que se reporto:
+ * desde la notificacion fija, "Ingreso" abria y "Gasto" no — porque "Gasto"
+ * era el valor que ya estaba puesto, e "Ingreso" cambiaba.
+ *
+ * Con el contador, dos peticiones identicas son dos objetos distintos y cada
+ * una dispara su efecto.
+ */
+export interface ShortcutRequest {
+  id: AppShortcut
+  /** Sube en cada entrega; solo sirve para que el objeto sea nuevo. */
+  serial: number
+}
+
+export function useAppShortcut(): [ShortcutRequest | null, () => void] {
+  const [shortcut, setShortcutState] = useState<ShortcutRequest | null>(null)
+  const setShortcut = (id: AppShortcut) =>
+    setShortcutState(prev => ({ id, serial: (prev?.serial ?? 0) + 1 }))
 
   useEffect(() => {
     if (!isTauri()) return
@@ -79,5 +99,5 @@ export function useAppShortcut(): [AppShortcut | null, () => void] {
     }
   }, [])
 
-  return [shortcut, () => setShortcut(null)]
+  return [shortcut, () => setShortcutState(null)]
 }

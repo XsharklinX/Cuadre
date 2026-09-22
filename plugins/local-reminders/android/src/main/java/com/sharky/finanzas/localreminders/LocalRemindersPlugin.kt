@@ -339,7 +339,9 @@ class LocalRemindersPlugin(private val activity: Activity) : Plugin(activity) {
         val builder = NotificationCompat.Builder(activity, QUICK_ADD_CHANNEL)
             .setSmallIcon(smallIcon)
             .setColor(QUICK_ADD_ACCENT)
-            .setContentTitle("\$harky · Agregar rápido")
+            // El nombre sale de `app_name`, no escrito a mano: asi un cambio de
+            // marca no deja el nombre viejo colgado en la barra de notificaciones.
+            .setContentTitle(activity.applicationInfo.loadLabel(activity.packageManager).toString() + " · Agregar rápido")
             .setContentText("Toca Gasto o Ingreso para anotarlo al instante.")
             .setOngoing(true)
             .setAutoCancel(false)

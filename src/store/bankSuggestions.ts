@@ -29,6 +29,13 @@ export interface BankSuggestion {
 
 interface BankSuggestionsState {
   enabled: boolean
+  /**
+   * Cuándo se activó la detección por primera vez (ms epoch), 0 = nunca.
+   *
+   * Sirve para no acusar de "no captura nada" a una detección que se acaba de
+   * encender y aún no ha tenido ocasión de capturar (`detectionHealth`).
+   */
+  enabledSince: number
   /** Si está activo, cuando el aviso se puede resolver a una cuenta (por los 4
    *  dígitos o el mapeo por app) el movimiento se CREA solo, sin pedir confirmar. */
   autoCreate: boolean
@@ -55,11 +62,17 @@ export const useBankSuggestions = create<BankSuggestionsState>()(
   persist(
     (set, get) => ({
       enabled: false,
+      enabledSince: 0,
       autoCreate: true,
       items: [],
       packageAccountMap: {},
       processed: [],
-      setEnabled: (enabled) => set({ enabled }),
+      setEnabled: (enabled) => set(state => ({
+        enabled,
+        // Solo la PRIMERA activación cuenta: apagar y encender no reinicia el
+        // margen de cortesía, o nunca se llegaría al aviso.
+        enabledSince: enabled && !state.enabledSince ? Date.now() : state.enabledSince,
+      })),
       setAutoCreate: (autoCreate) => set({ autoCreate }),
       add: (item) => {
         // Evita duplicados cuando el banco actualiza/reemplaza la misma notificación.

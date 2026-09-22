@@ -1,3 +1,4 @@
+import { APP_NAME } from '@/data/release'
 import { useState } from 'react'
 import { Icon } from '@/components/ui/Icon'
 import { playKeySound, playBackspaceSound, playDoneSound, playWarningHaptic } from '@/lib/sound'
@@ -36,7 +37,7 @@ export function MobilePinGate({ pin, onUnlocked }: { pin: string; onUnlocked: ()
         <div className="mbio-icon">
           <Icon name="lock" size={48} />
         </div>
-        <h2>$harky</h2>
+        <h2>{APP_NAME}</h2>
         <p>{error || 'Ingresa tu PIN para continuar'}</p>
 
         <div className="mpin-dots">

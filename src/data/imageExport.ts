@@ -1,3 +1,4 @@
+import { APP_NAME } from '@/data/release'
 import { localToday } from '@/data/helpers'
 import { saveFile } from '@/hooks/useTauri'
 
@@ -162,7 +163,7 @@ export async function exportElementPng(element: HTMLElement, name: string): Prom
     if (!blob) blob = await renderBlob(1)
     if (!blob) throw new Error('No se pudo generar la imagen')
     const filename = `${name}-${localToday()}.png`
-    await saveFile(blob, filename, 'Imagen de $harky', ['png'])
+    await saveFile(blob, filename, `Imagen de ${APP_NAME}`, ['png'])
   } finally {
     restore()
   }

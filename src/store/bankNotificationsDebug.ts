@@ -35,6 +35,15 @@ interface BankNotificationsDebugState {
   drainCount: number
   /** Cuántos avisos entregó el sistema en la última revisión. */
   lastPendingCount: number
+  /**
+   * Cuándo se capturó el ÚLTIMO aviso bancario (ms epoch), 0 = nunca.
+   *
+   * `lastDrainAt` solo dice que la app miró; esto dice que de verdad llegó
+   * algo. La diferencia entre los dos es justo el fallo que estuvo meses sin
+   * detectarse: la app revisaba la cola cada vez que se abría y la cola
+   * siempre venía vacía porque el servicio estaba desvinculado.
+   */
+  lastCapturedAt: number
   record: (entry: Omit<BankDebugEntry, 'id'>) => void
   /** Anota una revisión de la cola nativa y cuántos avisos entregó el sistema.
    *  Distingue "la app no revisa" de "revisa pero el sistema no entrega nada". */
@@ -50,8 +59,10 @@ export const useBankNotificationsDebug = create<BankNotificationsDebugState>()(
       lastDrainAt: 0,
       drainCount: 0,
       lastPendingCount: 0,
+      lastCapturedAt: 0,
       record: (entry) => set((state) => ({
         totalCaptured: state.totalCaptured + 1,
+        lastCapturedAt: Date.now(),
         entries: [
           { ...entry, id: `${entry.postTime}-${Math.random().toString(36).slice(2)}` },
           ...state.entries,

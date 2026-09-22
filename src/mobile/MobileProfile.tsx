@@ -12,6 +12,7 @@ import { AvatarCropper } from '@/components/AvatarCropper'
 import { canPickImageNative, pickImageNative } from '@/lib/nativeFiles'
 import { monthsLabel, simulatePayoff, useDebt } from '@/store/debt'
 import { useFinance } from '@/store/finance'
+import { useDev } from '@/store/dev'
 import { useSettings } from '@/store/settings'
 import type { Account, IconName, ViewId } from '@/types'
 
@@ -43,6 +44,7 @@ export function MobileProfile({
   goto: (view: ViewId) => void
 }) {
   const { displayName, setDisplayName, profilePhoto, setProfilePhoto } = useSettings()
+  const isVip = useDev(d => d.vip)
   const { accounts, transactions, goals, currency } = useFinance()
   const debtStore = useDebt()
   const fmtVal = useFmt()
@@ -204,6 +206,13 @@ export function MobileProfile({
         ) : (
           <div className="mpr-hero-identity">
             <h2>{effectiveName || t('myAccountLabel')}</h2>
+            {/* La insignia va junto al NOMBRE, no en una fila aparte: lo que
+                compra quien paga es que se note quien es. */}
+            {isVip && (
+              <span className="mpr-vip-badge">
+                <Icon name="star" size={10} /> {t('vipBadgeLabel')}
+              </span>
+            )}
             <button
               className="mpr-edit-name-btn"
               onClick={() => {

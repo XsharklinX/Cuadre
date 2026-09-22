@@ -74,7 +74,7 @@ export function Legend({ color, label }: { color: string; label: string }) {
   return <span className="legend"><i style={{ background: color }} />{label}</span>
 }
 
-export function Empty({ title = 'Todavía no hay datos', text, icon = 'shark', action }: {
+export function Empty({ title = 'Todavía no hay datos', text, icon = 'brand', action }: {
   title?: string
   text: string
   icon?: IconName

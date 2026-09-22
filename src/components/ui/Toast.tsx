@@ -55,7 +55,7 @@ function ToastRow({ item, leaving, onDismiss }: { item: ToastItem; leaving: bool
       }}
     >
       <span className="toast-icon">
-        <Icon name={item.icon ?? 'shark'} size={15} />
+        <Icon name={item.icon ?? 'brand'} size={15} />
       </span>
       <span className="toast-msg">{item.msg}</span>
       {item.action && (

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useFinance } from '@/store/finance'
+import { useDev } from '@/store/dev'
 import { useRating } from '@/store/rating'
 
 /** Retraso antes de mostrar el diálogo, para no atropellar el arranque. */
@@ -19,6 +20,19 @@ export function useRatingPrompt(suppressed = false): { open: boolean; close: () 
   const markSnoozed = useRating(s => s.markSnoozed)
 
   useEffect(() => {
+    /*
+     * Forzado desde el modo desarrollador: abre y punto, sin reglas ni
+     * espera. Probar este dialogo de otra forma exige siete dias de uso,
+     * ocho arranques y quince movimientos — o sea, no se probaba.
+     *
+     * La bandera se apaga al consumirla: se fuerza una vez, no para siempre.
+     */
+    if (useDev.getState().forceRating) {
+      useDev.getState().setForceRating(false)
+      setOpen(true)
+      return
+    }
+
     noteLaunch()
     // El conteo se lee DESPUÉS del retraso, no ahora: en el arranque el store
     // puede no haber hidratado todavía y saldría 0.

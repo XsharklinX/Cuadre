@@ -1,0 +1,21 @@
+<es-419>
+Tu tarjeta, como la lee tu banco:
+
+• Ahora puedes escribir lo que te queda DISPONIBLE, que es lo que muestra tu banco. La app calcula lo que debes.
+• Antes, una tarjeta con el disponible escrito en el saldo salía como si no se hubiera usado: el cupo entero libre y el botón de pagar en cero.
+• Desde la notificación fija, "Gasto" ya abre siempre.
+• Editar una cuenta se rehízo entera.
+• Las notificaciones ocupan menos pantalla y caben enteras.
+• Se acabó el menú de copiar al dejar pulsado.
+</es-419>
+
+<en-US>
+Your card, the way your bank shows it:
+
+• You can now type how much credit you have LEFT, which is what your bank shows. The app works out what you owe.
+• A card with the available amount typed into the balance looked unused: full limit free, pay button at zero.
+• From the ongoing notification, "Expense" now always opens.
+• The account editor was rebuilt.
+• Notifications take less screen and each alert fits whole.
+• No more copy menu when long-pressing anywhere.
+</en-US>

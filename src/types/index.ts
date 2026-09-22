@@ -19,7 +19,7 @@ export type IconName =
   // nav
   | 'grid' | 'list' | 'cards' | 'chart' | 'target'
   // acciones comunes
-  | 'plus' | 'arrowUp' | 'arrowDn' | 'shark' | 'search'
+  | 'plus' | 'arrowUp' | 'arrowDn' | 'shark' | 'brand' | 'search'
   | 'bell' | 'close' | 'calendar' | 'dots'
   | 'edit' | 'trash' | 'download' | 'print'
   // extras
@@ -187,6 +187,16 @@ export interface Transaction {
    * la transferencia). `undefined` = misma divisa, se usa `amount`.
    */
   toAmount?:    number
+  /**
+   * Solo transferencias cuyo destino es una TARJETA con dos libros: `true`
+   * abona la linea en divisa extranjera en vez del saldo principal.
+   *
+   * Existe porque una tarjeta dominicana lleva dos deudas que se pagan por
+   * separado, y un pago al banco es una transferencia, no un ingreso: sin
+   * esta marca el pago en dolares bajaba la deuda en pesos y dejaba la de
+   * dolares intacta.
+   */
+  toSecondary?: boolean
   recurring?:   RecurrenceFrequency | null
   recurringStart?: string
   recurringEnd?: string

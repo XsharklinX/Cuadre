@@ -1,9 +1,12 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { BrandMark } from '@/components/ui/BrandMark'
 import { Icon } from '@/components/ui/Icon'
 import { toast } from '@/components/ui/Toast'
 import { submitFeedback } from '@/data/feedback'
-import { APP_VERSION } from '@/data/release'
+import { APP_NAME, APP_VERSION } from '@/data/release'
+import { initialTapState, registerTap, type TapState } from '@/data/devUnlock'
+import { useDev } from '@/store/dev'
+import { playSuccessHaptic } from '@/lib/sound'
 import { useSettings } from '@/store/settings'
 import { useT } from '@/i18n'
 import { SettingsRow, SettingsSheet, type SheetProps } from './shared'
@@ -11,7 +14,7 @@ import { SettingsRow, SettingsSheet, type SheetProps } from './shared'
 const CONTACT_EMAIL = 'contactosharklin@gmail.com'
 // Fecha en que se actualizó por última vez el texto legal (no la fecha de hoy):
 // refleja cuándo cambió el contenido, como corresponde a un documento legal.
-const LEGAL_UPDATED = new Date('2026-07-18T00:00:00')
+const LEGAL_UPDATED = new Date('2026-09-20T00:00:00')
 
 type LegalSection = { title: string; body: string[] }
 type LegalDoc = Record<'es' | 'en', LegalSection[]>
@@ -21,13 +24,13 @@ const PRIVACY_SECTIONS: LegalDoc = {
     {
       title: '1. En resumen',
       body: [
-        '$harky es una app de finanzas personales que funciona en tu dispositivo. Tus datos financieros — cuentas, movimientos, categorías, presupuestos y metas — se guardan solo en tu teléfono. No necesitas crear una cuenta, no necesitas conexión a internet para usarla, y nada sale de tu dispositivo a menos que tú lo decidas explícitamente.',
+        `${APP_NAME} es una app de finanzas personales que funciona en tu dispositivo. Tus datos financieros — cuentas, movimientos, categorías, presupuestos y metas — se guardan solo en tu teléfono. No necesitas crear una cuenta, no necesitas conexión a internet para usarla, y nada sale de tu dispositivo a menos que tú lo decidas explícitamente.`,
       ],
     },
     {
       title: '2. Responsable',
       body: [
-        `$harky es desarrollada y mantenida por David Bonilla ("el Desarrollador", "nosotros"). Para cualquier duda sobre esta política o tus datos, escríbenos a ${CONTACT_EMAIL}.`,
+        `${APP_NAME} es desarrollada y mantenida por David Bonilla ("el Desarrollador", "nosotros"). Para cualquier duda sobre esta política o tus datos, escríbenos a ${CONTACT_EMAIL}.`,
       ],
     },
     {
@@ -59,7 +62,7 @@ const PRIVACY_SECTIONS: LegalDoc = {
     {
       title: '7. Tus derechos y control',
       body: [
-        'Puedes usar $harky totalmente sin conexión y sin cuenta; en ese caso tus datos nunca salen del teléfono.',
+        `Puedes usar ${APP_NAME} totalmente sin conexión y sin cuenta; en ese caso tus datos nunca salen del teléfono.`,
         'Puedes exportar una copia de tus datos cuando quieras desde Configuración → Datos → Exportar respaldo, y restaurarla luego.',
         'Puedes borrar de forma permanente todos tus datos desde Configuración → Datos → Borrar todos los datos.',
         `Si tienes cualquier solicitud sobre tus datos, escríbenos a ${CONTACT_EMAIL} y la atenderemos en un plazo razonable.`,
@@ -68,7 +71,7 @@ const PRIVACY_SECTIONS: LegalDoc = {
     {
       title: '8. Menores',
       body: [
-        '$harky no está dirigida a menores de 13 años y no recopilamos conscientemente información de menores. Si crees que un menor nos ha facilitado datos personales, contáctanos para eliminarlos.',
+        `${APP_NAME} no está dirigida a menores de 13 años y no recopilamos conscientemente información de menores. Si crees que un menor nos ha facilitado datos personales, contáctanos para eliminarlos.`,
       ],
     },
     {
@@ -86,13 +89,13 @@ const PRIVACY_SECTIONS: LegalDoc = {
     {
       title: '1. In short',
       body: [
-        '$harky is a personal finance app that runs on your device. Your financial data — accounts, transactions, categories, budgets and goals — is stored only on your phone. You do not need an account, you do not need an internet connection to use it, and nothing leaves your device unless you explicitly choose to send it.',
+        `${APP_NAME} is a personal finance app that runs on your device. Your financial data — accounts, transactions, categories, budgets and goals — is stored only on your phone. You do not need an account, you do not need an internet connection to use it, and nothing leaves your device unless you explicitly choose to send it.`,
       ],
     },
     {
       title: '2. Who is responsible',
       body: [
-        `$harky is developed and maintained by David Bonilla ("the Developer", "we"). For any question about this policy or your data, write to us at ${CONTACT_EMAIL}.`,
+        `${APP_NAME} is developed and maintained by David Bonilla ("the Developer", "we"). For any question about this policy or your data, write to us at ${CONTACT_EMAIL}.`,
       ],
     },
     {
@@ -124,7 +127,7 @@ const PRIVACY_SECTIONS: LegalDoc = {
     {
       title: '7. Your rights and control',
       body: [
-        'You can use $harky fully offline and without an account; in that case your data never leaves your phone.',
+        `You can use ${APP_NAME} fully offline and without an account; in that case your data never leaves your phone.`,
         'You can export a copy of your data at any time from Settings → Data → Export backup, and restore it later.',
         'You can permanently delete all your data from Settings → Data → Delete all data.',
         `For any request about your data, write to us at ${CONTACT_EMAIL} and we will handle it within a reasonable time.`,
@@ -133,7 +136,7 @@ const PRIVACY_SECTIONS: LegalDoc = {
     {
       title: '8. Children',
       body: [
-        '$harky is not directed at children under 13 and we do not knowingly collect information from minors. If you believe a minor has provided us with personal data, please contact us so we can remove it.',
+        `${APP_NAME} is not directed at children under 13 and we do not knowingly collect information from minors. If you believe a minor has provided us with personal data, please contact us so we can remove it.`,
       ],
     },
     {
@@ -154,13 +157,13 @@ const TERMS_SECTIONS: LegalDoc = {
     {
       title: '1. Aceptación',
       body: [
-        'Al descargar, instalar o usar $harky ("la app"), aceptas estos Términos de Uso. Si no estás de acuerdo con ellos, por favor no uses la app.',
+        `Al descargar, instalar o usar ${APP_NAME} ("la app"), aceptas estos Términos de Uso. Si no estás de acuerdo con ellos, por favor no uses la app.`,
       ],
     },
     {
-      title: '2. Qué es $harky',
+      title: `2. Qué es ${APP_NAME}`,
       body: [
-        '$harky es una herramienta de organización de finanzas personales para registrar ingresos, gastos, presupuestos y metas de ahorro. Es una herramienta informativa y de organización: no es una institución financiera, ni un banco, ni un asesor de inversiones, y no sustituye la asesoría profesional.',
+        `${APP_NAME} es una herramienta de organización de finanzas personales para registrar ingresos, gastos, presupuestos y metas de ahorro. Es una herramienta informativa y de organización: no es una institución financiera, ni un banco, ni un asesor de inversiones, y no sustituye la asesoría profesional.`,
       ],
     },
     {
@@ -178,13 +181,13 @@ const TERMS_SECTIONS: LegalDoc = {
     {
       title: '5. Uso aceptable',
       body: [
-        'Te comprometes a usar $harky de forma lícita y a no intentar vulnerar, hacer ingeniería inversa, sobrecargar o comprometer de cualquier forma la seguridad de la app o de los servicios que la respaldan.',
+        `Te comprometes a usar ${APP_NAME} de forma lícita y a no intentar vulnerar, hacer ingeniería inversa, sobrecargar o comprometer de cualquier forma la seguridad de la app o de los servicios que la respaldan.`,
       ],
     },
     {
       title: '6. Propiedad intelectual',
       body: [
-        'El nombre "$harky", su logo, diseño visual, código fuente y contenido son propiedad de David Bonilla, salvo las librerías de terceros usadas bajo sus respectivas licencias de código abierto.',
+        `El nombre "${APP_NAME}", su logo, diseño visual, código fuente y contenido son propiedad de David Bonilla, salvo las librerías de terceros usadas bajo sus respectivas licencias de código abierto.`,
       ],
     },
     {
@@ -202,7 +205,7 @@ const TERMS_SECTIONS: LegalDoc = {
     {
       title: '9. Cambios',
       body: [
-        'Podemos actualizar, modificar o descontinuar funciones de la app, así como estos Términos de Uso, en cualquier momento. Te avisaremos de los cambios relevantes dentro de la app. Si sigues usando $harky tras un cambio, se considera que aceptas los nuevos términos.',
+        `Podemos actualizar, modificar o descontinuar funciones de la app, así como estos Términos de Uso, en cualquier momento. Te avisaremos de los cambios relevantes dentro de la app. Si sigues usando ${APP_NAME} tras un cambio, se considera que aceptas los nuevos términos.`,
       ],
     },
     {
@@ -226,13 +229,13 @@ const TERMS_SECTIONS: LegalDoc = {
     {
       title: '1. Acceptance',
       body: [
-        'By downloading, installing or using $harky ("the app"), you agree to these Terms of Use. If you do not agree with them, please do not use the app.',
+        `By downloading, installing or using ${APP_NAME} ("the app"), you agree to these Terms of Use. If you do not agree with them, please do not use the app.`,
       ],
     },
     {
-      title: '2. What $harky is',
+      title: `2. What ${APP_NAME} is`,
       body: [
-        '$harky is a personal finance organization tool for tracking income, expenses, budgets and savings goals. It is an informational and organizational tool: it is not a financial institution, a bank, or an investment advisor, and it does not replace professional advice.',
+        `${APP_NAME} is a personal finance organization tool for tracking income, expenses, budgets and savings goals. It is an informational and organizational tool: it is not a financial institution, a bank, or an investment advisor, and it does not replace professional advice.`,
       ],
     },
     {
@@ -250,13 +253,13 @@ const TERMS_SECTIONS: LegalDoc = {
     {
       title: '5. Acceptable use',
       body: [
-        'You agree to use $harky lawfully, and not to attempt to breach, reverse-engineer, overload, or otherwise compromise the security of the app or the services that support it.',
+        `You agree to use ${APP_NAME} lawfully, and not to attempt to breach, reverse-engineer, overload, or otherwise compromise the security of the app or the services that support it.`,
       ],
     },
     {
       title: '6. Intellectual property',
       body: [
-        'The "$harky" name, its logo, visual design, source code and content are the property of David Bonilla, except for third-party libraries used under their respective open-source licenses.',
+        `The "${APP_NAME}" name, its logo, visual design, source code and content are the property of David Bonilla, except for third-party libraries used under their respective open-source licenses.`,
       ],
     },
     {
@@ -274,7 +277,7 @@ const TERMS_SECTIONS: LegalDoc = {
     {
       title: '9. Changes',
       body: [
-        'We may update, modify or discontinue features of the app, as well as these Terms of Use, at any time. We will notify you of relevant changes inside the app. If you keep using $harky after a change, you are considered to have accepted the new terms.',
+        `We may update, modify or discontinue features of the app, as well as these Terms of Use, at any time. We will notify you of relevant changes inside the app. If you keep using ${APP_NAME} after a change, you are considered to have accepted the new terms.`,
       ],
     },
     {
@@ -301,6 +304,39 @@ export function SettingsLegal({ activeSheet, onOpen, onClose }: SheetProps) {
   const lang = (useSettings(s => s.language) ?? 'es') as 'es' | 'en'
   const [commentText, setCommentText] = useState('')
   const [sending, setSending] = useState(false)
+
+  /*
+   * El gesto secreto. El contador vive en una ref y no en el estado: cada
+   * toque lo cambia y NO tiene que repintar nada — repintar en cada toque es
+   * justo lo que delataria que ahi hay algo.
+   */
+  const unlocked = useDev(d => d.unlocked)
+  const unlockDev = useDev(d => d.unlock)
+  const taps = useRef<TapState>(initialTapState)
+
+  /** Abre el correo en la app del sistema, nunca dentro del WebView. */
+  const openMail = async () => {
+    const url = `mailto:${CONTACT_EMAIL}`
+    try {
+      const { openUrl } = await import('@tauri-apps/plugin-opener')
+      await openUrl(url)
+    } catch {
+      // Navegador / plugin ausente: el camino de toda la vida.
+      window.open(url, '_blank', 'noopener')
+    }
+  }
+
+  const tapVersion = () => {
+    const result = registerTap(taps.current, Date.now(), unlocked)
+    taps.current = result.state
+    if (result.unlocked) {
+      unlockDev()
+      playSuccessHaptic()
+      toast(t('devUnlockedToast'), { icon: 'check', type: 'ok' })
+    } else if (result.remaining !== null) {
+      toast(t('devUnlockCountdown').replace('{n}', String(result.remaining)), { icon: 'info' })
+    }
+  }
 
   const updatedLabel = t('legalUpdatedLabel').replace(
     '{date}',
@@ -333,10 +369,18 @@ export function SettingsLegal({ activeSheet, onOpen, onClose }: SheetProps) {
           <SettingsRow icon="book"   iconColor="#f59e0b" label={t('termsOfUse')}    onClick={() => onOpen('terms')} />
         </div>
         <div className="mset-card">
-          <div className="mset-info-row">
-            <span>$harky</span>
+          {/* ESTA es la fila de la version que se ve al entrar en "Acerca de",
+              la ultima de la lista, y es donde la gente toca. El gesto de los
+              seis toques estaba SOLO en la version de dentro de "Sobre
+              nosotros", dos pantallas mas adentro: por eso no se abria el modo
+              desarrollador por mucho que se insistiera. Ahora valen las dos.
+
+              Sigue pareciendo una etiqueta a proposito: sin flecha, sin fondo
+              de boton, sin realce al tocar. */}
+          <button type="button" className="mset-info-row" onClick={tapVersion}>
+            <span>{APP_NAME}</span>
             <span>v{APP_VERSION}</span>
-          </div>
+          </button>
         </div>
       </div>
 
@@ -360,14 +404,55 @@ export function SettingsLegal({ activeSheet, onOpen, onClose }: SheetProps) {
 
       {activeSheet === 'about' && (
         <SettingsSheet title={t('aboutUs')} onClose={onClose}>
+          {/* "Acerca de" era un logo, un nombre y una version: tres lineas
+              que no dicen nada de la app. Ahora dice QUE es y por que, que es
+              lo que alguien busca cuando abre esta pantalla. */}
           <div className="mset-sheet-body mset-about">
-            <span className="mset-about-icon"><BrandMark size={76} /></span>
-            <strong className="mset-about-name">$harky</strong>
-            <span className="mset-about-version">{t('versionLabel').replace('{v}', APP_VERSION)}</span>
-            <p className="mset-about-dev">{t('developedByLabel')} <strong>David Bonilla</strong></p>
-            <p className="mset-about-desc">
-              {t('aboutDesc')}
-            </p>
+            <span className="mset-about-icon"><BrandMark size={72} /></span>
+            <strong className="mset-about-name">{APP_NAME}</strong>
+            <span className="mset-about-tagline">{t('aboutTagline')}</span>
+            {/* La version es un BOTON. Seis toques seguidos abren el modo
+                desarrollador (`data/devUnlock.ts`). A simple vista no se
+                distingue de una etiqueta: ese es el punto. */}
+            <button
+              type="button"
+              className="mset-about-version"
+              onClick={tapVersion}
+            >
+              {t('versionLabel').replace('{v}', APP_VERSION)}
+            </button>
+
+            <p className="mset-about-desc">{t('aboutDesc')}</p>
+
+            <div className="mset-about-points">
+              {([
+                ['lock',   '#5fe3c0', t('aboutLocalTitle'),  t('aboutLocalDesc')],
+                ['cards',  '#8bd6ff', t('aboutCardsTitle'),  t('aboutCardsDesc')],
+                ['shield', '#f5b62b', t('aboutNoAdsTitle'),  t('aboutNoAdsDesc')],
+              ] as const).map(([icon, color, title, desc]) => (
+                <div key={title} className="mset-about-point">
+                  <span className="mset-about-point-ico" style={{ background: color + '22', color }}>
+                    <Icon name={icon} size={16} />
+                  </span>
+                  <div>
+                    <strong>{title}</strong>
+                    <p>{desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mset-about-foot">
+              <p>{t('developedByLabel')} <strong>David Bonilla</strong></p>
+              {/* NO un <a href="mailto:">. En el WebView de Android eso navega
+                  la propia ventana a un esquema que no sabe pintar y deja la
+                  app en una pantalla de error. Igual que el resto de enlaces
+                  externos de la app: se delega en el sistema. */}
+              <button className="mset-about-mail" onClick={openMail}>
+                <Icon name="edit" size={14} /> {t('aboutContactLabel')}
+              </button>
+              <small>{t('aboutMadeIn')}</small>
+            </div>
           </div>
         </SettingsSheet>
       )}

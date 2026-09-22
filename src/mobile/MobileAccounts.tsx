@@ -12,6 +12,7 @@ import {
   hasSplitLimits, minimumPayment, projectMinimumPayoff, secondaryUtilization, utilizationBand,
 } from '@/data/creditCard'
 import { canDeleteAccountType, canHaveNetwork, creatableTypes, guessNetwork } from '@/data/cardNetwork'
+import { availableFromBalance, balanceFromAvailable, balanceFromOwed, owedFromBalance } from '@/data/creditEntry'
 import { findBank, guessBank } from '@/data/banks'
 import { MobileBankPicker } from './MobileBankPicker'
 import { NetworkMark } from '@/components/ui/NetworkMark'
@@ -470,6 +471,13 @@ function AccountDetailSheet({ account, mkey, onClose, onEdit, onViewAll, onEditT
                   className="sacc-detail-balance"
                 />
               )}
+              {/* Un saldo POSITIVO en una tarjeta no es deuda: es dinero a
+                  favor. Sin decirlo, "RD$ 2,218.55" se lee como lo que debes
+                  — y el boton de pagar, que sabe que no debes nada, parecia
+                  roto. */}
+              {account.type === 'credit' && account.balance > 0 && (
+                <span className="sacc-infavor">{t('inFavorTag')}</span>
+              )}
             </div>
           </div>
 
@@ -484,6 +492,7 @@ function AccountDetailSheet({ account, mkey, onClose, onEdit, onViewAll, onEditT
                 <strong className={`sacc-bal-value${account.balance < 0 ? ' owed' : ' clear'}`}>
                   {fmtVal(account.balance, accountCurrency(account, currency))}
                 </strong>
+                {account.balance > 0 && <span className="sacc-infavor">{t('inFavorTag')}</span>}
               </div>
               <div className="sacc-bal">
                 <span className="sacc-bal-label">
@@ -492,6 +501,7 @@ function AccountDetailSheet({ account, mkey, onClose, onEdit, onViewAll, onEditT
                 <strong className={`sacc-bal-value${(account.secondaryBalance ?? 0) < 0 ? ' owed' : ' clear'}`}>
                   {fmtVal(account.secondaryBalance ?? 0, account.secondaryCurrency!)}
                 </strong>
+                {(account.secondaryBalance ?? 0) > 0 && <span className="sacc-infavor">{t('inFavorTag')}</span>}
               </div>
             </div>
           )}
@@ -503,11 +513,15 @@ function AccountDetailSheet({ account, mkey, onClose, onEdit, onViewAll, onEditT
             <div className="sacc-util">
               <div className="sacc-util-head">
                 <span className="sacc-util-label">{t('creditUsedLabel')} · {account.secondaryCurrency}</span>
+                {/* El monto que va al lado del % es lo que QUEDA, no lo
+                    gastado: decia "Utilizado 40% · US$ 60.20" con una deuda de
+                    US$ 39.80 y un cupo de US$ 100. Las dos cifras eran
+                    correctas y juntas mentian. */}
                 <span className={`sacc-util-value ${utilizationBand(secUtil)}`}>
-                  {Math.round(secUtil * 100)}% · {fmtVal(
+                  {Math.round(secUtil * 100)}% · {t('availableAmount').replace('{amount}', fmtVal(
                     Math.max(0, account.secondaryLimit - creditUsed(account.secondaryBalance ?? 0)),
                     account.secondaryCurrency,
-                  )}
+                  ))}
                 </span>
               </div>
               <div
@@ -529,7 +543,8 @@ function AccountDetailSheet({ account, mkey, onClose, onEdit, onViewAll, onEditT
                 <span className="sacc-util-label">{t('creditUsedLabel')}</span>
                 <span className={`sacc-util-value ${band}`}>
                   {hasSplitLimits(account) ? `${accountCurrency(account, currency)} · ` : ''}
-                  {Math.round(utilPct)}% · {fmtVal(Math.max(0, account.limit - used!), accountCurrency(account, currency))}
+                  {Math.round(utilPct)}% · {t('availableAmount').replace('{amount}',
+                    fmtVal(Math.max(0, account.limit - used!), accountCurrency(account, currency)))}
                 </span>
               </div>
               <div
@@ -759,7 +774,7 @@ function getOverdraftOptions(t: ReturnType<typeof useT>): { value: OverdraftPoli
   ]
 }
 
-type SubSheet = 'balance' | 'limit' | 'short' | 'last4' | 'accCurrency'
+type SubSheet = 'balance' | 'available' | 'limit' | 'short' | 'last4' | 'accCurrency'
   | 'secondCurrency' | 'secondBalance' | 'statementDay' | 'paymentDay'
   | 'apr' | 'minPct' | 'network' | 'bank' | 'secondLimit' | null
 
@@ -825,7 +840,7 @@ function AccountEditorSheet({
   return (
     <>
       <SheetPortal>
-      <div ref={dialogRef} className="mobile-detail-sheet mpr-editor-overlay" role="dialog" aria-modal="true" onClick={onClose}>
+      <div ref={dialogRef} className="mobile-detail-sheet saed-overlay" role="dialog" aria-modal="true" onClick={onClose}>
         <section className="saed-sheet" onClick={e => e.stopPropagation()}>
 
           <header className="saed-header">
@@ -948,9 +963,38 @@ function AccountEditorSheet({
             {/* Filas tapeables */}
             <span className="mpr-group-label mpr-group-label-rows">{t('detailsLabel')}</span>
             <div className="mpr-form-rows">
-              {row(t('balance'), 'coins',
-                fields.balance !== 0 ? fmt(fields.balance, fields.currency ?? currency) : '0.00',
-                fields.balance === 0, 'balance')}
+              {/* En una tarjeta de credito la fila NO dice "Balance": dice
+                  cuanto debes. Con la etiqueta neutra el usuario tecleaba
+                  2,218.55 queriendo decir "debo 2,218.55" y el libro lo
+                  guardaba en POSITIVO, o sea "el banco me debe a mi": la
+                  tarjeta pasaba a "no debes nada" y el boton de pagar ofrecia
+                  RD$ 0.00 con una deuda real encima. */}
+              {fields.type === 'credit'
+                ? row(
+                    fields.balance > 0 ? t('cardInFavorLabel') : t('cardOwedLabel'),
+                    'coins',
+                    /* La MAGNITUD, no la deuda: con saldo a favor
+                       `owedFromBalance` da 0 por definicion, y la fila
+                       "Saldo a favor" mostraba RD$ 0.00 teniendo dinero a
+                       favor. La etiqueta ya dice de que lado esta. */
+                    fmt(Math.abs(fields.balance), fields.currency ?? currency),
+                    fields.balance === 0, 'balance')
+                : row(t('balance'), 'coins',
+                    fields.balance !== 0 ? fmt(fields.balance, fields.currency ?? currency) : '0.00',
+                    fields.balance === 0, 'balance')}
+
+              {/* DISPONIBLE, la otra cara de la misma moneda.
+                  Nadie mira su tarjeta en terminos de "cuanto debo": la app
+                  del banco dice "Disponible: RD$ 2,218.55", y eso es lo que la
+                  gente teclea. Al pedir solo la deuda, ese numero entraba como
+                  saldo A FAVOR y la tarjeta quedaba eternamente "sin usar",
+                  con el cupo entero libre y el boton de pagar ofreciendo cero.
+                  Las dos filas escriben el MISMO campo, asi que siempre
+                  cuadran: disponible = limite - deuda. */}
+              {fields.type === 'credit' && !!fields.limit && row(
+                t('cardAvailableLabel'), 'wallet',
+                fmt(availableFromBalance(fields.balance, fields.limit), fields.currency ?? currency),
+                false, 'available')}
 
               {row(t('currency'), 'dollar',
                 fields.currency && fields.currency !== currency
@@ -1102,12 +1146,31 @@ function AccountEditorSheet({
       </SheetPortal>
 
       {sub === 'balance' && (
+        /* Credito: se teclea lo que DEBES (positivo) y el libro lo guarda en
+           negativo, igual que ya hacia la linea en divisa extranjera. Las
+           demas cuentas siguen admitiendo negativo: un debito en sobregiro es
+           un saldo negativo legitimo. */
         <MobileAmountSheet
-          title={t('initialBalanceLabel')}
-          value={fields.balance}
+          title={fields.type === 'credit' ? t('cardOwedTitle') : t('initialBalanceLabel')}
+          value={fields.type === 'credit' ? owedFromBalance(fields.balance) : fields.balance}
           currency={fields.currency ?? currency}
-          allowNegative
-          onDone={v => { patch('balance', v); setSub(null) }}
+          allowNegative={fields.type !== 'credit'}
+          onDone={v => {
+            patch('balance', fields.type === 'credit' ? balanceFromOwed(v) : v)
+            setSub(null)
+          }}
+          onClose={() => setSub(null)}
+        />
+      )}
+      {sub === 'available' && fields.limit && (
+        /* Se teclea el disponible y se guarda la DEUDA, que es lo unico que el
+           libro entiende. Si alguien escribe mas que el limite, la deuda es
+           cero: no existe "disponible de mas". */
+        <MobileAmountSheet
+          title={t('cardAvailableTitle')}
+          value={availableFromBalance(fields.balance, fields.limit)}
+          currency={fields.currency ?? currency}
+          onDone={v => { patch('balance', balanceFromAvailable(v, fields.limit!)); setSub(null) }}
           onClose={() => setSub(null)}
         />
       )}
@@ -1380,8 +1443,26 @@ function PayCardSheet({
 
   // Solo cuentas con dinero real: no se paga una tarjeta con otra tarjeta.
   const sources = accounts.filter(a => a.type !== 'credit' && a.id !== card.id)
-  const owed = creditUsed(card.balance)
-  const minimum = minimumPayment(card)
+
+  /*
+   * QUE LINEA SE PAGA.
+   *
+   * Una tarjeta dominicana arrastra dos deudas —pesos y dolares— que el banco
+   * liquida por separado. La hoja solo sabia de la primera: con RD$ 0.00 en
+   * pesos y US$ 39.80 en dolares anunciaba "DEBES RD$ 0.00" y no habia forma
+   * de pagar lo que de verdad se debia.
+   */
+  const dual = hasSecondaryBalance(card)
+  const [line, setLine] = useState<'primary' | 'secondary'>(
+    dual && creditUsed(card.balance) <= 0 && creditUsed(card.secondaryBalance ?? 0) > 0 ? 'secondary' : 'primary',
+  )
+  const paySecondary = dual && line === 'secondary'
+  const payCurrency = paySecondary ? card.secondaryCurrency! : accountCurrency(card, currency)
+  const owed = paySecondary ? creditUsed(card.secondaryBalance ?? 0) : creditUsed(card.balance)
+  // El minimo se calcula sobre el saldo principal; la linea extranjera no
+  // tiene un minimo propio modelado, asi que ahi no se ofrece el atajo en vez
+  // de inventar una cifra.
+  const minimum = paySecondary ? null : minimumPayment(card)
 
   /**
    * @param amountInCard Monto EN LA DIVISA DE LA TARJETA.
@@ -1394,7 +1475,7 @@ function PayCardSheet({
     if (!fromId || amountInCard <= 0) return
     const source = accounts.find(a => a.id === fromId)
     if (!source) return
-    const cardCur = accountCurrency(card, currency)
+    const cardCur = payCurrency
     const sourceCur = accountCurrency(source, currency)
     const amount = cardCur === sourceCur
       ? amountInCard
@@ -1407,7 +1488,8 @@ function PayCardSheet({
         toAccount: card.id,
         amount,
         date: localToday(),
-        note: t('payCardLabel'),
+        note: paySecondary ? `${t('payCardLabel')} · ${card.secondaryCurrency}` : t('payCardLabel'),
+        ...(paySecondary ? { toSecondary: true } : {}),
       })
       playSuccessHaptic()
       toast(t('cardPaymentRecorded'), { icon: 'check', type: 'ok' })
@@ -1429,11 +1511,37 @@ function PayCardSheet({
               <button aria-label={t('close')} onClick={onClose}><Icon name="close" size={18} /></button>
             </header>
 
+            {/* Selector de linea: solo aparece cuando la tarjeta de verdad
+                lleva dos deudas. Con una sola divisa seria un control que no
+                decide nada. */}
+            {dual && (
+              <div className="sacc-pay-lines" role="tablist">
+                <button
+                  role="tab"
+                  aria-selected={line === 'primary'}
+                  className={line === 'primary' ? 'on' : ''}
+                  onClick={() => setLine('primary')}
+                >
+                  <em>{accountCurrency(card, currency)}</em>
+                  <b>{fmtVal(creditUsed(card.balance), accountCurrency(card, currency))}</b>
+                </button>
+                <button
+                  role="tab"
+                  aria-selected={line === 'secondary'}
+                  className={line === 'secondary' ? 'on' : ''}
+                  onClick={() => setLine('secondary')}
+                >
+                  <em>{card.secondaryCurrency}</em>
+                  <b>{fmtVal(creditUsed(card.secondaryBalance ?? 0), card.secondaryCurrency!)}</b>
+                </button>
+              </div>
+            )}
+
             <div className="sacc-pay-owed">
               <small>{t('owedLabel')}</small>
-              <strong>{fmtVal(owed, accountCurrency(card, currency))}</strong>
+              <strong>{fmtVal(owed, payCurrency)}</strong>
               {minimum !== null && minimum > 0 && (
-                <span>{t('cycleMinimum')}: {fmtVal(minimum, accountCurrency(card, currency))}</span>
+                <span>{t('cycleMinimum')}: {fmtVal(minimum, payCurrency)}</span>
               )}
             </div>
 
@@ -1467,7 +1575,7 @@ function PayCardSheet({
                   {t('payMinimum')}
                 </button>
               )}
-              <button disabled={!fromId || submitting} onClick={() => pay(owed)}>
+              <button disabled={!fromId || submitting || owed <= 0} onClick={() => pay(owed)}>
                 {t('payFull')}
               </button>
               <button className="ghost" disabled={!fromId || submitting} onClick={() => setAmountSheet(true)}>
@@ -1482,7 +1590,7 @@ function PayCardSheet({
         <MobileAmountSheet
           title={t('payCardLabel')}
           value={0}
-          currency={accountCurrency(card, currency)}
+          currency={payCurrency}
           onDone={v => { setAmountSheet(false); pay(v) }}
           onClose={() => setAmountSheet(false)}
         />

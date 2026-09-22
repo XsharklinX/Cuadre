@@ -1,0 +1,4 @@
+"$schema" = "schemas/schema.json"
+[default]
+description = "Permite consultar el producto, comprarlo y restaurar la compra a traves de Google Play Billing."
+permissions = ["allow-available", "allow-product", "allow-purchase", "allow-restore"]

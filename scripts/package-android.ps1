@@ -144,9 +144,17 @@ if ($Mode -eq 'build') {
     if ($LASTEXITCODE -ne 0) { throw 'No se pudo actualizar la version antes del build.' }
   }
 
-  # VersionCode: se sigue leyendo del archivo generado (gen/android/.../tauri.properties)
-  # + el ultimo build empaquetado, porque ese contador NUNCA debe bajar ni
-  # repetirse (Play Store lo exige) y es independiente del numero de version.
+  # VersionCode: UN solo contador, `release/android/version-code.txt`.
+  #
+  # Habia dos. `autoIncrementVersionCode` de tauri.conf.json llevaba el suyo en
+  # gen/android/tauri.properties —un archivo generado, que ademas estaba
+  # vacio— y este script llevaba el otro. Dos contadores que pueden separarse
+  # gobernando un numero que Play EXIGE que solo suba es una bomba de relojeria:
+  # el dia que el generado gane, la subida se rechaza y hay que adivinar por que.
+  # Ahora `autoIncrementVersionCode` esta en false y manda este archivo.
+  #
+  # Se sigue leyendo tauri.properties como SUELO por si un build antiguo dejo
+  # ahi un numero mas alto: bajar el contador rompe las subidas para siempre.
   $tauriVersion = Get-TauriVersionProps -Path $tauriPropsFile
   $baseVersionCode = [int]$tauriVersion.VersionCode
   $lastBuiltVersionCode = if (Test-Path -LiteralPath $androidVersionStateFile) {
@@ -165,6 +173,18 @@ if ($Mode -eq 'build') {
   # para que este env var lo recoja.
   $tauriConfJson = Get-Content -LiteralPath (Join-Path $repoRoot 'src-tauri\tauri.conf.json') -Raw | ConvertFrom-Json
   $env:SHARKY_ANDROID_VERSION_NAME = "$($tauriConfJson.version)"
+
+  # PUERTA: la version que se va a compilar TIENE que tener su entrada en el
+  # changelog. Sin esto se publico una 1.9.4 cuyo changelog mas nuevo decia
+  # 1.9.3: al actualizar, "Novedades" se abria en una lista que no mencionaba
+  # lo que el usuario acababa de instalar. El test unitario ya lo vigila, pero
+  # corre ANTES del auto-incremento de version, asi que no puede ver esto.
+  $releaseNotesFile = Join-Path $repoRoot 'src/data/release.ts'
+  $releaseNotes = Get-Content -LiteralPath $releaseNotesFile -Raw
+  if ($releaseNotes -notmatch [regex]::Escape("version: '$($env:SHARKY_ANDROID_VERSION_NAME)'")) {
+    Restore-VersionedFiles
+    throw "Falta la entrada de $($env:SHARKY_ANDROID_VERSION_NAME) en src/data/release.ts. Agregala antes de empaquetar."
+  }
 
   Write-Host "Android versionName: $($env:SHARKY_ANDROID_VERSION_NAME)"
   Write-Host "Android versionCode: $($env:SHARKY_ANDROID_VERSION_CODE)"

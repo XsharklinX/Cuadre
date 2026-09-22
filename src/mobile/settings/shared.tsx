@@ -11,6 +11,8 @@ export type Sheet =
   | 'comments' | 'about' | 'privacy' | 'terms' | 'export' | 'pin' | 'categories' | 'bankNotifications'
   | 'syncConflicts' | 'widgetAccounts' | 'backupSchedule' | 'soundProfile' | 'fxAlert' | 'anomalyAlert'
   | 'backupPassword' | 'restorePassword' | 'categoryRules' | 'qrMigration'
+  // Ocultas: solo existen con el modo desarrollador abierto.
+  | 'dev' | 'vip'
 
 export interface SheetProps {
   activeSheet: Sheet | null

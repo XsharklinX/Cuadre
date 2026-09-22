@@ -2,8 +2,8 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { ViewErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { Icon } from '@/components/ui/Icon'
 import { useT } from '@/i18n'
-import type { AppShortcut } from '@/hooks/useAppShortcut'
-import type { NotificationTargetType } from '@/hooks/useNotificationTarget'
+import type { ShortcutRequest } from '@/hooks/useAppShortcut'
+import type { NotificationRequest, NotificationTargetType } from '@/hooks/useNotificationTarget'
 import type { SharedReceipt } from '@/hooks/useTauri'
 import type { Transaction, ViewId, ViewProps } from '@/types'
 import type { BatchReceiptInput } from './MobileReceiptBatch'
@@ -128,9 +128,9 @@ export function MobileShell({
   userName?: string
   sharedReceipt?: SharedReceipt[]
   onConsumeSharedReceipt?: () => void
-  appShortcut?: AppShortcut | null
+  appShortcut?: ShortcutRequest | null
   onConsumeAppShortcut?: () => void
-  notificationTarget?: NotificationTargetType | null
+  notificationTarget?: NotificationRequest | null
   onConsumeNotificationTarget?: () => void
 }) {
   const t = useT()
@@ -266,21 +266,22 @@ export function MobileShell({
 
   useEffect(() => {
     if (!appShortcut) return
-    if (appShortcut === 'add-expense' || appShortcut === 'add-income') {
+    const shortcut = appShortcut.id
+    if (shortcut === 'add-expense' || shortcut === 'add-income') {
       // Mismo flujo que el botón + de la barra inferior — nunca la hoja
       // reducida: el widget y la notificación persistente deben abrir
       // exactamente la misma pantalla que se usa dentro de la app.
-      setQuickAddMode(appShortcut === 'add-expense' ? 'expense' : 'income')
+      setQuickAddMode(shortcut === 'add-expense' ? 'expense' : 'income')
       setRoute('add')
-    } else if (appShortcut === 'reports') {
+    } else if (shortcut === 'reports') {
       // 'accounts' es la vista por defecto de la ruta "reports" (ver
       // routeFromView): el ViewId 'reports' no mapea a ninguna ruta movil.
       gotoViewRef.current('accounts')
-    } else if (appShortcut === 'accounts') {
+    } else if (shortcut === 'accounts') {
       gotoViewRef.current('accounts')
-    } else if (appShortcut === 'budgets') {
+    } else if (shortcut === 'budgets') {
       gotoViewRef.current('budgets')
-    } else if (appShortcut === 'converter') {
+    } else if (shortcut === 'converter') {
       setConverterOpen(true)
     }
     onConsumeAppShortcut?.()
@@ -312,7 +313,7 @@ export function MobileShell({
   // ningún lado"). Ver useNotificationTarget para el mecanismo de entrega.
   useEffect(() => {
     if (!notificationTarget) return
-    applyNotificationTarget(notificationTarget)
+    applyNotificationTarget(notificationTarget.id)
     onConsumeNotificationTarget?.()
   }, [notificationTarget, onConsumeNotificationTarget])
 
@@ -331,26 +332,16 @@ export function MobileShell({
 
     return (
       <>
-        <div className="mobile-tab-segment">
-          <div className="mobile-segment mobile-segment-2" role="tablist" aria-label={t('accounts')}>
-            <button
-              className={view === 'accounts' ? 'on' : ''}
-              role="tab"
-              aria-selected={view === 'accounts'}
-              onClick={() => gotoView('accounts')}
-            >
-              {t('accounts')}
-            </button>
-            <button
-              className={view === 'goals' ? 'on' : ''}
-              role="tab"
-              aria-selected={view === 'goals'}
-              onClick={() => gotoView('goals')}
-            >
-              {t('goals')}
-            </button>
-          </div>
-        </div>
+        {/* SIN selector Cuentas/Metas.
+            Eran dos pantallas distintas compartiendo una pestaña de la barra
+            inferior: el selector se comia 60px de alto en TODAS las visitas a
+            Cuentas para ofrecer un salto que casi nadie da, y dejaba a Metas
+            escondida detras de un control que no se ve desde ningun otro
+            sitio. Cuentas es Cuentas; Metas vive en el menu ☰, que es donde
+            estan las demas herramientas.
+
+            La vista 'goals' sigue existiendo y se puede abrir (desde ☰ o
+            desde un aviso de meta): solo deja de tener este selector. */}
         <div className={`mobile-report-pane mobile-report-pane-${reportTransition}`} key={view}>
           {view === 'goals'
             ? (goalsRenderer && (
@@ -563,6 +554,7 @@ export function MobileShell({
             onClose={() => setNotifOpen(false)}
             onGotoBudgets={() => gotoView('budgets')}
             onGotoTarget={applyNotificationTarget}
+            onOpenDetection={() => onSettings('bankNotifications')}
             onEditTx={onEditTx}
           />
         </Suspense>

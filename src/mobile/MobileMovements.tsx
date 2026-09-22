@@ -80,22 +80,17 @@ export function MobileMovements({
 
   return (
     <div className="mobile-movements-screen">
-      {/* Sin centavos en esta franja. Son tres cifras en tres columnas de
-          unos 110px: con decimales, un ingreso de cinco digitos no cabe y se
-          cortaba con puntos suspensivos ("RD$ 65,132.…"). Una app de
-          dinero no puede recortar una cifra de dinero; el centavo aqui no le
-          dice nada a nadie y el detalle exacto esta a un toque. */}
       <section className="mobile-summary-strip mobile-summary-strip-movements">
         <article className="mini-stat">
           <small>{t('incomes')}</small>
           <strong className="income">
-            <AnimatedMoney value={summary.income} compact={compactNumbers} decimals={0} />
+            <AnimatedMoney value={summary.income} compact={compactNumbers} />
           </strong>
         </article>
         <article className="mini-stat">
           <small>{t('expenses')}</small>
           <strong className="expense">
-            <AnimatedMoney value={summary.expense} compact={compactNumbers} decimals={0} />
+            <AnimatedMoney value={summary.expense} compact={compactNumbers} />
           </strong>
         </article>
         <button
@@ -107,7 +102,7 @@ export function MobileMovements({
           <small>{t('totalBalance')}</small>
           <strong className={balancePositive ? 'income' : 'expense'}>
             {!balancePositive && '-'}
-            <AnimatedMoney value={Math.abs(totalBalance)} compact={compactNumbers} decimals={0} />
+            <AnimatedMoney value={Math.abs(totalBalance)} compact={compactNumbers} />
           </strong>
         </button>
       </section>

@@ -171,6 +171,16 @@ export function MobileGlobalSearch({
           placeholder={t('searchPlaceholderAll')}
           onChange={event => setQuery(event.target.value)}
         />
+        {query && (
+          <button
+            type="button"
+            className="mobile-search-wipe"
+            aria-label={t('clearFiltersLabel')}
+            onClick={() => setQuery('')}
+          >
+            <Icon name="close" size={12} />
+          </button>
+        )}
       </label>
 
       {topTags.length > 0 && (

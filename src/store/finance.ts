@@ -145,6 +145,13 @@ export function sanitizeFinanceData(value: unknown): FinanceData {
     if (tx.toAmount !== undefined && (tx.type !== 'transfer' || !amount(tx.toAmount) || tx.toAmount <= 0)) {
       tx = { ...tx, toAmount: undefined }
     }
+    // toSecondary: solo en una transferencia cuyo destino sea una tarjeta que
+    // de verdad lleve segunda divisa. Marcarla en cualquier otro sitio haria
+    // que el pago desapareciera de los dos libros.
+    if (tx.toSecondary) {
+      const dest = accounts.find(a => a.id === tx.toAccount)
+      if (tx.type !== 'transfer' || !dest?.secondaryCurrency) tx = { ...tx, toSecondary: undefined }
+    }
     // Trío FX: o están los tres campos válidos, o se van los tres. Un backup
     // manipulado con `fxRate: 0`/NaN corrompería el monto mostrado al usuario.
     const fxOk = tx.originalAmount !== undefined && amount(tx.originalAmount) && tx.originalAmount > 0
@@ -309,7 +316,14 @@ function applyBalance(accounts: Account[], tx: Transaction, sign: 1 | -1): Accou
   if (tx.type === 'transfer') {
     return accounts.map(a => {
       if (a.id === tx.fromAccount) return { ...a, balance: a.balance - sign * tx.amount }
-      if (a.id === tx.toAccount)   return { ...a, balance: a.balance + sign * (tx.toAmount ?? tx.amount) }
+      if (a.id === tx.toAccount) {
+        // Pago de la linea en divisa extranjera: abona el SEGUNDO libro. El
+        // saldo principal no se toca, porque son dos deudas distintas.
+        if (tx.toSecondary) {
+          return { ...a, secondaryBalance: (a.secondaryBalance ?? 0) + sign * (tx.toAmount ?? tx.amount) }
+        }
+        return { ...a, balance: a.balance + sign * (tx.toAmount ?? tx.amount) }
+      }
       return a
     })
   }
@@ -354,10 +368,11 @@ function assertTransactionShape(tx: Transaction, accounts: Account[], categories
 
 function normalizeTransaction(tx: Transaction): Transaction {
   if (tx.type === 'transfer') {
-    const { id, type, amount, date, note, fromAccount, toAccount, toAmount, tags } = tx
+    const { id, type, amount, date, note, fromAccount, toAccount, toAmount, toSecondary, tags } = tx
     return {
       id, type, amount, date, note, fromAccount, toAccount,
       ...(toAmount !== undefined && Number.isFinite(toAmount) && toAmount > 0 ? { toAmount } : {}),
+      ...(toSecondary ? { toSecondary: true } : {}),
       ...(tags?.length ? { tags } : {}),
     }
   }
@@ -396,7 +411,10 @@ function withCrossCurrencyAmount(tx: Transaction, accounts: Account[], base: Cur
   const from = accounts.find(a => a.id === tx.fromAccount)
   const to = accounts.find(a => a.id === tx.toAccount)
   const fromCur = from?.currency ?? base
-  const toCur = to?.currency ?? base
+  // Pagando la linea en divisa extranjera, la divisa que RECIBE es la
+  // secundaria de la tarjeta, no la principal: sin esto un pago en pesos a la
+  // linea en dolares abonaba pesos al libro en dolares.
+  const toCur = (tx.toSecondary ? to?.secondaryCurrency : to?.currency) ?? base
   if (fromCur === toCur) return tx
   return { ...tx, toAmount: convertCurrency(tx.amount, fromCur, toCur) }
 }
@@ -469,7 +487,7 @@ export interface FinanceState {
   importTxs: (txs: Array<Omit<Transaction, 'id'> & { id?: string }>) => void
   updateTx: (id: string, fields: Partial<Omit<Transaction, 'id'>>) => void
   deleteTx: (id: string) => void
-  transfer: (p: { fromAccount: string; toAccount: string; amount: number; date: string; note?: string }) => void
+  transfer: (p: { fromAccount: string; toAccount: string; amount: number; date: string; note?: string; toSecondary?: boolean }) => void
 
   // Cuentas
   addAccount:    (account: Omit<Account, 'id'>) => void
@@ -581,7 +599,7 @@ export const useFinance = create<FinanceState>()(
         }
       }),
 
-      transfer: ({ fromAccount, toAccount, amount, date, note }) => set(s => {
+      transfer: ({ fromAccount, toAccount, amount, date, note, toSecondary }) => set(s => {
         if (fromAccount === toAccount) throw new Error(tt('errSameAccount'))
         assertAvailableBalance(s.accounts, fromAccount, amount, s.currency)
         if (!s.accounts.some(a => a.id === toAccount)) throw new Error(tt('errDestAccountNotExist'))
@@ -589,6 +607,7 @@ export const useFinance = create<FinanceState>()(
           id: newId(), type: 'transfer',
           amount, fromAccount, toAccount,
           date, note: note ?? 'Transferencia',
+          ...(toSecondary ? { toSecondary: true } : {}),
         }, s.accounts, s.currency)
         return {
           transactions: sortTxns([tx, ...s.transactions]),

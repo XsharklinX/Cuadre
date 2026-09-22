@@ -161,8 +161,14 @@
   border: 0;
   cursor: pointer;
   display: flex;
+  /* Con la letra al 135% en una pantalla de 320px, el icono + el nombre + un
+     saldo de seis cifras no caben en una linea: la fila empujaba la rejilla y
+     se salia 25px de la pantalla. Envolviendo, el saldo baja a su propia
+     linea y no se pierde ni un digito. */
+  flex-wrap: wrap;
   gap: 12px;
   min-height: 60px;
+  min-width: 0;
   padding: 10px 14px;
   text-align: left;
   width: 100%;
@@ -200,6 +206,9 @@
   font-size: 16px;
   font-variant-numeric: tabular-nums;
   font-weight: 800;
+  /* Cuando la fila envuelve, el saldo se va al extremo derecho de su linea en
+     vez de quedar pegado debajo del icono. */
+  margin-left: auto;
   white-space: nowrap;
 }
 
@@ -263,6 +272,20 @@
    cifras mas que el mismo saldo en dolares (RD$ 23,410.40 vs US$ 312.45), y
    con columnas iguales el de pesos se partia en dos lineas mientras el otro
    sobraba sitio. */
+/* Marca de "saldo a favor": verde, discreta, pero imposible de confundir con
+   una deuda. */
+.sacc-infavor {
+  align-self: start;
+  background: color-mix(in oklab, var(--income) 18%, transparent);
+  border-radius: 999px;
+  color: var(--income);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: .05em;
+  padding: 2px 8px;
+  text-transform: uppercase;
+  width: fit-content;
+}
 .sacc-card-balances { display: grid; gap: 8px; grid-template-columns: 1.25fr 1fr; }
 .sacc-card-balances.single { grid-template-columns: 1fr; }
 .sacc-bal {
@@ -567,6 +590,38 @@
   padding: 14px 16px calc(22px + env(safe-area-inset-bottom, 0px));
   width: 100%;
 }
+/* Selector de linea (pesos / dolares) de la hoja de pago. Las dos deudas se
+   muestran a la vez para que elegir no sea a ciegas. */
+.sacc-pay-lines { display: flex; gap: 8px; }
+.sacc-pay-lines button {
+  background: var(--surface-2);
+  border: 1px solid transparent;
+  border-radius: 13px;
+  color: var(--text);
+  display: grid;
+  flex: 1;
+  font-family: inherit;
+  gap: 2px;
+  justify-items: start;
+  min-width: 0;
+  padding: 10px 12px;
+  text-align: left;
+}
+.sacc-pay-lines button.on { border-color: var(--accent); background: color-mix(in oklab, var(--accent) 14%, var(--surface-2)); }
+.sacc-pay-lines em {
+  color: var(--text-dim);
+  font-size: 10.5px;
+  font-style: normal;
+  font-weight: 850;
+  letter-spacing: .08em;
+}
+.sacc-pay-lines b {
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
 .sacc-pay-owed {
   background: var(--surface-2);
   border-radius: 14px;
@@ -842,7 +897,9 @@
   position: relative;
   scroll-snap-align: start;
   text-align: left;
-  width: min(300px, 82vw);
+  /* `vw` se mide sin escalar y la app se dibuja escalada por --fs: sin
+     dividir, con la letra grande la tarjeta se salia de la pantalla. */
+  width: min(300px, calc(82vw / var(--fs, 1)));
 }
 .sacc-plastic:active { transform: scale(.985); }
 .sacc-plastic:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
@@ -992,16 +1049,65 @@
    ═══════════════════════════════════════════════════════════ */
 
 .saed-overlay { align-items: flex-end; }
+/*
+ * EL OVERLAY DEL EDITOR — hoja inferior, y una sola superficie que se desliza.
+ *
+ * Antes reutilizaba `.mpr-editor-overlay`, que mezclaba dos modelos a la vez:
+ * colocaba la hoja ARRIBA como un dialogo (`align-items: flex-start`) con
+ * 104px de relleno abajo —el rectangulo negro bajo la hoja— mientras la hoja
+ * llevaba esquinas redondeadas solo arriba, que es lenguaje de hoja inferior.
+ * Y encima el overlay hacia scroll POR SU CUENTA, compitiendo con el del
+ * cuerpo: dos superficies deslizandose una dentro de otra, cada una llevandose
+ * el dedo cuando le tocaba.
+ *
+ * Ahora la hoja nace pegada al borde inferior, ocupa hasta donde necesite, y
+ * lo unico que se desliza es su cuerpo.
+ */
+.saed-overlay {
+  align-items: flex-end;
+  justify-content: center;
+  /* El overlay NO se desplaza: solo `.saed-body`. */
+  overflow: hidden;
+  padding: 0;
+  touch-action: none;
+  z-index: 260;
+}
+
+/*
+ * COLUMNA FLEX, no rejilla.
+ *
+ * Antes era `grid-template-rows: auto auto auto 1fr` con CINCO hijos: el
+ * quinto (los botones) caia en una fila implicita, y el cuerpo — la fila
+ * `1fr` — quedaba a merced del espacio sobrante. Dentro del cuerpo,
+ * `.mpr-form-rows` lleva `overflow: hidden`, y una caja con overflow recortado
+ * tiene tamano minimo automatico CERO: cuando el alto apretaba, en vez de
+ * desbordar y dejar que el cuerpo hiciera scroll, la caja se encogia y
+ * recortaba sus propias filas. En el telefono del usuario quedaba visible solo
+ * "Balance" y el resto de Detalles desaparecia: ni se veia ni se podia tocar.
+ *
+ * Con flex explicito la cabecera, la vista previa, el nombre y los botones no
+ * encogen nunca, y todo el sobrante va al cuerpo, que es el unico que hace
+ * scroll.
+ */
 .saed-sheet {
+  animation: mobile-sheet-up var(--m-duration, 190ms) var(--m-ease-out, cubic-bezier(.2,.8,.2,1));
   background: var(--surface);
-  border-radius: 20px 20px 0 0;
-  display: grid;
-  gap: 14px;
-  grid-template-rows: auto auto auto 1fr;
-  max-height: 92vh;
-  padding: 14px 16px calc(20px + env(safe-area-inset-bottom, 0px));
+  border-radius: 22px 22px 0 0;
+  box-shadow: 0 -20px 50px rgba(0, 0, 0, .5);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  /* `dvh` y no `vh`: con la barra de direcciones visible, `vh` cuenta alto que
+     no existe y el pie queda debajo del borde de la pantalla. */
+  max-height: min(94dvh, calc(100dvh - env(safe-area-inset-top) - 8px));
+  max-width: 520px;
+  padding: 12px 16px calc(14px + env(safe-area-inset-bottom, 0px));
   width: 100%;
 }
+.saed-sheet > .saed-header,
+.saed-sheet > .saed-preview,
+.saed-sheet > .saed-name,
+.saed-sheet > .mpr-editor-actions { flex: 0 0 auto; }
 .saed-header { align-items: center; display: flex; justify-content: space-between; }
 .saed-header > span { color: var(--text); font-size: 16px; font-weight: 850; }
 .saed-close {
@@ -1011,11 +1117,30 @@
 .saed-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .saed-preview { display: grid; justify-items: center; }
+/*
+ * En pantallas cortas la vista previa y el nombre se comian el sitio del
+ * cuerpo, y "Detalles" quedaba reducido a una franja donde la primera fila
+ * salia cortada por la mitad. La previa se encoge; los campos mandan.
+ */
+@media (max-height: 740px) {
+  .saed-preview-card { max-width: 180px; }
+  .saed-preview-row { padding: 9px 12px; }
+  .saed-sheet { gap: 10px; max-height: 96vh; }
+  .saed-name { font-size: 15px; min-height: 44px; }
+}
 /* La tarjeta de la vista previa es la MISMA que la del carrusel, solo que
    sin scroll-snap ni interacción: lo que ves es literalmente lo que habrá. */
+/*
+ * La vista previa es un ADORNO; Detalles es el trabajo.
+ *
+ * A 300px la tarjeta ocupaba ~190px de alto y dejaba al cuerpo unos 200px:
+ * dos filas de Detalles visibles de las doce que tiene una tarjeta de
+ * credito, la segunda cortada por la mitad. Se ve rota porque lo esta.
+ * A 220px sigue reconociendose perfectamente y devuelve 60px al contenido.
+ */
 .saed-preview-card {
   cursor: default;
-  max-width: 300px;
+  max-width: 220px;
   width: 100%;
 }
 .saed-preview-card:active { transform: none; }
@@ -1046,9 +1171,58 @@
 .saed-name::placeholder { color: var(--text-dim); font-weight: 500; }
 .saed-name:focus-visible { border-color: var(--accent); outline: 2px solid var(--accent); outline-offset: -1px; }
 
+/*
+ * FLUJO DE BLOQUE dentro del scroll, no rejilla ni flex.
+ *
+ * Los hijos de un contenedor en flujo normal no se pueden comprimir: cada
+ * seccion ocupa lo que ocupa y el cuerpo desborda hacia el scroll. Es la
+ * unica forma de que "Detalles" no vuelva a recortarse solo.
+ */
 .saed-body {
-  display: grid;
-  gap: 18px;
+  display: block;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
 }
+.saed-body > * { margin-bottom: 14px; }
+/* Ultimo elemento con aire suficiente para que no quede pegado al pie fijo, y
+   para que se note que ahi abajo hay mas cosa que se puede desplazar. */
+.saed-body > :last-child { padding-bottom: 6px; }
+.saed-body > :last-child { margin-bottom: 0; }
+/* La etiqueta de un grupo va pegada a lo que etiqueta, no flotando a 18px. */
+.saed-body > .mpr-group-label-rows { margin-bottom: 6px; }
+
+/* Se pega arriba al desplazar: en una lista de doce filas, saber en que
+   bloque estas sin tener que volver a subir. */
+.saed-body > .mpr-group-label-rows {
+  background: var(--surface);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+/* Cinturon y tirantes: aunque algun dia vuelva a haber un contenedor flex
+   por encima, estas cajas no ceden altura. */
+.saed-body .mpr-form-rows,
+.saed-body .mpr-form-section { flex-shrink: 0; }
+
+/* ── Editor de cuentas: densidad ─────────────────────────────
+   La cabecera del editor (previa + nombre + tipo + color) se comia el alto y
+   dejaba tres filas de Detalles visibles de las doce que tiene una tarjeta.
+   Detalles es donde se trabaja; lo de arriba es contexto. Estas reglas solo
+   aprietan lo de arriba, dentro de ESTE editor: en Perfil los mismos
+   controles siguen como estaban. */
+.saed-body .mpr-type-pill {
+  border-radius: 11px;
+  font-size: 11.5px;
+  min-height: 46px;
+  padding: 6px 4px;
+}
+.saed-body .mpr-field-group { display: grid; gap: 7px; }
+.saed-body .mpr-group-label { font-size: 10.5px; letter-spacing: .09em; }
+
+/* La caja de filas ya no se recorta a media fila: si no cabe entera, que se
+   vea que hay mas abajo en vez de dejar una linea partida al ras del pie. */
+.saed-body .mpr-form-rows { scroll-margin-bottom: 12px; }

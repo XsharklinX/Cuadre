@@ -335,6 +335,7 @@ pub fn run() {
         builder = builder.plugin(tauri_plugin_bank_notifications::init());
         builder = builder.plugin(tauri_plugin_keystore::init());
         builder = builder.plugin(tauri_plugin_home_widget::init());
+        builder = builder.plugin(tauri_plugin_play_billing::init());
     }
 
     builder

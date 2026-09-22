@@ -9,7 +9,7 @@ import type { Account, CurrencyCode } from '@/types'
 import { newId } from '@/data/seed'
 import { isTauri } from '@/hooks/useTauri'
 import { tt } from '@/i18n'
-import { listenBankNotifications, takePendingBankNotifications } from '@/lib/bankNotifications'
+import { getNotificationAccessStatus, listenBankNotifications, takePendingBankNotifications } from '@/lib/bankNotifications'
 import { classifyBankNotification } from '@/lib/bankNotificationParser'
 import { useBankSuggestions } from '@/store/bankSuggestions'
 import { useBankNotificationsDebug } from '@/store/bankNotificationsDebug'
@@ -135,6 +135,17 @@ export function useBankNotifications() {
         draining = false
       }
     }
+
+    /*
+     * Pedir el estado REPARA de paso: el lado nativo, si ve el permiso
+     * concedido y el servicio desvinculado, pide el re-vínculo.
+     *
+     * Antes esto solo pasaba al abrir Ajustes → Detección, una pantalla a la
+     * que nadie entra. Por eso la detección podía quedarse muerta desde la
+     * actualización del APK hasta que a alguien se le ocurriera mirar. Ahora
+     * se intenta en cada arranque, que es cuando Android la había soltado.
+     */
+    void getNotificationAccessStatus()
 
     void drain() // lo capturado mientras la app estaba cerrada
 

@@ -1,3 +1,4 @@
+import { APP_NAME } from '@/data/release'
 import { accountSavingsRate, amountForCategory, byCategory, dateLocale, fmt, getAccount, getCategory, localToday, monthLabel, monthlySeries, savingsBalance, totalBalanceInBase, totals, transactionsForTotals, txForMonth } from './helpers'
 import type { FinanceState } from '@/store/finance'
 import { saveFile } from '@/hooks/useTauri'
@@ -43,10 +44,10 @@ export function createExecutiveSummary(state: FinanceState, month?: string): Rep
 export async function exportExcel(state: FinanceState): Promise<void> {
   const ExcelJS = await import('exceljs')
   const wb = new ExcelJS.Workbook()
-  wb.creator = '$harky'
+  wb.creator = APP_NAME
   wb.created = new Date()
   wb.subject = 'Reporte financiero personal'
-  wb.title = '$harky - Reporte financiero'
+  wb.title = `${APP_NAME} - Reporte financiero`
 
   const addSheet = (name: string, rows: Record<string, string | number | undefined>[]) => {
     const ws = wb.addWorksheet(name)
@@ -129,7 +130,7 @@ export async function exportExcel(state: FinanceState): Promise<void> {
   const filename  = downloadName('sharky-finanzas', 'xlsx')
   const mimeType  = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
   const blob      = new Blob([buffer], { type: mimeType })
-  await saveFile(blob, filename, 'Reporte de $harky', ['xlsx'])
+  await saveFile(blob, filename, `Reporte de ${APP_NAME}`, ['xlsx'])
 }
 
 const csvField = (value: string | number): string => {
@@ -153,7 +154,7 @@ export async function exportCsv(state: FinanceState): Promise<void> {
   const csv = [header, ...rows].map(row => row.map(csvField).join(',')).join('\r\n')
   const blob = new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' })
   const filename = downloadName('sharky-movimientos', 'csv')
-  await saveFile(blob, filename, 'Movimientos de $harky', ['csv'])
+  await saveFile(blob, filename, `Movimientos de ${APP_NAME}`, ['csv'])
 }
 
 export async function exportMonthlyPdf(state: FinanceState, month: string, ownerName: string, lang: 'en' | 'es' = 'es'): Promise<void> {
@@ -173,7 +174,7 @@ export async function exportMonthlyPdf(state: FinanceState, month: string, owner
   doc.text('$', 23, 26)
   doc.setTextColor(23, 32, 51)
   doc.setFontSize(20)
-  doc.text('$harky', 40, 25)
+  doc.text(APP_NAME, 40, 25)
   doc.setFontSize(10)
   doc.setTextColor(102, 112, 133)
   doc.text(tt('pdfTagline'), 40, 31)
@@ -303,5 +304,5 @@ export async function exportMonthlyPdf(state: FinanceState, month: string, owner
 
   const filename  = downloadName(`sharky-estado-${month}`, 'pdf')
   const pdfBlob = doc.output('blob')
-  await saveFile(pdfBlob, filename, 'Estado Financiero $harky', ['pdf'])
+  await saveFile(pdfBlob, filename, `Estado Financiero ${APP_NAME}`, ['pdf'])
 }

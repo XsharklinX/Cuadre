@@ -1,0 +1,19 @@
+[package]
+name = "tauri-plugin-play-billing"
+version = "0.1.0"
+edition = "2021"
+description = "Compra unica (producto in-app) via Google Play Billing"
+links = "tauri-plugin-play-billing"
+
+[lib]
+name = "tauri_plugin_play_billing"
+path = "src/lib.rs"
+
+[dependencies]
+tauri = { version = "2", default-features = false }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }

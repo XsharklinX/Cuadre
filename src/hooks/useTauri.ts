@@ -4,6 +4,7 @@
  * equivalente web (download/upload por archivo).
  */
 
+import { APP_NAME } from '@/data/release'
 import { localToday } from '@/data/helpers'
 
 /** True cuando la app corre dentro de Tauri (no en el browser). */
@@ -164,7 +165,7 @@ export async function saveBackup(json: string, folder?: string | null): Promise<
     await saveToAppFolder(blob, filename, folder)
     return true
   }
-  return saveFile(blob, filename, 'Backup de $harky', ['json'])
+  return saveFile(blob, filename, `Backup de ${APP_NAME}`, ['json'])
 }
 
 

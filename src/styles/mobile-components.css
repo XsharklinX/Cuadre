@@ -933,10 +933,10 @@
     border: 2.5px solid transparent;
     border-radius: 50%;
     flex-shrink: 0;
-    height: 32px;
+    height: 28px;
     position: relative;
     transition: transform var(--m-duration-fast, 160ms) var(--m-ease, ease), box-shadow var(--m-duration-fast, 160ms) var(--m-ease, ease);
-    width: 32px;
+    width: 28px;
   }
   .mpr-color-dot.on {
     border-color: var(--m-bg);
@@ -962,7 +962,7 @@
     color: var(--m-text);
     display: flex;
     gap: 11px;
-    min-height: 50px;
+    min-height: 46px;
     padding: 0 14px;
     text-align: left;
   }
@@ -1081,6 +1081,9 @@
   .mpr-editor-actions {
     background: var(--m-bg, #121212);
     border-top: 1px solid var(--m-border);
+    /* Sombra hacia arriba: dice que el contenido SIGUE por debajo del pie, en
+       vez de dejar una fila cortada a ras sin explicacion. */
+    box-shadow: 0 -10px 18px -12px rgba(0, 0, 0, .8);
     display: flex;
     flex-shrink: 0;
     gap: 10px;

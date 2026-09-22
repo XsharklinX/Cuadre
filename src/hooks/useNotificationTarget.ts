@@ -33,8 +33,20 @@ function firstTarget(urls: string[] | null | undefined): NotificationTargetType 
  * seguridad para los dispositivos donde el evento de deep link no llega en
  * warm-start.
  */
-export function useNotificationTarget(): [NotificationTargetType | null, () => void] {
-  const [target, setTarget] = useState<NotificationTargetType | null>(null)
+/**
+ * Con NUMERO DE SERIE, por lo mismo que `useAppShortcut`: React descarta un
+ * `setState` al mismo valor, asi que tocar dos veces seguidas el mismo aviso
+ * no volvia a navegar. La segunda vez la app se quedaba donde estaba.
+ */
+export interface NotificationRequest {
+  id: NotificationTargetType
+  serial: number
+}
+
+export function useNotificationTarget(): [NotificationRequest | null, () => void] {
+  const [target, setTargetState] = useState<NotificationRequest | null>(null)
+  const setTarget = (id: NotificationTargetType) =>
+    setTargetState(prev => ({ id, serial: (prev?.serial ?? 0) + 1 }))
 
   useEffect(() => {
     if (!isTauri()) return
@@ -76,5 +88,5 @@ export function useNotificationTarget(): [NotificationTargetType | null, () => v
     }
   }, [])
 
-  return [target, () => setTarget(null)]
+  return [target, () => setTargetState(null)]
 }

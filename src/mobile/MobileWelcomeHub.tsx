@@ -5,6 +5,7 @@ import type { IconName } from '@/types'
 import { useFinance } from '@/store/finance'
 import { useSettings } from '@/store/settings'
 import { CURRENCIES } from '@/data/currencies'
+import { APP_NAME } from '@/data/release'
 import { useT } from '@/i18n'
 import { MobileOnboarding } from './MobileOnboarding'
 import type { CurrencyCode } from '@/types'
@@ -19,7 +20,7 @@ const NAME = 2
 const CURRENCY = 3
 const ACCOUNT = 4
 
-// Los 3 puntos de valor de "Así funciona": qué diferencia a $harky, no un tutorial.
+// Los 3 puntos de valor de "Así funciona": qué diferencia a Cuadre, no un tutorial.
 function howPoints(t: ReturnType<typeof useT>): Array<{ icon: IconName; color: string; title: string; desc: string }> {
   return [
     { icon: 'bell',  color: '#5bc0ff', title: t('obDetectTitle'),     desc: t('obDetectDesc') },
@@ -69,7 +70,11 @@ export function MobileWelcomeHub() {
           <div className="mobile-welcome-glow" />
           <div className="mobile-welcome-brand">
             <BrandMark size={72} />
-            <h1><span className="mobile-welcome-dollar">$</span>harky</h1>
+            {/* Del mismo sitio que el resto: el nombre estaba escrito a mano
+                aqui, con el signo de dolar como parte del diseño, asi que la
+                primera pantalla que ve alguien que instala la app seguia
+                diciendo la marca vieja. */}
+            <h1>{APP_NAME}</h1>
           </div>
           <p className="mobile-welcome-tagline">{t('welcomeTaglineLine1')}<br />{t('welcomeTaglineLine2')}</p>
         </div>

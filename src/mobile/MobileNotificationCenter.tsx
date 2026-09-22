@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Icon } from '@/components/ui/Icon'
 import { toast } from '@/components/ui/Toast'
 import type { MobileAlert } from '@/data/alerts'
+import { useDetectionHealth } from '@/hooks/useDetectionHealth'
 import { fmt, dateLocale } from '@/data/helpers'
 import { useBankSuggestions } from '@/store/bankSuggestions'
 import { useFinance } from '@/store/finance'
@@ -51,11 +52,26 @@ function relativeTime(createdAt: number, t: ReturnType<typeof useT>): string {
  * dos círculos diminutos. La hoja ocupa casi toda la pantalla para sentirse
  * como una pantalla propia, no un panel flotando sobre Movimientos.
  */
-export function MobileNotificationCenter({ onClose, onGotoBudgets, onGotoTarget, onEditTx }: {
+/**
+ * Fecha de una sugerencia, a prueba de datos viejos o corruptos.
+ *
+ * `date` llego despues que `postTime`, asi que una cola guardada por una
+ * version anterior puede no traerlo. `new Date(undefined)` da "Invalid Date",
+ * y eso se pintaba tal cual.
+ */
+function fmtSuggestionDate(item: { date?: string; postTime?: number }, lang: string): string {
+  const raw = item.date ? new Date(item.date) : item.postTime ? new Date(item.postTime) : null
+  if (!raw || Number.isNaN(raw.getTime())) return ''
+  return raw.toLocaleDateString(dateLocale(lang))
+}
+
+export function MobileNotificationCenter({ onClose, onGotoBudgets, onGotoTarget, onEditTx, onOpenDetection }: {
   onClose: () => void
   onGotoBudgets: () => void
   onGotoTarget: (type: NotificationTargetType) => void
   onEditTx: (transaction: Transaction) => void
+  /** Abre Ajustes → Deteccion de transacciones (aviso de deteccion muerta). */
+  onOpenDetection: () => void
 }) {
   const t = useT()
   const lang = (useSettings(s => s.language) ?? 'es') as 'en' | 'es'
@@ -100,6 +116,7 @@ export function MobileNotificationCenter({ onClose, onGotoBudgets, onGotoTarget,
   }, [])
 
   const [historyOpen, setHistoryOpen] = useState(false)
+  const health = useDetectionHealth()
 
   return (
     <SheetPortal>
@@ -122,6 +139,28 @@ export function MobileNotificationCenter({ onClose, onGotoBudgets, onGotoTarget,
           </div>
 
           <div className="mnc-body">
+            {/*
+              Va FUERA del "no hay nada": si la deteccion esta rota, lo que
+              hay es justamente una lista vacia, y una lista vacia se lee como
+              "no ha pasado nada" en vez de como "llevo meses sin registrar
+              tus gastos". Ese malentendido duro meses.
+            */}
+            {health?.alert && (
+              <button className="mnc-health" onClick={() => { onOpenDetection(); onClose() }}>
+                <span className="mnc-health-ico"><Icon name="alert" size={16} /></span>
+                <span className="mnc-health-text">
+                  <strong>{t('detectionDeadTitle')}</strong>
+                  <small>
+                    {health.state === 'no-access' ? t('detectionNoAccessBody')
+                      : health.state === 'unbound' ? t('detectionUnboundBody')
+                      : health.daysSilent === null ? t('detectionSilentNeverBody')
+                      : t('detectionSilentBody').replace('{n}', String(health.daysSilent))}
+                  </small>
+                </span>
+                <span className="mnc-health-cta">{t('detectionFixAction')}</span>
+              </button>
+            )}
+
             {historyTotal === 0 ? (
               <div className="mnc-empty">
                 <span className="mnc-empty-icon"><Icon name="bell" size={32} /></span>
@@ -157,11 +196,25 @@ export function MobileNotificationCenter({ onClose, onGotoBudgets, onGotoTarget,
                               </span>
                               <div className="mnc-card-title">
                                 <b>{item.note}</b>
-                                <small>{new Date(item.date).toLocaleDateString(dateLocale(lang))}</small>
+                                {/* `postTime` de respaldo: una sugerencia guardada
+                                    por una version vieja (o con la fecha
+                                    corrupta) pintaba "Invalid Date" en la
+                                    cara del usuario. Si tampoco hay hora, no
+                                    se muestra nada — mejor un hueco que una
+                                    mentira. */}
+                                {/* El monto va en la SEGUNDA linea, junto a la
+                                    fecha, no peleando con el concepto por el
+                                    ancho. En un cajon estrecho ganaba siempre
+                                    el monto (no encoge) y el concepto quedaba
+                                    en "Consumo...", que no dice nada: leer
+                                    QUE fue es la mitad de la decision. */}
+                                <span className="mnc-card-meta">
+                                  <small>{fmtSuggestionDate(item, lang)}</small>
+                                  <strong className={`mnc-card-amount ${isIncome ? 'income' : 'expense'}`}>
+                                    {isIncome ? '+' : '−'}{fmt(item.amount, item.currency ?? currency)}
+                                  </strong>
+                                </span>
                               </div>
-                              <strong className={`mnc-card-amount ${isIncome ? 'income' : 'expense'}`}>
-                                {isIncome ? '+' : '−'}{fmt(item.amount, item.currency ?? currency)}
-                              </strong>
                             </div>
 
                             <div className="mnc-card-chips">

@@ -1,3 +1,4 @@
+import { APP_NAME } from '@/data/release'
 import { useEffect, useState } from 'react'
 import { Icon } from '@/components/ui/Icon'
 import { authenticateBiometric, checkBiometric } from '@/lib/biometric'
@@ -13,7 +14,7 @@ export function MobileBiometricGate({ onUnlocked, onUnavailable }: { onUnlocked:
     setState('prompting')
     setError('')
     try {
-      await authenticateBiometric('Desbloquear $harky')
+      await authenticateBiometric(`Desbloquear ${APP_NAME}`)
       setState('done')
       onUnlocked()
     } catch (err) {
@@ -45,7 +46,7 @@ export function MobileBiometricGate({ onUnlocked, onUnavailable }: { onUnlocked:
         <div className="mbio-icon">
           <Icon name={icon === 'faceId' ? 'user' : 'lock'} size={48} />
         </div>
-        <h2>$harky</h2>
+        <h2>{APP_NAME}</h2>
         <p>{state === 'error' ? error : 'Verificando identidad…'}</p>
         {state === 'error' && (
           <>

@@ -1,6 +1,6 @@
 {
   "name": "sharky",
-  "version": "1.9.1",
+  "version": "1.9.5",
   "private": true,
   "type": "module",
   "scripts": {
@@ -23,7 +23,8 @@
     "android:release": "powershell -ExecutionPolicy Bypass -File scripts/package-android.ps1 -Mode build -Target all -Package aab",
     "android:devices": "powershell -ExecutionPolicy Bypass -Command \"& \\\"$env:LOCALAPPDATA\\Android\\Sdk\\platform-tools\\adb.exe\\\" devices -l\"",
     "android:logcat": "powershell -ExecutionPolicy Bypass -Command \"& \\\"$env:LOCALAPPDATA\\Android\\Sdk\\platform-tools\\adb.exe\\\" logcat -c; & \\\"$env:LOCALAPPDATA\\Android\\Sdk\\platform-tools\\adb.exe\\\" logcat AndroidRuntime:E chromium:E RustStdoutStderr:D Tauri:D *:S\"",
-    "tauri:icon": "tauri icon public/icon.svg"
+    "tauri:icon": "tauri icon public/icon.svg",
+    "verify": "npm run lint && npm run typecheck && npm run test && npm run test:e2e"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.106.2",

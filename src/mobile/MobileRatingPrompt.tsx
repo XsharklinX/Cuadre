@@ -85,7 +85,7 @@ export function MobileRatingPrompt({
               la marca se muestra por sí misma. */}
           <div className="mrate-art" aria-hidden="true">
             <span className="mrate-glow" />
-            <span className="mrate-mark"><Icon name="shark" size={44} /></span>
+            <span className="mrate-mark"><Icon name="brand" size={44} /></span>
             <span className="mrate-stars">
               {[0, 1, 2, 3, 4].map(i => (
                 <i key={i} style={{ animationDelay: `${i * 70}ms` }}><Icon name="star" size={16} /></i>

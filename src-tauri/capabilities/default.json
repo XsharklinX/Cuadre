@@ -14,6 +14,7 @@
     "local-reminders:default",
     "bank-notifications:default",
     "keystore:default",
-    "home-widget:default"
+    "home-widget:default",
+    "play-billing:default"
   ]
 }
