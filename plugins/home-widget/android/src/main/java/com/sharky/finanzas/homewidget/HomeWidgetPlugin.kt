@@ -49,12 +49,14 @@ class HomeWidgetPlugin(private val activity: Activity) : Plugin(activity) {
             .putLong(SYNCED_AT_KEY, System.currentTimeMillis())
             .apply()
 
-        val context = activity.applicationContext
-        SharkyBalanceWidgetProvider.refreshAll(context)
-        SharkyBudgetWidgetProvider.refreshAll(context)
-        SharkyConverterWidgetProvider.refreshAll(context)
-        // El de acceso rápido (+) no lee el snapshot: es un botón fijo, no hay
-        // nada que repintar.
+        /*
+         * Desde 1.9.8 no hay nada que repintar: el unico widget que queda es
+         * el acceso rapido "+", que es un boton fijo y no lee el snapshot.
+         *
+         * El snapshot SE SIGUE guardando arriba a proposito: es barato, y si
+         * mañana vuelve a haber un widget con datos, el dato ya esta ahi en
+         * vez de aparecer vacio hasta la primera sincronizacion.
+         */
         invoke.resolve(JSObject())
     }
 
@@ -72,22 +74,21 @@ class HomeWidgetPlugin(private val activity: Activity) : Plugin(activity) {
 
         val result = JSObject()
         result.put("supported", supported)
-        result.put("balance", installedCount(SharkyBalanceWidgetProvider::class.java))
-        result.put("budgets", installedCount(SharkyBudgetWidgetProvider::class.java))
-        result.put("converter", installedCount(SharkyConverterWidgetProvider::class.java))
         result.put("quickadd", installedCount(SharkyQuickAddWidgetProvider::class.java))
         result.put("lastSyncedAt", prefs.getLong(SYNCED_AT_KEY, 0))
         result.put("hasSnapshot", prefs.getString(SNAPSHOT_KEY, null) != null)
         invoke.resolve(result)
     }
 
-    /** "Actualizar ahora" de Ajustes: fuerza el repintado con lo ya guardado. */
+    /**
+     * "Actualizar ahora" de Ajustes.
+     *
+     * Ya no repinta nada —el "+" no muestra datos— pero el comando se mantiene:
+     * lo llama la app y quitarlo obligaria a tocar el lado JS para no ganar
+     * nada. Responde OK y no hace trabajo.
+     */
     @Command
     fun refreshWidgets(invoke: Invoke) {
-        val context = activity.applicationContext
-        SharkyBalanceWidgetProvider.refreshAll(context)
-        SharkyBudgetWidgetProvider.refreshAll(context)
-        SharkyConverterWidgetProvider.refreshAll(context)
         invoke.resolve(JSObject())
     }
 
@@ -97,12 +98,10 @@ class HomeWidgetPlugin(private val activity: Activity) : Plugin(activity) {
         val args = invoke.parseArgs(RequestPinArgs::class.java)
         val manager = activity.getSystemService(Context.APPWIDGET_SERVICE) as AppWidgetManager
 
-        val providerClass = when (args.widget) {
-            "budgets" -> SharkyBudgetWidgetProvider::class.java
-            "converter" -> SharkyConverterWidgetProvider::class.java
-            "quickadd" -> SharkyQuickAddWidgetProvider::class.java
-            else -> SharkyBalanceWidgetProvider::class.java
-        }
+        // Solo queda uno. Cualquier valor cae en el mismo sitio en vez de
+        // fallar: una app vieja que pida "balance" recibe el "+" en lugar de un
+        // error sin explicacion.
+        val providerClass = SharkyQuickAddWidgetProvider::class.java
 
         val supported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
             manager.isRequestPinAppWidgetSupported

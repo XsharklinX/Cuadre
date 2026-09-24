@@ -118,6 +118,25 @@ export function MobileNotificationCenter({ onClose, onGotoBudgets, onGotoTarget,
   const [historyOpen, setHistoryOpen] = useState(false)
   const health = useDetectionHealth()
 
+  /*
+   * FILTROS.
+   *
+   * Todo caia en una sola lista: transacciones detectadas que hay que
+   * responder, avisos que llevan a algun sitio, e historial ya pasado. Con
+   * quince entradas, lo accionable —lo unico que pide algo del usuario— queda
+   * enterrado entre lo informativo, y el panel se vuelve algo que se cierra
+   * sin leer.
+   */
+  const [filter, setFilter] = useState<'all' | 'review' | 'log'>('all')
+  const showReview = filter === 'all' || filter === 'review'
+  const showLog = filter === 'all' || filter === 'log'
+
+  const clearLog = useNotificationHistory(s => s.clear)
+  // Con el filtro "Registro" puesto, el historial sale desplegado: plegarlo
+  // ahi obligaria a un toque mas para ver justo lo que se acaba de pedir.
+  const logOpen = historyOpen || filter === 'log'
+
+
   return (
     <SheetPortal>
       <div className="mobile-detail-sheet mnc-wrap" role="dialog" aria-modal="true"
@@ -137,6 +156,43 @@ export function MobileNotificationCenter({ onClose, onGotoBudgets, onGotoTarget,
               <button className="mnc-close" aria-label={t('close')} onClick={onClose}><Icon name="close" size={18} /></button>
             </header>
           </div>
+
+          {/*
+            LA BARRA DE FILTROS.
+            "Por revisar" es lo que PIDE algo del usuario; el registro es lo
+            que ya paso. Separarlos es la diferencia entre un panel que se
+            atiende y uno que se cierra sin leer.
+          */}
+          {historyTotal > 0 && (
+            <div className="mnc-filters" role="tablist">
+              {([
+                ['all', t('notifFilterAll'), historyTotal],
+                ['review', t('notifFilterReview'), reviewCount],
+                ['log', t('notifFilterLog'), history.length],
+              ] as const).map(([key, label, count]) => (
+                <button
+                  key={key}
+                  role="tab"
+                  aria-selected={filter === key}
+                  className={`mnc-filter${filter === key ? ' on' : ''}`}
+                  onClick={() => setFilter(key)}
+                >
+                  {label}
+                  {count > 0 && <em>{count}</em>}
+                </button>
+              ))}
+              {/* Vaciar el registro. Antes solo se podian borrar de uno en uno:
+                  con treinta entradas viejas, nadie lo hace. */}
+              {showLog && history.length > 0 && (
+                <button className="mnc-clear" onClick={() => {
+                  clearLog()
+                  toast(t('notifLogCleared'), { icon: 'check', type: 'ok' })
+                }}>
+                  <Icon name="trash" size={14} />
+                </button>
+              )}
+            </div>
+          )}
 
           <div className="mnc-body">
             {/*
@@ -163,13 +219,15 @@ export function MobileNotificationCenter({ onClose, onGotoBudgets, onGotoTarget,
 
             {historyTotal === 0 ? (
               <div className="mnc-empty">
-                <span className="mnc-empty-icon"><Icon name="bell" size={32} /></span>
+                {/* Un check, no una campana apagada: "no hay nada pendiente"
+                    es un buen resultado, no una pantalla rota. */}
+                <span className="mnc-empty-icon"><Icon name="check" size={34} /></span>
                 <b>{t('notifEmptyTitle')}</b>
                 <small>{t('notifEmptyHint')}</small>
               </div>
             ) : (
               <>
-                {suggestions.length > 0 && (
+                {showReview && suggestions.length > 0 && (
                   <div className="mnc-group">
                     {/* PRIMERO lo que pide accion. Antes los tres bloques
                         —detectados, avisos e historial— tenian el mismo
@@ -185,7 +243,15 @@ export function MobileNotificationCenter({ onClose, onGotoBudgets, onGotoTarget,
                         const suggestedCat = categoryFor(item)
                         const isIncome = item.type === 'income'
                         return (
-                          <article key={item.id} className="mnc-card">
+                          <article
+                            key={item.id}
+                            className="mnc-card"
+                            /* La naturaleza del movimiento la lleva la TARJETA,
+                               no solo un icono de 34px: ingreso y gasto se
+                               distinguian por un cuadrito de color que habia
+                               que ir a buscar. */
+                            data-kind={isIncome ? 'income' : 'expense'}
+                          >
                             <div className="mnc-card-top">
                               <span className="mnc-card-icon" style={{
                                 background: isIncome ? '#35d0a222' : '#ff6b8a22',
@@ -260,7 +326,7 @@ export function MobileNotificationCenter({ onClose, onGotoBudgets, onGotoTarget,
                   </div>
                 )}
 
-                {alerts.length > 0 && (
+                {showReview && alerts.length > 0 && (
                   <div className="mnc-group">
                     <div className="mnc-group-title">
                       {t('notifAlertsSection')}
@@ -301,22 +367,22 @@ export function MobileNotificationCenter({ onClose, onGotoBudgets, onGotoTarget,
                 {/* El historial es REFERENCIA, no accion: va plegado. Abierto
                     competia por la pantalla con lo que si hay que revisar, y
                     era lo que hacia que el panel se sintiera un volcado. */}
-                {history.length > 0 && (
+                {showLog && history.length > 0 && (
                   <div className="mnc-group">
                     <button
                       className="mnc-group-title toggle"
                       onClick={() => setHistoryOpen(v => !v)}
-                      aria-expanded={historyOpen}
+                      aria-expanded={logOpen}
                     >
                       {t('notifHistorySection')}
                       <span className="mnc-group-count">{history.length}</span>
                       <Icon
                         name="arrowUp"
                         size={13}
-                        style={{ transform: historyOpen ? 'rotate(180deg)' : 'rotate(90deg)', marginLeft: 'auto' }}
+                        style={{ transform: logOpen ? 'rotate(180deg)' : 'rotate(90deg)', marginLeft: 'auto' }}
                       />
                     </button>
-                    <div className="mnc-card-list" hidden={!historyOpen}>
+                    <div className="mnc-card-list" hidden={!logOpen}>
                       {history.map(entry => (
                         <div key={entry.id} className="mnc-history-row">
                           <button className="mnc-history-tap" onClick={() => goToHistoryEntry(entry.type)}>

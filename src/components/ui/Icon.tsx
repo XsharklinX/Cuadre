@@ -22,6 +22,8 @@ import {
   GraduationCap, Stethoscope, Salad, Wine,
   Crown, Trophy, Shield, MapPin, Package,
   Banknote, Coins, HandCoins, Landmark, Receipt,
+  // Iconos de los temas: cada uno tiene que decir SU ambiente de un vistazo.
+  Moon, Waves, Sunrise, CircleDot, Wifi,
 } from 'lucide-react'
 import type { IconName } from '@/types'
 
@@ -106,6 +108,11 @@ const MAP: Partial<Record<IconName, LucideIcon>> = {
   // 20 nuevos
   tree:        TreePine,
   sun:         Sun,
+  moon:        Moon,
+  waves:       Waves,
+  sunrise:     Sunrise,
+  circleDot:   CircleDot,
+  wifi:        Wifi,
   bike:        Bike,
   train:       Train,
   tv:          Tv,

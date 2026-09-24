@@ -74,8 +74,15 @@ test('editar un movimiento conserva su categoría', async ({ page }) => {
 
 test('crear una meta y aportarle refleja el saldo', async ({ page }) => {
   await boot(page)
-  await nav(page, 'Cuentas')
-  await page.getByRole('tab', { name: 'Metas' }).first().click()
+  /*
+   * Metas vive en el menu de herramientas (☰), no en una pestaña de Cuentas.
+   * Esta prueba seguia buscando `role=tab name=Metas` de cuando si lo era, y
+   * por eso agotaba los 45s esperando un control que ya no existe. Se navega
+   * por el TEXTO de la fila, no por su posicion: añadir una herramienta
+   * mañana no debe volver a romper esto.
+   */
+  await page.locator('.mobile-topbar-menu').click()
+  await page.locator('.mobile-tools-row', { hasText: 'Metas' }).first().click()
   // MobileGoals se carga bajo demanda (lazy): esperar a que la vista aparezca.
   await expect(page.locator('.mgl-root').first()).toBeVisible({ timeout: 10_000 })
 

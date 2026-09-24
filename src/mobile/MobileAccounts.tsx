@@ -4,7 +4,7 @@ import { toast } from '@/components/ui/Toast'
 import { AnimatedMoney } from '@/components/ui/AnimatedMoney'
 import { CatBadge } from '@/views/shared'
 import { ACCENT_COLORS } from '@/constants'
-import { accountActivity, accountBalanceInBase, creditCardsOwedInBase, accountCurrency, dateLocale, fmt, getAccount, getCategory, localToday, monthlyAccountSeries, visibleAccounts } from '@/data/helpers'
+import { accountActivity, accountBalanceInBase, accountCurrency, dateLocale, fmt, getAccount, getCategory, localToday, monthlyAccountSeries, visibleAccounts } from '@/data/helpers'
 import { CURRENCIES as CURRENCY_LIST, convertCurrency, getCurrencyMeta } from '@/data/currencies'
 import { CARD_NETWORKS, networkMeta } from '@/data/cardNetwork'
 import {
@@ -14,6 +14,7 @@ import {
 import { canDeleteAccountType, canHaveNetwork, creatableTypes, guessNetwork } from '@/data/cardNetwork'
 import { availableFromBalance, balanceFromAvailable, balanceFromOwed, owedFromBalance } from '@/data/creditEntry'
 import { findBank, guessBank } from '@/data/banks'
+import { cardFigures, cardGroups, cashAccounts, type CardGroupId } from '@/data/accountGroups'
 import { MobileBankPicker } from './MobileBankPicker'
 import { NetworkMark } from '@/components/ui/NetworkMark'
 import { useFinance } from '@/store/finance'
@@ -47,6 +48,11 @@ function getTypeMeta(t: ReturnType<typeof useT>): Record<AccountType, { label: s
     savings: { label: t('savings'), group: t('bankAccountsGroupLabel'),  icon: 'piggy'  },
     credit:  { label: t('credit'),  group: t('creditCardsGroupLabel'),   icon: 'cards'  },
   }
+}
+
+/** El titulo de cada grupo de tarjetas. */
+const GROUP_LABEL: Record<CardGroupId, 'credit' | 'debit' | 'savings'> = {
+  credit: 'credit', debit: 'debit', savings: 'savings',
 }
 
 function accountKind(a: Account): 'asset' | 'debt' {
@@ -121,11 +127,21 @@ export function MobileAccounts({ mkey, createRequest, onEditTx, onDeleteTx }: {
   }, [accounts, currency, TYPE_META, t])
 
 
-  const cashAccounts = accounts.filter(a => a.type !== 'credit')
+  /*
+   * EL EFECTIVO APARTE, LAS TARJETAS JUNTAS.
+   *
+   * Antes eran "tu dinero" (efectivo + debito + ahorro) y "tus tarjetas"
+   * (solo credito). Un efectivo y un ahorro no se parecen en nada y estaban
+   * en la misma lista; un debito y un credito —que si son la misma clase de
+   * objeto— estaban separados. La particion vive en `data/accountGroups.ts`.
+   */
+  const cash = cashAccounts(accounts)[0] ?? null
+  const groups = useMemo(() => cardGroups(accounts, currency), [accounts, currency])
+  const cardCount = groups.reduce((n, g) => n + g.accounts.length, 0)
+  const cardsView = useSettings(s => s.cardsView)
+  const setCardsView = useSettings(s => s.setCardsView)
+
   const creditCards  = accounts.filter(a => a.type === 'credit')
-  const cashTotal    = cashAccounts
-    .filter(a => a.includeInTotal !== false)
-    .reduce((sum, a) => sum + accountBalanceInBase(a, currency), 0)
 
   /**
    * La tarjeta cuyo pago vence antes. Con dos o tres tarjetas, "¿cuánto debo
@@ -202,145 +218,213 @@ export function MobileAccounts({ mkey, createRequest, onEditTx, onDeleteTx }: {
         </div>
       ) : (
         <>
-          {/* ── REGISTRO 1: dinero que tienes ───────────────
-              Filas compactas. Un saldo es un número: no necesita una
-              tarjeta ni el sparkline de 20px que antes competía con él. */}
-          {cashAccounts.length > 0 && (
-            <div className="sacc-block">
-              <div className="sacc-section">
-                <span className="sacc-section-title">{t('yourMoneyLabel')}</span>
-                <span className="sacc-section-total">{fmtVal(cashTotal, currency)}</span>
-              </div>
-              <div className="sacc-rows">
-                {cashAccounts.map(a => (
-                  <button key={a.id} className="sacc-row" onClick={() => setSelectedId(a.id)}>
-                    <span className="sacc-row-ico" style={{ background: `color-mix(in oklab, ${a.color} 16%, transparent)`, color: a.color }}>
-                      <Icon name={TYPE_META[a.type].icon} size={19} />
-                    </span>
-                    <span className="sacc-row-info">
-                      <span className="sacc-row-name">
-                        {a.name}
-                        {a.includeInTotal === false && (
-                          <span className="sacc-badge">{t('excludedFromTotalBadge')}</span>
-                        )}
-                      </span>
-                      <span className="sacc-row-meta">
-                        {TYPE_META[a.type].label}
-                        {a.last4 ? ` · ····${a.last4}` : ''}
-                        {a.currency && a.currency !== currency ? ` · ${a.currency}` : ''}
-                      </span>
-                    </span>
-                    <span className="sacc-row-right">
-                      {/* La red identifica la tarjeta antes que el nombre que
-                          el usuario le puso. Solo si la cuenta lleva plastico. */}
-                      {a.network && canHaveNetwork(a.type) && (
-                        <NetworkMark network={a.network} size={24} />
-                      )}
-                      <span className="sacc-row-amount">
-                        {fmtVal(a.balance, accountCurrency(a, currency))}
-                      </span>
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
+          {/*
+            ── EFECTIVO ─────────────────────────────────────────────────
+            Un BILLETE, no una fila ni una tarjeta. Es el único dinero que no
+            pasa por un banco, así que no debe parecerse a nada de abajo: la
+            proporción ya lo separa antes de leer una palabra.
+
+            Compacto a propósito: muestra una sola cifra y ocupaba como una
+            tarjeta entera.
+          */}
+          {cash ? (
+            <button
+              className="sacc-bill"
+              onClick={() => setSelectedId(cash.id)}
+              aria-label={`${cash.name}, ${fmtVal(cash.balance, accountCurrency(cash, currency))}`}
+            >
+              <span className="sacc-bill-guilloche" aria-hidden="true" />
+              <span className="sacc-bill-frame" aria-hidden="true" />
+              <span className="sacc-bill-wm" aria-hidden="true">
+                <Icon name="banknote" size={22} />
+              </span>
+              <span className="sacc-bill-id">
+                <span className="sacc-bill-label">
+                  {t('cash')}
+                  {cash.currency && cash.currency !== currency ? ` · ${cash.currency}` : ''}
+                </span>
+                <span className="sacc-bill-amount">
+                  {fmtVal(cash.balance, accountCurrency(cash, currency))}
+                </span>
+              </span>
+              {/* Microtexto de seguridad: el detalle que solo tiene el papel. */}
+              <span className="sacc-bill-micro" aria-hidden="true">
+                CUADRE·EFECTIVO·CUADRE·EFECTIVO·CUADRE·EFECTIVO
+              </span>
+            </button>
+          ) : (
+            <button className="sacc-bill-empty" onClick={() => setEditingAccount('new')}>
+              <Icon name="banknote" size={20} />
+              <span>
+                <b>{t('noCashLabel')}</b>
+                <small>{t('noCashHint')}</small>
+              </span>
+            </button>
           )}
 
-          {/* ── REGISTRO 2: dinero que debes ────────────────
-              CARRUSEL de tarjetas reales, no un panel plano. Una tarjeta de
-              crédito ES un objeto físico con proporción, marca y color; la
-              gente la reconoce por cómo se ve, no por leer su nombre. Se
-              desliza en horizontal con anclaje, como el billetero del
-              teléfono.
-
-              Cada tarjeta lleva solo lo que cabe sin apretar: identidad,
-              saldos y cuánto del cupo va. El ciclo, el mínimo y el aviso de
-              interés viven en la ficha, a un toque. */}
-          {creditCards.length > 0 && (
+          {/*
+            ── MIS TARJETAS ─────────────────────────────────────────────
+            Débito, ahorro y crédito son la misma clase de objeto y estaban
+            en dos montones distintos. Ahora van juntas, agrupadas por tipo y
+            cada grupo con su total: sin eso, cinco cuentas son un sancocho.
+          */}
+          {groups.length > 0 && (
             <div className="sacc-block">
               <div className="sacc-section">
-                <span className="sacc-section-title">{t('yourCardsLabel')}</span>
-                <span className="sacc-section-total">
-                  {fmtVal(creditCardsOwedInBase(accounts, currency), currency)} {t('owedLabel')}
-                </span>
+                <span className="sacc-section-title">{t('myCardsLabel')}</span>
+                <span className="sacc-count">{cardCount}</span>
+
+                {/* CÓMO SE VEN. El carrusel luce con tres tarjetas y estorba
+                    con nueve: hay que deslizar a ciegas para encontrar una. */}
+                <div className="sacc-viewtoggle" role="group" aria-label={t('cardsViewLabel')}>
+                  <button
+                    className={cardsView === 'carousel' ? 'on' : ''}
+                    aria-pressed={cardsView === 'carousel'}
+                    aria-label={t('cardsViewCarousel')}
+                    onClick={() => setCardsView('carousel')}
+                  >
+                    <Icon name="cards" size={14} />
+                  </button>
+                  <button
+                    className={cardsView === 'list' ? 'on' : ''}
+                    aria-pressed={cardsView === 'list'}
+                    aria-label={t('cardsViewList')}
+                    onClick={() => setCardsView('list')}
+                  >
+                    <Icon name="list" size={14} />
+                  </button>
+                </div>
               </div>
 
-              <div className="sacc-carousel" role="list">
-                {creditCards.map(a => {
-                  const cur     = accountCurrency(a, currency)
-                  const owed    = creditUsed(a.balance)
-                  const util    = creditUtilization(a, currency)
-                  const band    = util !== null ? utilizationBand(util) : null
-                  const dual    = hasSecondaryBalance(a)
-                  const secOwed = creditUsed(a.secondaryBalance ?? 0)
-                  const bank    = findBank(a.bankId) ?? guessBank(a.name)
-                  const cycle   = creditCycle(a)
+              {groups.map(group => (
+                <div key={group.id} className="sacc-group">
+                  <div className="sacc-group-head">
+                    <span>{t(GROUP_LABEL[group.id])}</span>
+                    <span className="sacc-group-n">{group.accounts.length}</span>
+                    {/* En crédito el total lleva verbo: un número rojo a secas
+                        se lee como saldo, no como deuda. */}
+                    <span className={`sacc-group-total ${group.id}`}>
+                      {group.id === 'credit'
+                        ? t('owedAmount').replace('{amount}', fmtVal(group.total, currency))
+                        : fmtVal(group.total, currency)}
+                    </span>
+                  </div>
 
-                  return (
-                    <button
-                      key={a.id}
-                      role="listitem"
-                      className="sacc-plastic"
-                      style={{ '--card': a.color } as React.CSSProperties}
-                      onClick={() => setSelectedId(a.id)}
-                      aria-label={`${a.name}, ${TYPE_META[a.type].label}`}
-                    >
-                      {/* La textura: dos arcos muy tenues del propio color de
-                          la tarjeta. Da profundidad sin usar una imagen ni un
-                          degradado que compita con las cifras. */}
-                      <span className="sacc-plastic-sheen" aria-hidden="true" />
-
-                      <span className="sacc-plastic-top">
-                        <span className="sacc-plastic-bank">
-                          {bank?.name ?? TYPE_META[a.type].label}
-                        </span>
-                        {a.network
-                          ? <NetworkMark network={a.network} size={30} />
-                          : <Icon name="cards" size={20} className="sacc-plastic-generic" />}
-                      </span>
-
-                      {/* Los ultimos 4 digitos van con el NOMBRE, como van
-                          impresos en el plastico de verdad. Antes compartian
-                          fila con las cifras y en una tarjeta de dos divisas
-                          (pesos y dolares) los tres textos no caben: los
-                          montos se montaban encima del numero. */}
-                      <span className="sacc-plastic-id">
-                        <span className="sacc-plastic-name">{a.name}</span>
-                        {a.last4 && <span className="sacc-plastic-last4">···· {a.last4}</span>}
-                      </span>
-
-                      <span className="sacc-plastic-bottom">
-                        <span className="sacc-plastic-figures">
-                          <span className="sacc-plastic-fig">
-                            <em>{cur}</em>
-                            <b className={owed > 0 ? 'owed' : ''}>{fmtVal(a.balance, cur)}</b>
-                          </span>
-                          {dual && (
-                            <span className="sacc-plastic-fig">
-                              <em>{a.secondaryCurrency}</em>
-                              <b className={secOwed > 0 ? 'owed' : ''}>
-                                {fmtVal(a.secondaryBalance ?? 0, a.secondaryCurrency!)}
-                              </b>
+                  <div className={cardsView === 'list' ? 'sacc-cardlist' : 'sacc-carousel'} role="list">
+                    {group.accounts.map(a => {
+                      const fig = cardFigures(a, currency)
+                      const bank = findBank(a.bankId) ?? guessBank(a.name)
+                      return cardsView === 'list'
+                        ? (
+                          <button
+                            key={a.id}
+                            role="listitem"
+                            className="sacc-cardrow"
+                            style={{ '--card': a.color } as React.CSSProperties}
+                            onClick={() => setSelectedId(a.id)}
+                          >
+                            {/* Chip diminuto: mantiene el tipo reconocible sin
+                                la tarjeta entera. */}
+                            <span className={`sacc-mini ${a.type}`} aria-hidden="true" />
+                            <span className="sacc-cardrow-id">
+                              <b>{bank?.name ?? a.name}</b>
+                              <small>
+                                {a.last4 ? `···· ${a.last4}` : TYPE_META[a.type].label}
+                                {fig.usedLocal !== null && ` · ${Math.round((fig.usedLocal + (fig.usedForeign ?? 0)) * 100)}% ${t('ofLimitShort')}`}
+                                {a.currency && a.currency !== currency ? ` · ${a.currency}` : ''}
+                              </small>
                             </span>
-                          )}
-                        </span>
-                      </span>
+                            <span className="sacc-cardrow-amt">
+                              <b className={a.type === 'credit' ? 'owed' : ''}>
+                                {fmtVal(fig.primary, fig.currency)}
+                              </b>
+                              {fig.secondary && (
+                                <small className="owed">{fmtVal(fig.secondary.amount, fig.secondary.currency)}</small>
+                              )}
+                              {!fig.secondary && fig.currency !== currency && (
+                                <small>≈ {fmtVal(accountBalanceInBase(a, currency), currency)}</small>
+                              )}
+                            </span>
+                          </button>
+                        )
+                        : (
+                          <button
+                            key={a.id}
+                            role="listitem"
+                            className={`sacc-plastic ${a.type}`}
+                            style={{ '--card': a.color } as React.CSSProperties}
+                            onClick={() => setSelectedId(a.id)}
+                            aria-label={`${a.name}, ${TYPE_META[a.type].label}`}
+                          >
+                            <span className="sacc-plastic-sheen" aria-hidden="true" />
 
-                      {/* Franja de cupo al borde inferior: se lee de un
-                          vistazo sin robarle sitio a las cifras. */}
-                      {util !== null && a.limit && (
-                        <span className="sacc-plastic-util" aria-hidden="true">
-                          <i className={band ?? 'ok'} style={{ width: `${Math.max(2, util * 100)}%` }} />
-                        </span>
-                      )}
+                            <span className="sacc-plastic-top">
+                              <span className="sacc-plastic-bank">
+                                <b>{bank?.name ?? a.name}</b>
+                                <small>{TYPE_META[a.type].label}</small>
+                              </span>
+                              {a.type === 'credit' && a.network
+                                ? <NetworkMark network={a.network} size={26} />
+                                : a.currency && a.currency !== currency
+                                  ? <span className="sacc-plastic-cur">{a.currency}</span>
+                                  : a.type === 'savings'
+                                    ? <Icon name="lock" size={15} className="sacc-plastic-mark" />
+                                    : <Icon name="wifi" size={15} className="sacc-plastic-mark" />}
+                            </span>
 
-                      {cycle.paymentSoon && (
-                        <span className="sacc-plastic-due">{t('dueSoonShort')}</span>
-                      )}
-                    </button>
-                  )
-                })}
-              </div>
+                            <span className="sacc-plastic-mid">
+                              {/* El ahorro NO lleva chip: no tiene tarjeta
+                                  física, y dibujarle uno sería mentir. */}
+                              {a.type !== 'savings' && (
+                                <span className="sacc-chip" aria-hidden="true">
+                                  <i /><i />
+                                </span>
+                              )}
+                              <span className="sacc-plastic-figs">
+                                <small>{a.type === 'credit' ? t('cardOwedLabel') : t('cardAvailableLabel')}</small>
+                                <b className={a.type === 'credit' ? 'owed' : ''}>
+                                  {fmtVal(fig.primary, fig.currency)}
+                                </b>
+                                {/* Una tarjeta dominicana arrastra dos deudas
+                                    que el banco liquida por separado. */}
+                                {fig.secondary && (
+                                  <em className="owed">{fmtVal(fig.secondary.amount, fig.secondary.currency)}</em>
+                                )}
+                                {!fig.secondary && fig.currency !== currency && (
+                                  <em>≈ {fmtVal(accountBalanceInBase(a, currency), currency)}</em>
+                                )}
+                              </span>
+                            </span>
+
+                            <span className="sacc-plastic-foot">
+                              {fig.usedLocal !== null ? (
+                                <>
+                                  {/* DOS TRAMOS: el cupo es uno solo y lo
+                                      consumen las dos deudas. */}
+                                  <span className="sacc-util" aria-hidden="true">
+                                    <i style={{ width: `${fig.usedLocal * 100}%` }} />
+                                    {!!fig.usedForeign && <i className="fx" style={{ width: `${fig.usedForeign * 100}%` }} />}
+                                  </span>
+                                  <span className="sacc-plastic-meta">
+                                    <span>
+                                      {Math.round((fig.usedLocal + (fig.usedForeign ?? 0)) * 100)}% {t('ofLimitShort')}
+                                      {a.last4 ? ` · ···· ${a.last4}` : ''}
+                                    </span>
+                                    <span>{t('freeAmount').replace('{amount}', fmtVal(fig.free ?? 0, fig.currency))}</span>
+                                  </span>
+                                </>
+                              ) : (
+                                <span className="sacc-plastic-meta">
+                                  <span>{a.last4 ? `···· ${a.last4}` : ''}</span>
+                                </span>
+                              )}
+                            </span>
+                          </button>
+                        )
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
 
@@ -900,33 +984,53 @@ function AccountEditorSheet({
             enseña lo que habrá, no una tarjeta bonita que no existe.
           */}
           <div className="saed-preview">
-            {fields.type === 'credit' ? (
-              <div className="sacc-plastic saed-preview-card" style={{ '--card': fields.color } as React.CSSProperties}>
+            {/*
+              LA VISTA PREVIA USA EL MISMO CHASIS QUE LA PANTALLA.
+              Antes tenia su propio juego de clases, asi que al rediseñar las
+              tarjetas la previsualizacion se quedo enseñando el diseño viejo:
+              una vista previa que no coincide con lo que sale al guardar es
+              peor que no tener vista previa.
+            */}
+            {fields.type !== 'cash' ? (
+              <div
+                className={`sacc-plastic ${fields.type} saed-preview-card`}
+                style={{ '--card': fields.color } as React.CSSProperties}
+              >
                 <span className="sacc-plastic-sheen" aria-hidden="true" />
                 <span className="sacc-plastic-top">
                   <span className="sacc-plastic-bank">
-                    {findBank(fields.bankId)?.name ?? TYPE_META[fields.type].label}
+                    <b>{findBank(fields.bankId)?.name ?? (fields.name || t('accountNamePlaceholder'))}</b>
+                    <small>{TYPE_META[fields.type].label}</small>
                   </span>
-                  {fields.network
-                    ? <NetworkMark network={fields.network} size={28} />
-                    : <Icon name="cards" size={19} className="sacc-plastic-generic" />}
+                  {fields.type === 'credit' && fields.network
+                    ? <NetworkMark network={fields.network} size={26} />
+                    : fields.currency && fields.currency !== currency
+                      ? <span className="sacc-plastic-cur">{fields.currency}</span>
+                      : fields.type === 'savings'
+                        ? <Icon name="lock" size={15} className="sacc-plastic-mark" />
+                        : <Icon name="wifi" size={15} className="sacc-plastic-mark" />}
                 </span>
-                <span className="sacc-plastic-id">
-                  <span className="sacc-plastic-name">{fields.name || t('accountNamePlaceholder')}</span>
-                  {fields.last4 && <span className="sacc-plastic-last4">···· {fields.last4}</span>}
-                </span>
-                <span className="sacc-plastic-bottom">
-                  <span className="sacc-plastic-figures">
-                    <span className="sacc-plastic-fig">
-                      <em>{fields.currency ?? currency}</em>
-                      <b>{fmt(fields.balance, fields.currency ?? currency)}</b>
-                    </span>
-                    {fields.secondaryCurrency && (
-                      <span className="sacc-plastic-fig">
-                        <em>{fields.secondaryCurrency}</em>
-                        <b>{fmt(fields.secondaryBalance ?? 0, fields.secondaryCurrency)}</b>
-                      </span>
+
+                <span className="sacc-plastic-mid">
+                  {fields.type !== 'savings' && (
+                    <span className="sacc-chip" aria-hidden="true"><i /><i /></span>
+                  )}
+                  <span className="sacc-plastic-figs">
+                    <small>{fields.type === 'credit' ? t('cardOwedLabel') : t('cardAvailableLabel')}</small>
+                    <b className={fields.type === 'credit' ? 'owed' : ''}>
+                      {fmt(Math.abs(fields.balance), fields.currency ?? currency)}
+                    </b>
+                    {fields.secondaryCurrency && !!fields.secondaryBalance && (
+                      <em className="owed">
+                        {fmt(Math.abs(fields.secondaryBalance), fields.secondaryCurrency)}
+                      </em>
                     )}
+                  </span>
+                </span>
+
+                <span className="sacc-plastic-foot">
+                  <span className="sacc-plastic-meta">
+                    <span>{fields.last4 ? `···· ${fields.last4}` : ''}</span>
                   </span>
                 </span>
               </div>

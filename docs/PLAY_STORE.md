@@ -1,4 +1,4 @@
-# $harky - Google Play Console submission notes
+# Cuadre - Google Play Console submission notes
 
 Reference for the first Play Store release. Update this file each time the
 app is resubmitted with relevant changes.

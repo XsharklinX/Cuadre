@@ -4,12 +4,12 @@ export type TxType       = 'income' | 'expense' | 'transfer'
 export type CurrencyCode = 'DOP' | 'USD' | 'EUR' | 'MXN' | 'GBP' | 'COP' | 'ARS' | 'BRL' | 'CAD'
 /**
  * Temas. Los cuatro nuevos no son variantes de gris: cada uno cambia el TONO
- * de toda la app, no solo su claridad. `sand` es ademas un segundo tema claro
- * —calido, de papel— porque hasta ahora quien no soportaba el fondo oscuro
- * tenia una sola opcion y era un blanco que deslumbra.
+ * de toda la app, no solo su claridad: son ambientes, no tres grises. Cada uno
+ * lleva ademas su propio icono y su frase en el selector (ver THEME_FACE en
+ * `settings/SettingsAppearance.tsx`).
  */
 export type ThemeName    = 'dark' | 'light' | 'amoled' | 'system'
-                         | 'ocean' | 'sunset' | 'forest' | 'sand'
+                         | 'ocean' | 'sunset' | 'forest'
 export type DensityName  = 'compact' | 'regular' | 'comfy'
 export type OverdraftPolicy = 'block' | 'warn' | 'allow'
 export type CardNetwork = 'visa' | 'mastercard' | 'amex' | 'discover' | 'other'
@@ -36,6 +36,8 @@ export type IconName =
   | 'lock' | 'user' | 'palette'
   // 20 iconos nuevos
   | 'tree' | 'sun' | 'bike' | 'train' | 'tv' | 'monitor'
+  // iconos de los temas
+  | 'moon' | 'waves' | 'sunrise' | 'circleDot' | 'wifi'
   | 'headphones' | 'clock' | 'key' | 'tool' | 'brush'
   | 'graduation' | 'stethoscope' | 'salad' | 'wine'
   | 'crown' | 'trophy' | 'shield' | 'map' | 'package'
@@ -358,6 +360,15 @@ export interface WeekBucket {
 
 export interface FmtOptions {
   decimals?: number
+  /**
+   * Ignora el modo privado.
+   *
+   * Para los sitios donde tapar la cifra rompe la funcion en vez de
+   * protegerla: un archivo de respaldo, una exportacion a Excel o el texto de
+   * un correo con los montos como bolitas no le sirve a nadie. El modo privado
+   * protege LA PANTALLA, no los datos.
+   */
+  neverMask?: boolean
 }
 
 // ── Props compartidas de vistas ───────────────────────────

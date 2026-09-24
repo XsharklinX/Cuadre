@@ -132,20 +132,6 @@
     --m-elevation: 0 12px 32px rgba(0,22,14,.45);
     --m-elevation-sm: 0 6px 18px rgba(0,22,14,.34);
   }
-  /* ARENA es CLARO: hereda los ajustes del tema claro (verdes/rojos legibles
-     sobre fondo claro, sombras tintadas) pero en tono calido. */
-  .mobile-app[data-theme="sand"] {
-    --m-income: #0f7a56;
-    --m-expense: #c0392f;
-    --m-elevation: 0 12px 32px rgba(70,52,28,.13);
-    --m-elevation-sm: 0 6px 18px rgba(70,52,28,.09);
-    --m-brand-band: linear-gradient(150deg, #e7d6bd 0%, #f0e4d3 55%, #f7efe4 100%);
-    --m-brand-on: #2b2318;
-    --m-brand-on-dim: rgba(43,35,24,.62);
-    --m-brand-layer: rgba(43,35,24,.07);
-    --m-brand-layer-strong: rgba(43,35,24,.14);
-    --m-brand-line: rgba(43,35,24,.13);
-  }
 
   .app.mobile-app {
     display: block;
@@ -2513,6 +2499,63 @@
      una banda con glow que le da identidad al panel en vez de una fila plana.
      El degradado y sus capas salen de los tokens --m-brand-*, así que en tema
      claro la banda es clara y el texto oscuro. */
+
+  /* ── Filtros del centro de notificaciones (1.9.8) ───────────────────
+     Todo caía en una sola lista: lo que hay que responder, lo que lleva a
+     algún sitio y lo que ya pasó. Con quince entradas, lo accionable queda
+     enterrado entre lo informativo y el panel se vuelve algo que se cierra
+     sin leer. Estos tres botones separan "me pide algo" de "ya pasó". */
+  .mnc-filters {
+    align-items: center;
+    border-bottom: 1px solid var(--m-border);
+    display: flex;
+    gap: 6px;
+    padding: 4px 16px 10px;
+  }
+  .mnc-filter {
+    align-items: center;
+    background: color-mix(in oklab, var(--m-text) 6%, transparent);
+    border: 1px solid transparent;
+    border-radius: 999px;
+    color: var(--m-muted);
+    display: flex;
+    font-size: 12.5px;
+    font-weight: 750;
+    gap: 6px;
+    padding: 7px 12px;
+    transition: background .15s ease, color .15s ease;
+  }
+  .mnc-filter.on {
+    background: color-mix(in oklab, var(--m-primary) 16%, transparent);
+    border-color: color-mix(in oklab, var(--m-primary) 40%, transparent);
+    color: var(--m-primary);
+  }
+  /* El contador va DENTRO de la pastilla: fuera competía con el título de la
+     sección de abajo y se leía como si fueran dos cifras distintas. */
+  .mnc-filter em {
+    background: color-mix(in oklab, currentColor 20%, transparent);
+    border-radius: 999px;
+    font-size: 10.5px;
+    font-style: normal;
+    font-weight: 900;
+    min-width: 18px;
+    padding: 1px 5px;
+    text-align: center;
+  }
+  /* Vaciar el registro. Antes solo se borraba de una en una: con treinta
+     entradas viejas, nadie lo hace. */
+  .mnc-clear {
+    align-items: center;
+    background: transparent;
+    border-radius: 9px;
+    color: var(--m-muted);
+    display: flex;
+    justify-content: center;
+    margin-left: auto;
+    padding: 7px;
+  }
+  .mnc-clear:active { background: color-mix(in oklab, var(--m-expense) 14%, transparent); color: var(--m-expense); }
+
   .mnc-top {
     background:
       radial-gradient(circle at 88% -20%, color-mix(in oklab, var(--m-primary) 26%, transparent), transparent 60%),
@@ -3321,4 +3364,223 @@
   .mobile-icon-btn.on {
     background: color-mix(in oklab, var(--accent, #ffdd3d) 20%, transparent);
     color: var(--accent, #ffdd3d);
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     CENTRO DE NOTIFICACIONES — rediseño visual (1.9.8)
+
+     Lo anterior era correcto y anónimo: tarjetas grises idénticas, un icono de
+     34px y el monto a 15px, más pequeño que el título. Una transacción de
+     RD$ 12.000 se veía igual que un recordatorio, y un ingreso igual que un
+     gasto. Nada pesaba más que nada, así que no había dónde mirar primero.
+
+     Aquí la tarjeta LLEVA su naturaleza: el color de ingreso o gasto la tiñe,
+     le pinta el canto y le da el color al monto — que pasa a ser el elemento
+     más grande de la tarjeta, porque es el dato.
+     ═══════════════════════════════════════════════════════════════════ */
+
+  /* ── La tarjeta de un movimiento detectado ─────────────────────── */
+  .mnc-card {
+    background: var(--m-surface);
+    border: 1px solid var(--m-border);
+    /* Canto de color a la izquierda: se ve de reojo al desplazar, antes de
+       leer una sola palabra. */
+    border-left: 3px solid var(--m-border);
+    border-radius: 16px;
+    min-width: 0;
+    overflow: hidden;
+    padding: 13px 13px 13px 14px;
+    position: relative;
+  }
+  .mnc-card[data-kind="income"] {
+    background:
+      linear-gradient(118deg, color-mix(in oklab, var(--m-income) 13%, transparent), transparent 52%),
+      var(--m-surface);
+    border-color: color-mix(in oklab, var(--m-income) 24%, var(--m-border));
+    border-left-color: var(--m-income);
+  }
+  .mnc-card[data-kind="expense"] {
+    background:
+      linear-gradient(118deg, color-mix(in oklab, var(--m-expense) 13%, transparent), transparent 52%),
+      var(--m-surface);
+    border-color: color-mix(in oklab, var(--m-expense) 24%, var(--m-border));
+    border-left-color: var(--m-expense);
+  }
+
+  .mnc-card-top { align-items: center; display: flex; gap: 11px; min-width: 0; }
+  /* El icono gana anillo y tamaño: era una mancha de color de 34px sin forma
+     propia. */
+  .mnc-card-icon {
+    align-items: center;
+    border-radius: 13px;
+    box-shadow: 0 0 0 1px color-mix(in oklab, currentColor 28%, transparent) inset;
+    display: flex;
+    flex-shrink: 0;
+    height: 40px;
+    justify-content: center;
+    width: 40px;
+  }
+  .mnc-card-title { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; padding-top: 1px; }
+  .mnc-card-title b {
+    color: var(--m-text);
+    font-size: 14.5px;
+    font-weight: 800;
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mnc-card-title small { color: var(--m-muted); font-size: 11.5px; font-weight: 600; }
+
+  .mnc-card-meta { align-items: baseline; display: flex; gap: 10px; justify-content: space-between; margin-top: 10px; min-width: 0; }
+  /* EL MONTO ES EL DATO. Estaba a 15px, más pequeño que el título — el número
+     por el que se abre el panel era lo tercero que se leía. */
+  .mnc-card-amount {
+    flex-shrink: 0;
+    font-size: 22px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 900;
+    letter-spacing: -.02em;
+    white-space: nowrap;
+  }
+  .mnc-card-amount.income { color: var(--m-income); }
+  .mnc-card-amount.expense { color: var(--m-expense); }
+
+  /* ── Cabecera de grupo ─────────────────────────────────────────── */
+  .mnc-group-title {
+    align-items: center;
+    color: var(--m-muted);
+    display: flex;
+    font-size: 10.5px;
+    font-weight: 900;
+    gap: 8px;
+    letter-spacing: .1em;
+    margin: 0 0 10px;
+    text-transform: uppercase;
+    width: 100%;
+  }
+  .mnc-group-title.primary { color: var(--m-primary); }
+  .mnc-group-count {
+    background: color-mix(in oklab, currentColor 18%, transparent);
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 900;
+    min-width: 18px;
+    padding: 1px 6px;
+    text-align: center;
+  }
+
+  /* ── Aviso financiero ──────────────────────────────────────────── */
+  .mnc-alert-row {
+    align-items: stretch;
+    background:
+      linear-gradient(118deg, color-mix(in oklab, var(--m-expense) 9%, transparent), transparent 54%),
+      var(--m-surface);
+    border: 1px solid var(--m-border);
+    border-left: 3px solid var(--m-border);
+    border-radius: 15px;
+    display: flex;
+    gap: 2px;
+    overflow: hidden;
+  }
+  .mnc-alert-row[data-level="warn"] {
+    background: linear-gradient(118deg, color-mix(in oklab, #f7b231 12%, transparent), transparent 54%), var(--m-surface);
+    border-color: color-mix(in oklab, #f7b231 26%, var(--m-border));
+    border-left-color: #f7b231;
+  }
+  .mnc-alert-row[data-level="danger"] {
+    background: linear-gradient(118deg, color-mix(in oklab, #ff5470 13%, transparent), transparent 54%), var(--m-surface);
+    border-color: color-mix(in oklab, #ff5470 28%, var(--m-border));
+    border-left-color: #ff5470;
+  }
+
+  /* ── La detección rota ─────────────────────────────────────────── */
+  /* Es el aviso más importante que puede dar esta pantalla: significa que la
+     app lleva tiempo sin registrar gastos. Tiene que verse como una alarma, no
+     como una fila más. */
+  .mnc-health {
+    align-items: center;
+    background:
+      linear-gradient(125deg, color-mix(in oklab, var(--m-expense) 22%, transparent), transparent 58%),
+      var(--m-surface);
+    border: 1px solid color-mix(in oklab, var(--m-expense) 38%, transparent);
+    border-radius: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding: 14px;
+    text-align: left;
+    width: 100%;
+  }
+  .mnc-health-ico {
+    align-items: center;
+    background: color-mix(in oklab, var(--m-expense) 22%, transparent);
+    border-radius: 12px;
+    color: var(--m-expense);
+    display: flex;
+    flex-shrink: 0;
+    height: 38px;
+    justify-content: center;
+    width: 38px;
+  }
+  .mnc-health-cta {
+    background: var(--m-expense);
+    border-radius: 11px;
+    color: #fff;
+    font-size: 12.5px;
+    font-weight: 850;
+    margin-left: auto;
+    padding: 9px 14px;
+  }
+
+  /* ── Vacío ─────────────────────────────────────────────────────── */
+  /* "No hay nada" es un buen resultado, no un error: se pinta en verde y con
+     el icono del check, no con una campana apagada en gris. */
+  .mnc-empty {
+    align-items: center;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    padding: 54px 24px;
+    text-align: center;
+  }
+  .mnc-empty-icon {
+    align-items: center;
+    background: color-mix(in oklab, var(--m-income) 13%, transparent);
+    border: 1px solid color-mix(in oklab, var(--m-income) 26%, transparent);
+    border-radius: 50%;
+    color: var(--m-income);
+    display: flex;
+    height: 78px;
+    justify-content: center;
+    width: 78px;
+  }
+  .mnc-empty b { color: var(--m-text); font-size: 16.5px; font-weight: 850; }
+  .mnc-empty small { color: var(--m-muted); font-size: 12.5px; line-height: 1.5; max-width: 30ch; }
+
+  /* Segmentado del onboarding: "cuanto debo" vs "cuanto me queda".
+     Es la pregunta que decide si el saldo de la tarjeta queda bien o al reves,
+     asi que se pinta como una eleccion de dos, no como un ajuste escondido. */
+  .mob-onboard-seg {
+    background: color-mix(in oklab, var(--m-text) 7%, transparent);
+    border-radius: 13px;
+    display: flex;
+    gap: 4px;
+    margin-bottom: 10px;
+    padding: 4px;
+    width: 100%;
+  }
+  .mob-onboard-seg button {
+    border-radius: 10px;
+    color: var(--m-muted);
+    flex: 1;
+    font-size: 12.5px;
+    font-weight: 750;
+    padding: 9px 8px;
+  }
+  .mob-onboard-seg button.on {
+    background: var(--m-surface);
+    box-shadow: 0 1px 4px rgb(0 0 0 / .2);
+    color: var(--m-text);
   }

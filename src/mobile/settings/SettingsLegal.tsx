@@ -10,6 +10,7 @@ import { playSuccessHaptic } from '@/lib/sound'
 import { useSettings } from '@/store/settings'
 import { useT } from '@/i18n'
 import { SettingsRow, SettingsSheet, type SheetProps } from './shared'
+import { MobileRateSheet } from '@/mobile/MobileRateSheet'
 
 const CONTACT_EMAIL = 'contactosharklin@gmail.com'
 // Fecha en que se actualizó por última vez el texto legal (no la fecha de hoy):
@@ -303,6 +304,7 @@ export function SettingsLegal({ activeSheet, onOpen, onClose }: SheetProps) {
   const t = useT()
   const lang = (useSettings(s => s.language) ?? 'es') as 'es' | 'en'
   const [commentText, setCommentText] = useState('')
+  const [rateOpen, setRateOpen] = useState(false)
   const [sending, setSending] = useState(false)
 
   /*
@@ -365,6 +367,21 @@ export function SettingsLegal({ activeSheet, onOpen, onClose }: SheetProps) {
       <div className="mset-section">
         <span className="mset-section-title">{t('aboutSection')}</span>
         <div className="mset-card">
+          {/* VALORAR. Va primero y con las estrellas a la vista: la app ya
+              sabia pedir una valoracion sola, pero quien QUERIA dejarla no
+              tenia ningun camino salvo buscar la app a mano en Play. */}
+          <button className="mset-row mset-rate-row" onClick={() => setRateOpen(true)}>
+            <span className="mset-row-icon" style={{ background: '#ffdd3d22', color: '#ffdd3d' }}>
+              <Icon name="star" size={18} />
+            </span>
+            <div className="mset-row-text">
+              <b>{t('rateAppRow')}</b>
+              <small>{t('rateAppRowDesc')}</small>
+            </div>
+            <span className="mset-rate-stars" aria-hidden="true">
+              {[0, 1, 2, 3, 4].map(i => <Icon key={i} name="star" size={11} />)}
+            </span>
+          </button>
           <SettingsRow icon="edit"  iconColor="#5bc0ff" label={t('comments')}  onClick={() => onOpen('comments')} />
           <SettingsRow icon="info"  iconColor="#35d0a2" label={t('aboutUs')}   onClick={() => onOpen('about')} />
         </div>
@@ -387,6 +404,14 @@ export function SettingsLegal({ activeSheet, onOpen, onClose }: SheetProps) {
           </button>
         </div>
       </div>
+
+      {rateOpen && (
+        <MobileRateSheet
+          onClose={() => setRateOpen(false)}
+          onFeedback={() => onOpen('comments')}
+        />
+      )}
+
 
       {activeSheet === 'comments' && (
         <SettingsSheet title={t('comments')} onClose={onClose}>

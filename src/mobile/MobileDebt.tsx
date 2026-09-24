@@ -8,7 +8,7 @@ import { useFinance } from '@/store/finance'
 import { creditCardsAsDebts } from '@/data/creditCard'
 import {
   useDebt, simulatePayoff, debtProgress, monthlyPaymentPlan, payoffTargetId,
-  freedomDate, isOwed, lastPaymentDate,
+  freedomDate, isOwed, lastPaymentDate, monthsLabel,
   type Debt, type DebtDirection, type DebtKind, type PayoffMethod,
 } from '@/store/debt'
 import {
@@ -40,6 +40,11 @@ const EMPTY: Omit<Debt, 'id'> = {
  */
 /** El icono del tipo. Un préstamo del banco y lo que le debes a tu primo no
  *  se parecen en nada, y hasta ahora se veían exactamente igual. */
+const KIND_LABEL = (t: ReturnType<typeof useT>): Record<DebtKind, string> => ({
+  loan: t('debtKindLoan'), card: t('debtKindCard'),
+  store: t('debtKindStore'), personal: t('debtKindPersonal'),
+})
+
 const KIND_ICON: Record<DebtKind, Parameters<typeof Icon>[0]['name']> = {
   loan: 'landmark', card: 'cards', store: 'bag', personal: 'heart',
 }
@@ -145,45 +150,73 @@ export function MobileDebt() {
   return (
     <div className="mdebt-root">
 
-      {/* Héroe: fecha de libertad + progreso. Solo si hay pasivos: con la
-          pantalla usada unicamente para apuntar lo que te deben, "libre de
-          deudas en marzo" no significa nada. */}
+      {/*
+        ══════════════════════════════════════════════════════════════
+        EL HÉROE.
+
+        Antes esto era texto centrado sobre un degradado suave: la pantalla
+        empezaba en gris y no se veía dinero hasta la mitad. Ahora es un panel
+        con peso propio — la fecha de libertad enorme, el total debajo, y el
+        anillo de progreso a la derecha con el porcentaje dentro.
+
+        El anillo y no otra barra: en una pantalla que ya tiene tres barras
+        (progreso global, composición y una por deuda), una cuarta se pierde.
+        Un círculo se lee de reojo y no compite con nada.
+        ══════════════════════════════════════════════════════════════
+      */}
       {debts.length > 0 && <>
-      <div className="mdebt-free">
-        <span className="mdebt-free-label">{freeAt ? t('freeInLabel') : t('keepPayingLabel')}</span>
-        {freeAt && (
-          <div className="mdebt-free-date">
-            {new Date(`${freeAt}T00:00:00`).toLocaleDateString(dateLocale(lang), { month: 'long', year: 'numeric' })}
-          </div>
-        )}
-        <div className="mdebt-free-owe">
-          {t('owedColon').replace('{amount}', fmtVal(totalDebt, currency))}
-        </div>
-        <div className="mdebt-free-bar"><i style={{ width: `${Math.max(3, paidPct)}%` }} /></div>
-        <div className="mdebt-free-meta">
-          {t('paidPctMonths').replace('{pct}', String(paidPct)).replace('{months}', String(active.months))}
+      <div className="mdebt-hero">
+        <div className="mdebt-hero-main">
+          <span className="mdebt-hero-eyebrow">{freeAt ? t('freeInLabel') : t('keepPayingLabel')}</span>
+          {freeAt ? (
+            <strong className="mdebt-hero-date">
+              {new Date(`${freeAt}T00:00:00`).toLocaleDateString(dateLocale(lang), { month: 'long', year: 'numeric' })}
+            </strong>
+          ) : (
+            <strong className="mdebt-hero-date">{monthsLabel(active.months, t)}</strong>
+          )}
+          <span className="mdebt-hero-owe">{fmtVal(totalDebt, currency)}</span>
         </div>
 
-        {/*
-          DE QUÉ ESTÁ HECHA TU DEUDA.
-          Un total y un porcentaje no dicen nada sobre el reparto: RD$ 80.000
-          puede ser una deuda enorme o cinco medianas, y lo que hay que hacer
-          en cada caso es distinto. Cada tramo lleva el color de su deuda, así
-          que la barra y la lista de abajo se leen juntas sin leyenda.
-        */}
-        {debts.length > 1 && totalDebt > 0 && (
-          <div className="mdebt-mix" aria-hidden="true">
-            {[...debts]
-              .sort((a, b) => b.balance - a.balance)
-              .map(d => (
-                <i
-                  key={d.id}
-                  style={{ width: `${(d.balance / totalDebt) * 100}%`, background: d.color }}
-                />
-              ))}
-          </div>
-        )}
+        {/* Anillo de progreso. `strokeDasharray` sobre una circunferencia
+            conocida: sin JS de animación y sin dependencias. */}
+        <svg className="mdebt-ring" viewBox="0 0 84 84" aria-hidden="true">
+          <circle className="mdebt-ring-track" cx="42" cy="42" r="36" />
+          <circle
+            className="mdebt-ring-fill"
+            cx="42" cy="42" r="36"
+            strokeDasharray={`${(paidPct / 100) * 2 * Math.PI * 36} ${2 * Math.PI * 36}`}
+          />
+          <text className="mdebt-ring-pct" x="42" y="42">{paidPct}%</text>
+          <text className="mdebt-ring-cap" x="42" y="55">{t('paidLabelShort')}</text>
+        </svg>
       </div>
+
+      {/*
+        DE QUÉ ESTÁ HECHA TU DEUDA — ahora con nombres, no una barra muda.
+
+        Un total no dice nada del reparto: RD$ 80.000 puede ser una deuda
+        enorme o cinco medianas, y lo que toca hacer en cada caso es distinto.
+        La barra es gruesa y va etiquetada con la mayor, para que se entienda
+        sin tener que cruzarla con la lista de abajo.
+      */}
+      {debts.length > 1 && totalDebt > 0 && (
+        <div className="mdebt-mix-block">
+          <div className="mdebt-mix" aria-hidden="true">
+            {[...debts].sort((a, b) => b.balance - a.balance).map(d => (
+              <i key={d.id} style={{ width: `${(d.balance / totalDebt) * 100}%`, background: d.color }} />
+            ))}
+          </div>
+          <div className="mdebt-mix-legend">
+            {[...debts].sort((a, b) => b.balance - a.balance).slice(0, 3).map(d => (
+              <span key={d.id}>
+                <i style={{ background: d.color }} />
+                {d.name} · {Math.round((d.balance / totalDebt) * 100)}%
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Estrategia, sin jerga */}
       <div className="mdebt-plan">
@@ -266,26 +299,47 @@ export function MobileDebt() {
                 onClick={() => { if (!isDerived(debt.id)) setEditing(debt) }}
                 disabled={isDerived(debt.id)}
               >
-                <div className="mdebt-debt-top">
-                  {/* El icono del tipo en vez del punto de color cuando se
-                      sabe qué clase de deuda es: dice más con el mismo sitio. */}
-                  <span className="mdebt-kind" style={{ background: `${debt.color}26`, color: debt.color }}>
-                    <Icon name={debt.kind ? KIND_ICON[debt.kind] : isDerived(debt.id) ? 'cards' : 'dollar'} size={14} />
+                {/*
+                  LA CABECERA, con el icono del tipo a tamaño de verdad.
+                  Antes era un punto de 11px que se perdía entre el texto; un
+                  préstamo del banco y lo que le debes a tu primo se veían
+                  idénticos.
+                */}
+                <div className="mdebt-debt-head">
+                  <span className="mdebt-kind">
+                    <Icon name={debt.kind ? KIND_ICON[debt.kind] : isDerived(debt.id) ? 'cards' : 'dollar'} size={17} />
                   </span>
-                  <b>{debt.name}</b>
-                  {isDerived(debt.id) && <span className="mdebt-card-badge">{t('fromCardBadge')}</span>}
-                  {debt.rate > 0 && <span className="mdebt-debt-rate">{debt.rate}%</span>}
-                  <strong>{fmtVal(debt.balance, currency)}</strong>
+                  <span className="mdebt-debt-id">
+                    <b>{debt.name}</b>
+                    <small>
+                      {isDerived(debt.id) ? t('fromCardBadge')
+                        : debt.counterparty ? debt.counterparty
+                        : debt.kind ? KIND_LABEL(t)[debt.kind]
+                        : t('debtDirectionOwed')}
+                      {debt.rate > 0 && <> · {debt.rate}%</>}
+                    </small>
+                  </span>
+                  {debt.id === targetId && (
+                    <span className="mdebt-target-flag">{t('targetTag')}</span>
+                  )}
                 </div>
-                <div className="mdebt-debt-bar"><i style={{ width: `${Math.max(2, prog)}%`, background: debt.color }} /></div>
+
+                {/* LA CIFRA, grande. Es el dato por el que se abre la pantalla
+                    y estaba del tamaño del nombre. */}
+                <div className="mdebt-debt-amount">{fmtVal(debt.balance, currency)}</div>
+
+                <div className="mdebt-debt-bar">
+                  <i style={{ width: `${Math.max(2, prog)}%`, background: debt.color }} />
+                </div>
                 <div className="mdebt-debt-sub">
                   {isDerived(debt.id)
                     ? t('editOnAccountHint')
                     : t('paidOfOriginal').replace('{pct}', String(prog))}
                 </div>
-                {/* El calendario, que es lo que de verdad se pregunta la
-                    gente: cuando toca pagar y cuanto falta para terminar. */}
-                {(debt.dueDay || debt.endDate || debt.counterparty) && (
+
+                {/* El calendario: cuándo toca pagar y cuánto falta para
+                    terminar, que es lo que de verdad se pregunta la gente. */}
+                {(debt.dueDay || debt.endDate) && (
                   <div className="mdebt-debt-meta">
                     <DueBadge debt={debt} today={today} />
                     {debt.endDate && (
@@ -295,7 +349,6 @@ export function MobileDebt() {
                           : t('debtLastInstallment')}
                       </span>
                     )}
-                    {debt.counterparty && <span className="mdebt-meta-chip">{debt.counterparty}</span>}
                   </div>
                 )}
               </button>

@@ -14,7 +14,7 @@ const PACKAGE_NAME = 'com.sharky.miapp'
  * esquema `market://`, que abre la app de Play directamente; si no hay Play
  * instalado (emulador, dispositivo sin GMS), cae al navegador.
  */
-async function openStoreReview(): Promise<void> {
+export async function openStoreReview(): Promise<void> {
   const { app, web } = playStoreUrls(PACKAGE_NAME)
   try {
     const { openUrl } = await import('@tauri-apps/plugin-opener')

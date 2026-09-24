@@ -10,10 +10,9 @@ const PALETTE: Record<ThemeName, { bg: string; surface: string; scheme: 'dark' |
   // Los temas de color: la barra de estado tiene que llevar el MISMO fondo que
   // la app o queda una franja de otro tono arriba, que es lo que delata que un
   // tema esta a medio hacer.
-  ocean:  { bg: '#04161f', surface: '#0b2430', scheme: 'dark' },
-  sunset: { bg: '#1a0f1c', surface: '#271629', scheme: 'dark' },
-  forest: { bg: '#071612', surface: '#0e251e', scheme: 'dark' },
-  sand:   { bg: '#f3ece1', surface: '#fffaf3', scheme: 'light' },
+  ocean:  { bg: '#021018', surface: '#0a2836', scheme: 'dark' },
+  sunset: { bg: '#17091b', surface: '#2a1230', scheme: 'dark' },
+  forest: { bg: '#03120c', surface: '#0b2419', scheme: 'dark' },
 }
 
 function upsertMeta(name: string, content: string) {

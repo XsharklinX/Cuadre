@@ -198,6 +198,30 @@ export interface FeeContext {
   isTransfer?: boolean
   /** true si el usuario marcó el movimiento como avance de efectivo. */
   isCashAdvance?: boolean
+  /**
+   * De dónde sale el dinero. Es lo que decide si aplica la Ley 288-04.
+   *
+   * `debit` incluye cuentas corrientes y de ahorro: el pago sale de tu cuenta
+   * como cargo electrónico y el banco retiene el 0.15%.
+   * `credit` NO lo paga al comprar — una compra con tarjeta de crédito no
+   * debita tu cuenta; el impuesto llega después, cuando PAGAS la tarjeta desde
+   * una cuenta de banco, y ahí ya se cobra como transferencia.
+   * `cash` no toca el sistema bancario: no hay impuesto que cobrar.
+   */
+  payerType?: 'debit' | 'credit' | 'cash'
+  /**
+   * true si el movimiento va de una cuenta tuya a otra cuenta tuya.
+   *
+   * Moverte dinero entre tus propios bolsillos no es un gasto y no debe
+   * cargarte un impuesto de gasto en el libro.
+   */
+  ownTransfer?: boolean
+  /**
+   * El usuario apagó el cálculo del 0.15%. Por defecto está encendido, pero
+   * no todos los bancos lo retienen igual ni en todas las operaciones, así que
+   * tiene que poder quitarse sin pelear con la app.
+   */
+  lawTaxDisabled?: boolean
 }
 
 /**
@@ -218,10 +242,35 @@ export function computeFees(base: number, ctx: FeeContext): FeeLine[] {
     if (amount > 0) lines.push({ kind, pct: rule.pct, amount })
   }
 
+  /*
+   * ENTRE CUENTAS PROPIAS NO SE COBRA NADA.
+   *
+   * Pasar dinero de tu ahorro a tu corriente no es un gasto: es el mismo
+   * dinero cambiando de bolsillo. Cargarle un impuesto de gasto inflaria lo
+   * gastado del mes con dinero que nunca salio de tus manos.
+   */
+  if (ctx.ownTransfer) return lines
+
   // El recargo por divisa solo aplica si de verdad hubo cambio de moneda.
   if (ctx.typedCurrency !== ctx.accountCurrency) add('fx-surcharge')
-  if (ctx.isTransfer) add('itbis-transfer')
   if (ctx.isCashAdvance) add('cash-advance')
+
+  /*
+   * LEY 288-04 — el 0.15% que faltaba.
+   *
+   * Hasta ahora esto solo se aplicaba si el usuario marcaba el movimiento como
+   * transferencia a mano. Resultado: una compra normal en pesos con tarjeta de
+   * debito no generaba NINGUN cargo, mientras el banco si se lo retenia. El
+   * libro quedaba con mas dinero del que habia de verdad.
+   *
+   * Se aplica cuando el dinero sale de una CUENTA DE BANCO (debito o ahorro),
+   * que es cuando hay un cargo electronico que gravar. Efectivo no: no toca el
+   * sistema bancario. Tarjeta de credito tampoco al comprar — el impuesto
+   * llega cuando pagas la tarjeta desde tu cuenta, y ahi se cobra como la
+   * transferencia que es.
+   */
+  const debits = ctx.isTransfer || ctx.payerType === 'debit'
+  if (debits && !ctx.lawTaxDisabled) add('itbis-transfer')
 
   return lines
 }

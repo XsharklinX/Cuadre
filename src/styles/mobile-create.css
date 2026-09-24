@@ -500,11 +500,23 @@
     color: #06121c;
   }
   /* Quick row above the keypad: account icon · note · date — all part of the bottom panel */
+  /* LA FILA SE ENVUELVE.
+     Aqui conviven el concepto, la fecha y tres iconos (descripcion, camara,
+     recurrente). A 320px con la letra al 135% ya no caben en una linea: el
+     ultimo icono quedaba 16px fuera de la pantalla, imposible de tocar — lo
+     cazo la guardia de desbordamiento de e2e.
+     Envolver y no encoger: a esa escala unos botones mas pequeños serian
+     ilegibles e imposibles de acertar. Ademas aguanta si mañana se añade otro
+     icono, que es como llegamos hasta aqui. */
   .mobile-create-quick-row {
     align-items: center;
     display: flex;
+    flex-wrap: wrap;
     gap: 7px;
   }
+  /* El campo de concepto se queda con la primera linea entera; los iconos
+     bajan juntos a la segunda cuando no caben. */
+  .mobile-create-quick-row > .mobile-quick-note-input { flex: 1 1 150px; }
   .mobile-category-grid.field-error {
     border-radius: 16px;
     box-shadow: 0 0 0 2px #ff4d6d66;

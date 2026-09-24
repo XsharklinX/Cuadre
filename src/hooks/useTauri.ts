@@ -159,7 +159,7 @@ export async function pickBackupFolder(): Promise<string | null> {
  * - Web/PWA: el usuario elige la ubicación (selector de archivos / share sheet).
  */
 export async function saveBackup(json: string, folder?: string | null): Promise<boolean> {
-  const filename = `sharky-backup-${localToday()}.json`
+  const filename = `cuadre-backup-${localToday()}.json`
   const blob = new Blob([json], { type: 'application/json' })
   if (isTauri()) {
     await saveToAppFolder(blob, filename, folder)

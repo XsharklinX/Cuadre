@@ -218,8 +218,16 @@ export function MobileCreateFlow({
       typedCurrency,
       accountCurrency: targetCurrency,
       isCashAdvance,
+      // De donde sale el dinero decide si aplica el 0.15% de la Ley 288-04.
+      // Sin este dato, una compra en pesos con debito no generaba ningun cargo
+      // mientras el banco si lo retenia.
+      payerType: activeAccount?.type === 'credit' ? 'credit'
+        : activeAccount?.type === 'cash' ? 'cash'
+        : 'debit',
+      lawTaxDisabled: !settings.lawTaxEnabled,
     })
-  }, [mode, amount, bankProfile, typedCurrency, targetCurrency, isCashAdvance])
+  }, [mode, amount, bankProfile, typedCurrency, targetCurrency, isCashAdvance,
+      activeAccount?.type, settings.lawTaxEnabled])
   const feeTotal = totalFees(feeLines)
   const validTransfer = mode === 'transfer' && !!fromAccount && !!toAccount && fromAccount !== toAccount
 

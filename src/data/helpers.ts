@@ -8,7 +8,36 @@ import type {
 } from '@/types'
 
 // ── Formato de moneda ─────────────────────────────────────
+/**
+ * MODO PRIVADO — el interruptor, en el unico sitio por el que pasa el dinero.
+ *
+ * La primera version lo puso en `useFmt`, el hook. Parecia razonable y estaba
+ * mal: CATORCE archivos llaman a `fmt()` directamente —Movimientos entre
+ * ellos— y `AnimatedMoney` tambien. En todos esos, los montos seguian a la
+ * vista con el modo privado encendido. Tapar "casi todo" no tapa nada: basta
+ * una pantalla para que quien mira por encima del hombro vea el sueldo.
+ *
+ * Va aqui, en `fmt`, que es el embudo real. No es un estado de React a
+ * proposito: `fmt` es una funcion pura que se llama desde sitios sin hooks
+ * (exportaciones, widgets, notificaciones), y una bandera de modulo llega a
+ * todos. El store la mantiene al dia (ver `store/settings.ts`).
+ */
+let privacyMasked = false
+
+/** La mascara. Ancho fijo y sin signo: un "−" delator seguiria contando. */
+export const MONEY_MASK = '••••'
+
+/** La cambia el store de ajustes; nadie mas deberia llamarla. */
+export function setPrivacyMasked(on: boolean): void {
+  privacyMasked = on
+}
+
+export function isPrivacyMasked(): boolean {
+  return privacyMasked
+}
+
 export function fmt(n: number, currency: CurrencyCode, opts: FmtOptions = {}): string {
+  if (privacyMasked && !opts.neverMask) return MONEY_MASK
   const c    = CURRENCIES[currency]
   const sign = n < 0 ? '-' : ''
   const abs  = Math.abs(n)

@@ -1,3 +1,4 @@
+import { isReminderKindOn, type ReminderKind } from '@/data/reminderKinds'
 import { tt } from '@/i18n'
 import { isTauri } from '@/hooks/useTauri'
 import { useFinance } from '@/store/finance'
@@ -30,7 +31,7 @@ function buildReminderSnapshot(): string {
   const { transactions, accounts, categories, currency, goals } = useFinance.getState()
   const {
     language, dismissedAlerts, silencedRecurring, fxAlertEnabled, fxAlertCurrency, fxAlertThreshold, fxAlertDirection,
-    anomalyAlertsEnabled, anomalySensitivity,
+    anomalyAlertsEnabled, anomalySensitivity, reminderKinds,
   } = useSettings.getState()
 
   const mkey = currentMonthKey()
@@ -73,7 +74,7 @@ function buildReminderSnapshot(): string {
         dateLabel: new Date(`${next}T00:00:00`).toLocaleDateString(locale, { day: 'numeric', month: 'short' }),
         amountLabel: fmtCompact(tx.amount, currency),
         recurringEnd: tx.recurringEnd ?? null,
-        lowFunds,
+        lowFunds: on('lowfunds') ? lowFunds : false,
         accountName: account?.name ?? '',
       }
     })
@@ -146,6 +147,8 @@ function buildReminderSnapshot(): string {
         }))
     : []
 
+  const on = (kind: ReminderKind) => isReminderKindOn(reminderKinds, kind)
+
   return JSON.stringify({
     dismissedAlerts,
     lastTransactionDate,
@@ -171,12 +174,19 @@ function buildReminderSnapshot(): string {
       anomalyText:        tt('notifAnomalyText'),
       today:              tt('notifToday'),
     },
-    categories: categoriesSnapshot,
-    recurring: recurringSnapshot,
-    goals: goalsSnapshot,
-    weekly,
-    fx,
-    anomalies: anomaliesSnapshot,
+    /*
+     * LOS TIPOS APAGADOS VIAJAN VACIOS.
+     *
+     * El worker de Android dispara a partir de estas listas, asi que apagar un
+     * tipo de aviso no necesita tocar Kotlin: basta con no mandarle los datos.
+     * Lo que no existe en el snapshot no se puede notificar.
+     */
+    categories: on('budget') ? categoriesSnapshot : [],
+    recurring:  on('recurring') ? recurringSnapshot : [],
+    goals:      on('goal') ? goalsSnapshot : [],
+    weekly:     on('weekly') ? weekly : null,
+    fx:         on('fx') ? fx : null,
+    anomalies:  on('anomaly') ? anomaliesSnapshot : [],
   })
 }
 

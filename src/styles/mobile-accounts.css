@@ -137,24 +137,13 @@
   letter-spacing: .04em;
   text-transform: uppercase;
 }
-.sacc-section-total {
-  color: var(--text-dim);
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
-  font-weight: 750;
-}
+
 .sacc-block { display: grid; gap: 10px; }
 
 /* ── REGISTRO 1: dinero que tienes ─────────────────────────
    Un saldo es un número. No necesita una tarjeta, ni un sparkline de 20px
    que a ese tamaño no se lee: eso era ruido compitiendo con la cifra. */
-.sacc-rows {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  display: grid;
-  overflow: hidden;
-}
+
 .sacc-row {
   align-items: center;
   background: transparent;
@@ -212,16 +201,7 @@
   white-space: nowrap;
 }
 
-.sacc-badge {
-  background: var(--track);
-  border-radius: 999px;
-  color: var(--text-dim);
-  font-size: 9.5px;
-  font-weight: 850;
-  letter-spacing: .04em;
-  padding: 1px 6px;
-  text-transform: uppercase;
-}
+
 
 /* ── REGISTRO 2: tarjetas de crédito ───────────────────────
    Tarjeta completa, no fila. Lleva un RAIL lateral en el color de la
@@ -243,27 +223,11 @@
 .sacc-card:active { background: var(--surface-2); }
 .sacc-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-.sacc-card-head { align-items: flex-start; display: flex; gap: 12px; justify-content: space-between; }
-.sacc-card-id { display: grid; gap: 2px; min-width: 0; }
-.sacc-card-name {
-  align-items: center;
-  color: var(--text);
-  display: flex;
-  flex-wrap: wrap;
-  font-size: 15px;
-  font-weight: 800;
-  gap: 6px;
-  line-height: 20px;
-}
-.sacc-card-bank { color: var(--text-dim); font-size: 12.5px; line-height: 16px; }
-.sacc-card-chip {
-  border-radius: 10px;
-  display: grid;
-  flex-shrink: 0;
-  height: 34px;
-  place-items: center;
-  width: 34px;
-}
+
+
+
+
+
 
 /* Los dos saldos, a peso IGUAL. Una tarjeta dominicana arrastra dos deudas
    reales que se pagan por separado; jerarquizar una sobre la otra inventa
@@ -437,20 +401,11 @@
 
 /* En la fila compacta, la red va junto al saldo: identifica la cuenta antes
    de que el ojo llegue al nombre. */
-.sacc-row-right { align-items: center; display: flex; gap: 10px; }
+
 
 /* En la tarjeta, la red OCUPA el lugar del icono genérico cuando se conoce:
    es lo que está impreso en el plástico y lo que el ojo busca primero. */
-.sacc-card-net {
-  align-items: center;
-  background: var(--surface-2);
-  border-radius: 8px;
-  display: grid;
-  flex-shrink: 0;
-  min-height: 34px;
-  padding: 0 9px;
-  place-items: center;
-}
+
 
 .sacc-locked-note {
   align-items: flex-start;
@@ -851,23 +806,88 @@
 .sacc-tx-row:active { background: var(--surface-2); }
 .sacc-tx-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
-/* ═══════════════════════════════════════════════════════════
-   EL CARRUSEL DE TARJETAS
-   ═══════════════════════════════════════════════════════════
-   Una tarjeta de crédito es un objeto FÍSICO: tiene proporción, marca y
-   color, y la gente la reconoce por cómo se ve, no por leer su nombre. Un
-   panel rectangular con texto no es una tarjeta, es una fila con más
-   padding.
+/* ═══════════════════════════════════════════════════════════════════
+   MIS TARJETAS — un chasis, tres acabados (1.9.8)
 
-   Proporción 1.586 — la de una tarjeta real (85.6 × 53.98 mm). Es lo que
+   Antes solo el crédito era una tarjeta; el débito y el ahorro eran filas
+   de texto, y el efectivo estaba mezclado con ellos. Ahora las tres son
+   plástico —misma proporción, mismo sitio de la cifra— y lo que cambia es
+   el ACABADO y lo que solo esa cuenta tiene. Si hay que leer la etiqueta
+   para saber cuál es cuál, el diseño no funciona.
+
+   Proporción 1.586: la de una tarjeta real (85.6 × 53.98 mm). Es lo que
    hace que el ojo la lea como plástico antes de leer una sola letra.
-   ═══════════════════════════════════════════════════════════ */
+   ═══════════════════════════════════════════════════════════════════ */
+
+.sacc-count {
+  background: color-mix(in oklab, var(--text) 10%, transparent);
+  border-radius: 999px;
+  color: var(--text-dim);
+  font-size: 10.5px;
+  font-weight: 800;
+  padding: 1px 7px;
+}
+
+/* El interruptor de vista. El carrusel luce con tres tarjetas y estorba con
+   nueve: hay que deslizar a ciegas para encontrar una. */
+.sacc-viewtoggle {
+  background: color-mix(in oklab, var(--text) 7%, transparent);
+  border-radius: 10px;
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+  padding: 2px;
+}
+.sacc-viewtoggle button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: var(--text-dim);
+  display: flex;
+  height: 28px;
+  justify-content: center;
+  width: 32px;
+}
+.sacc-viewtoggle button.on { background: var(--surface-2); color: var(--text); }
+.sacc-viewtoggle button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.sacc-group { display: grid; gap: 9px; margin-top: 14px; }
+.sacc-group-head {
+  align-items: baseline;
+  color: var(--text-dim);
+  display: flex;
+  font-size: 10px;
+  font-weight: 850;
+  gap: 7px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.sacc-group-n {
+  background: color-mix(in oklab, var(--text) 9%, transparent);
+  border-radius: 999px;
+  font-size: 9px;
+  padding: 1px 6px;
+}
+/* En crédito el total lleva verbo ("Debes"): un número rojo a secas se lee
+   como saldo, no como deuda. */
+.sacc-group-total {
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  letter-spacing: 0;
+  margin-left: auto;
+  text-transform: none;
+}
+.sacc-group-total.credit  { color: var(--m-expense, #ff6b8a); }
+.sacc-group-total.savings { color: var(--m-income, #35d0a2); }
+.sacc-group-total.debit   { color: var(--text); }
 
 .sacc-carousel {
   display: flex;
   gap: 12px;
-  /* Se sale del margen de la pantalla y vuelve a entrar con padding: así la
-     tarjeta siguiente asoma por el borde e invita a deslizar. */
+  /* Se sale del margen y vuelve a entrar con padding: la tarjeta siguiente
+     asoma por el borde e invita a deslizar. */
   margin-inline: -16px;
   overflow-x: auto;
   padding-inline: 16px;
@@ -879,10 +899,9 @@
 
 .sacc-plastic {
   aspect-ratio: 1.586;
-  background:
-    linear-gradient(145deg,
-      color-mix(in oklab, var(--card) 88%, #000 12%) 0%,
-      color-mix(in oklab, var(--card) 62%, #000 38%) 100%);
+  background: linear-gradient(145deg,
+    color-mix(in oklab, var(--card) 88%, #000 12%) 0%,
+    color-mix(in oklab, var(--card) 62%, #000 38%) 100%);
   border: 0;
   border-radius: 16px;
   color: #fff;
@@ -893,160 +912,301 @@
   isolation: isolate;
   justify-content: space-between;
   overflow: hidden;
-  padding: 16px;
+  padding: 14px;
   position: relative;
   scroll-snap-align: start;
   text-align: left;
   /* `vw` se mide sin escalar y la app se dibuja escalada por --fs: sin
-     dividir, con la letra grande la tarjeta se salia de la pantalla. */
+     dividir, con la letra grande la tarjeta se salía de la pantalla. */
   width: min(300px, calc(82vw / var(--fs, 1)));
 }
 .sacc-plastic:active { transform: scale(.985); }
 .sacc-plastic:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 
-/* La textura: dos arcos del propio color, muy tenues. Da profundidad sin una
-   imagen que pese ni un degradado de colores ajenos compitiendo con las
-   cifras — que es el recurso que delata una tarjeta genérica. */
-.sacc-plastic-sheen {
+/* ── EL ACABADO, que es lo que distingue ───────────────────────────── */
+
+/* CRÉDITO: brillo de plástico, reflejo alto y sombra baja. */
+.sacc-plastic-sheen { inset: 0; position: absolute; z-index: -1; }
+.sacc-plastic.credit .sacc-plastic-sheen {
   background:
-    radial-gradient(120% 90% at 92% 8%, rgba(255,255,255,.16), transparent 58%),
-    radial-gradient(90% 70% at 8% 100%, rgba(0,0,0,.22), transparent 62%);
-  inset: 0;
-  position: absolute;
-  z-index: -1;
+    radial-gradient(120% 90% at 92% 8%, rgba(255,255,255,.22), transparent 58%),
+    radial-gradient(90% 70% at 8% 100%, rgba(0,0,0,.26), transparent 62%);
+}
+/* DÉBITO: mate. Sin reflejo, grano finísimo en diagonal. */
+.sacc-plastic.debit .sacc-plastic-sheen {
+  background:
+    radial-gradient(130% 100% at 50% 0%, rgba(255,255,255,.07), transparent 62%),
+    repeating-linear-gradient(45deg, rgba(255,255,255,.035) 0 2px, transparent 2px 4px);
+}
+/* AHORRO: lino. Nervaduras horizontales — textil, no plástico. */
+.sacc-plastic.savings .sacc-plastic-sheen {
+  opacity: .55;
+  background:
+    repeating-linear-gradient(0deg, rgba(255,255,255,.09) 0 1px, transparent 1px 5px),
+    radial-gradient(120% 90% at 20% 10%, rgba(255,255,255,.12), transparent 60%);
 }
 
-.sacc-plastic-top {
-  align-items: flex-start;
-  display: flex;
-  gap: 10px;
-  justify-content: space-between;
-}
-.sacc-plastic-bank {
-  color: rgba(255,255,255,.82);
-  font-size: 11px;
+.sacc-plastic-top { align-items: flex-start; display: flex; gap: 10px; }
+.sacc-plastic-bank { min-width: 0; }
+.sacc-plastic-bank b {
+  display: block;
+  font-size: 12.5px;
   font-weight: 750;
-  letter-spacing: .04em;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-.sacc-plastic-generic { color: rgba(255,255,255,.55); }
-/* El distintivo de red va sobre un velo claro: los colores de marca (el azul
-   de Visa, el rojo de Mastercard) pierden contraste sobre una tarjeta
-   oscura. */
-.sacc-plastic .netmark {
-  background: rgba(255,255,255,.92);
-  border-radius: 6px;
-  padding: 4px 7px;
-}
-
-/* Nombre + ultimos 4: el nombre cede espacio con puntos suspensivos, el
-   numero nunca se parte. */
-.sacc-plastic-id {
-  align-items: baseline;
-  display: flex;
-  gap: 10px;
-  justify-content: space-between;
-  min-width: 0;
-}
-.sacc-plastic-name {
-  color: #fff;
-  font-size: 17px;
-  font-weight: 800;
-  letter-spacing: -.01em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
-.sacc-plastic-bottom {
-  align-items: flex-end;
-  display: flex;
-  gap: 12px;
-  justify-content: space-between;
-  /* Red de seguridad: un saldo absurdamente largo se recorta dentro de la
-     tarjeta en vez de desbordarse sobre lo que tenga al lado. */
-  overflow: hidden;
-}
-.sacc-plastic-figures { display: flex; gap: 14px; min-width: 0; }
-.sacc-plastic-fig { display: grid; gap: 1px; min-width: 0; }
-.sacc-plastic-fig em {
-  color: rgba(255,255,255,.62);
-  font-size: 9.5px;
-  font-style: normal;
-  font-weight: 800;
-  letter-spacing: .08em;
-}
-.sacc-plastic-fig b {
-  color: #fff;
-  font-size: 15px;
-  font-variant-numeric: tabular-nums;
+.sacc-plastic-bank small {
+  color: rgba(255,255,255,.55);
+  font-size: 8px;
   font-weight: 850;
-  white-space: nowrap;
+  letter-spacing: .14em;
+  text-transform: uppercase;
 }
-/* La deuda no se pinta de rojo aquí: sobre plástico oscuro el rojo grita y
-   la tarjeta pasa a parecer un error. Se marca con un punto delante. */
-.sacc-plastic-fig b.owed::before {
-  background: #ffd9d2;
-  border-radius: 50%;
-  content: '';
-  display: inline-block;
-  height: 5px;
-  margin-right: 5px;
-  vertical-align: middle;
-  width: 5px;
+.sacc-plastic-mark { color: rgba(255,255,255,.8); flex: none; margin-left: auto; }
+.sacc-plastic-cur {
+  background: rgba(255,255,255,.16);
+  border-radius: 999px;
+  font-size: 9.5px;
+  font-weight: 850;
+  letter-spacing: .05em;
+  margin-left: auto;
+  padding: 2px 8px;
 }
-.sacc-plastic-last4 {
-  color: rgba(255,255,255,.66);
+
+.sacc-plastic-mid { align-items: flex-end; display: flex; gap: 10px; }
+
+/* EL CHIP. Dorado en crédito, plateado en débito — es lo que hacen los
+   bancos, y funciona porque nadie tiene que aprendérselo.
+   El AHORRO no lleva: no tiene tarjeta física, y dibujarle un chip sería
+   mentir (ver MobileAccounts.tsx). */
+.sacc-chip {
+  border-radius: 4px;
+  flex: none;
+  height: 20px;
+  position: relative;
+  width: 26px;
+}
+.sacc-plastic.credit .sacc-chip { background: linear-gradient(140deg, #f5d98b, #c9a44c); }
+.sacc-plastic.debit  .sacc-chip { background: linear-gradient(140deg, #e8e8ea, #a9adb6); }
+.sacc-chip > i { background: rgba(0,0,0,.26); position: absolute; }
+.sacc-chip > i:first-child { height: .5px; left: 3px; right: 3px; top: 50%; }
+.sacc-chip > i:last-child  { bottom: 3px; left: 50%; top: 3px; width: .5px; }
+
+.sacc-plastic-figs { flex: 1; min-width: 0; }
+.sacc-plastic-figs small {
+  color: rgba(255,255,255,.55);
+  display: block;
+  font-size: 8px;
+  font-weight: 750;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.sacc-plastic-figs b {
+  display: block;
+  font-size: 19px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  letter-spacing: -.02em;
+  line-height: 1.2;
+}
+.sacc-plastic-figs b.owed { color: #ff8fa6; }
+/* La SEGUNDA deuda, separada por un filete: una tarjeta dominicana arrastra
+   su línea en pesos y su línea en dólares, y el banco las liquida aparte. */
+.sacc-plastic-figs em {
+  border-top: 1px solid rgba(255,255,255,.14);
+  color: rgba(255,255,255,.62);
+  display: block;
   font-size: 11.5px;
+  font-style: normal;
   font-variant-numeric: tabular-nums;
   font-weight: 700;
+  margin-top: 3px;
+  padding-top: 3px;
+}
+.sacc-plastic-figs em.owed { color: rgba(255,143,166,.82); }
+
+.sacc-plastic-foot { display: grid; gap: 4px; }
+/* DOS TRAMOS: el cupo es uno solo y lo consumen las dos deudas. Con una sola
+   barra al 74%, una tarjeta con deuda en dólares diría que queda más cupo
+   del que hay. */
+.sacc-util {
+  background: rgba(255,255,255,.18);
+  border-radius: 999px;
+  display: flex;
+  gap: 1px;
+  height: 4px;
+  overflow: hidden;
+}
+.sacc-util > i { background: #ff8fa6; display: block; height: 100%; transition: width .35s ease; }
+.sacc-util > i.fx { background: #ffc46b; }
+.sacc-plastic-meta {
+  color: rgba(255,255,255,.6);
+  display: flex;
+  font-size: 8px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 750;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+/* ── LISTA: para quien tiene muchas ────────────────────────────────── */
+.sacc-cardlist { display: grid; gap: 6px; }
+.sacc-cardrow {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--card, var(--border));
+  border-radius: 12px;
+  cursor: pointer;
+  display: flex;
+  gap: 11px;
+  padding: 9px 12px;
+  text-align: left;
+  width: 100%;
+}
+.sacc-cardrow:active { background: var(--surface-2); }
+.sacc-cardrow:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Chip diminuto: mantiene el tipo reconocible sin la tarjeta entera. */
+.sacc-mini {
+  border-radius: 4px;
+  flex: none;
+  height: 18px;
+  width: 26px;
+}
+.sacc-mini.credit  { background: linear-gradient(140deg, #f5d98b, #c9a44c); }
+.sacc-mini.debit   { background: linear-gradient(140deg, #e8e8ea, #a9adb6); }
+.sacc-mini.savings { background: linear-gradient(140deg, var(--card), color-mix(in oklab, var(--card) 55%, #000)); }
+.sacc-cardrow-id { flex: 1; min-width: 0; }
+.sacc-cardrow-id b {
+  color: var(--text);
+  display: block;
+  font-size: 13px;
+  font-weight: 750;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
-
-/* Franja de cupo pegada al borde inferior: se lee de un vistazo sin robarle
-   sitio a las cifras. */
-.sacc-plastic-util {
-  background: rgba(255,255,255,.18);
-  bottom: 0;
-  height: 3px;
-  left: 0;
-  position: absolute;
-  right: 0;
+.sacc-cardrow-id small { color: var(--text-dim); font-size: 10px; font-weight: 650; }
+.sacc-cardrow-amt { flex: none; text-align: right; }
+.sacc-cardrow-amt b {
+  color: var(--text);
+  display: block;
+  font-size: 13.5px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
 }
-.sacc-plastic-util > i { display: block; height: 100%; transition: width .25s ease; }
-.sacc-plastic-util > i.ok    { background: #6fe3ab; }
-.sacc-plastic-util > i.watch { background: #ffc94d; }
-.sacc-plastic-util > i.high  { background: #ff8a76; }
+.sacc-cardrow-amt b.owed { color: var(--m-expense, #ff6b8a); }
+.sacc-cardrow-amt small {
+  color: var(--text-dim);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+.sacc-cardrow-amt small.owed { color: color-mix(in oklab, var(--m-expense, #ff6b8a) 78%, transparent); }
 
-.sacc-plastic-due {
-  background: #ffc94d;
-  border-radius: 999px;
-  color: #3a2a00;
-  font-size: 9.5px;
+/* ── EL EFECTIVO: un billete ───────────────────────────────────────
+   Es el único dinero que no pasa por un banco, así que no se parece a nada
+   de arriba. Compacto a propósito: muestra una sola cifra y ocupaba como
+   una tarjeta entera. */
+.sacc-bill {
+  background: linear-gradient(118deg, #17614a 0%, #0e4335 55%, #0a3028 100%);
+  border: 0;
+  border-radius: 10px;
+  cursor: pointer;
+  display: block;
+  min-height: 76px;
+  overflow: hidden;
+  position: relative;
+  text-align: left;
+  width: 100%;
+}
+.sacc-bill:active { transform: scale(.99); }
+.sacc-bill:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+/* GUILLOCHÉ: el entramado fino de un billete real, con gradientes en vez de
+   una imagen que pese. */
+.sacc-bill-guilloche {
+  inset: 0;
+  mix-blend-mode: soft-light;
+  opacity: .5;
+  position: absolute;
+  background:
+    repeating-radial-gradient(circle at 20% 50%, rgba(255,255,255,.5) 0 1px, transparent 1px 6px),
+    repeating-linear-gradient(115deg, rgba(255,255,255,.18) 0 1px, transparent 1px 5px);
+}
+.sacc-bill-frame {
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 5px;
+  inset: 5px;
+  position: absolute;
+}
+.sacc-bill-wm {
+  align-items: center;
+  background: radial-gradient(circle, rgba(255,255,255,.13), transparent 68%);
+  border-radius: 50%;
+  color: rgba(255,255,255,.45);
+  display: flex;
+  height: 46px;
+  justify-content: center;
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 46px;
+}
+.sacc-bill-id { left: 14px; position: absolute; top: 12px; }
+.sacc-bill-label {
+  color: rgba(255,255,255,.6);
+  display: block;
+  font-size: 8px;
   font-weight: 850;
-  letter-spacing: .04em;
-  padding: 2px 8px;
-  position: absolute;
-  right: 14px;
+  letter-spacing: .16em;
   text-transform: uppercase;
-  top: 46px;
 }
+.sacc-bill-amount {
+  color: #fff;
+  display: block;
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  letter-spacing: -.02em;
+  line-height: 1.2;
+  margin-top: 1px;
+}
+/* Microtexto de seguridad: el detalle que solo tiene el papel moneda. */
+.sacc-bill-micro {
+  bottom: 8px;
+  color: rgba(255,255,255,.3);
+  font-size: 5px;
+  left: 14px;
+  letter-spacing: .28em;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 60%;
+}
+/* Sin efectivo: un contorno, no un "RD$ 0.00" enorme en un billete bonito. */
+.sacc-bill-empty {
+  align-items: center;
+  background: transparent;
+  border: 1px dashed color-mix(in oklab, var(--text) 20%, transparent);
+  border-radius: 10px;
+  color: var(--text-dim);
+  cursor: pointer;
+  display: flex;
+  gap: 12px;
+  min-height: 76px;
+  padding: 0 16px;
+  text-align: left;
+  width: 100%;
+}
+.sacc-bill-empty b { color: var(--text); display: block; font-size: 13px; font-weight: 750; }
+.sacc-bill-empty small { color: var(--text-dim); font-size: 11px; }
 
 @media (prefers-reduced-motion: reduce) {
-  .sacc-plastic:active { transform: none; }
-  .sacc-plastic-util > i { transition-duration: 0ms; }
+  .sacc-plastic:active, .sacc-bill:active { transform: none; }
+  .sacc-util > i { transition-duration: 0ms; }
 }
-
-/* ═══════════════════════════════════════════════════════════
-   EDITOR DE CUENTA
-   ═══════════════════════════════════════════════════════════
-   Era una hoja de campos prestada del Perfil: llenabas a ciegas y descubrías
-   el resultado al guardar. Ahora la vista previa manda y los campos la
-   sirven — que es el orden correcto cuando lo que se edita tiene una cara.
-   ═══════════════════════════════════════════════════════════ */
 
 .saed-overlay { align-items: flex-end; }
 /*

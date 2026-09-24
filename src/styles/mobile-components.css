@@ -2011,116 +2011,278 @@
   .mdebt-add-btn { align-items: center; background: var(--m-primary); border-radius: 12px; color: #000; display: flex; font-size: 15px; font-weight: 700; gap: 6px; margin-top: 8px; padding: 14px 24px; }
   /* Héroe "Libre de deudas": banda tintada de verde-libertad, no un negro fijo,
      para que funcione en tema claro. */
-  .mdebt-free {
-    background: linear-gradient(155deg, color-mix(in oklab, var(--m-income) 18%, var(--m-surface)), var(--m-surface));
-    border-bottom: 1px solid color-mix(in oklab, var(--m-income) 20%, var(--m-border));
-    padding: 22px 20px 20px; text-align: center;
-  }
-  .mdebt-free-label { color: var(--m-muted); font-size: 12.5px; font-weight: 700; }
-  .mdebt-free-date { color: var(--m-text); font-size: 27px; font-weight: 850; letter-spacing: -.02em; margin: 3px 0 4px; text-transform: capitalize; }
-  .mdebt-free-owe { color: var(--m-muted); font-size: 13px; font-variant-numeric: tabular-nums; }
-  .mdebt-free-bar { background: color-mix(in oklab, var(--m-text) 10%, transparent); border-radius: 999px; height: 9px; margin: 13px 0 5px; overflow: hidden; }
-  .mdebt-free-bar i { background: var(--m-income); border-radius: 999px; display: block; height: 100%; transition: width .4s cubic-bezier(.2,.8,.2,1); }
-  .mdebt-free-meta { color: var(--m-muted); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+  /* ═══════════════════════════════════════════════════════════════════
+     DEUDAS — rediseño completo (1.9.8)
 
-  /* DE QUE ESTA HECHA TU DEUDA.
-     Un total no dice nada del reparto: RD$ 80.000 puede ser una deuda enorme o
-     cinco medianas, y lo que toca hacer es distinto. Cada tramo lleva el color
-     de su deuda, asi que esta barra y la lista de abajo se leen juntas sin
-     necesidad de leyenda. */
+     Lo anterior era texto gris centrado sobre un degradado del 8%: la pantalla
+     arrancaba sin color y el dinero no aparecía hasta la mitad. El color de
+     cada deuda existía como un punto de 11px que se perdía entre el texto.
+
+     Aquí el color de cada deuda MANDA: tiñe su tarjeta, pinta su barra, marca
+     su tramo en la composición y decide el borde. Y la dirección —lo que debes
+     contra lo que te deben— se ve antes de leer nada.
+     ═══════════════════════════════════════════════════════════════════ */
+
+  /* ── El héroe ──────────────────────────────────────────────────── */
+  .mdebt-hero {
+    align-items: center;
+    background:
+      radial-gradient(120% 140% at 88% -20%, color-mix(in oklab, var(--m-expense) 30%, transparent), transparent 62%),
+      linear-gradient(160deg, color-mix(in oklab, var(--m-primary) 22%, var(--m-surface)), var(--m-surface) 72%);
+    border-bottom: 1px solid var(--m-border);
+    display: flex;
+    gap: 14px;
+    padding: 20px 18px 22px;
+  }
+  .mdebt-hero-main { flex: 1; min-width: 0; }
+  .mdebt-hero-eyebrow {
+    color: var(--m-muted);
+    display: block;
+    font-size: 10.5px;
+    font-weight: 850;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+  }
+  .mdebt-hero-date {
+    color: var(--m-text);
+    display: block;
+    font-size: 26px;
+    font-weight: 900;
+    letter-spacing: -.025em;
+    line-height: 1.12;
+    margin: 4px 0 6px;
+    text-transform: capitalize;
+  }
+  /* El total DEBIDO, en el rojo de gasto: es lo que duele y lo que se viene a
+     mirar. En gris se leía como un pie de foto. */
+  .mdebt-hero-owe {
+    color: var(--m-expense);
+    font-size: 17px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 850;
+  }
+
+  /* Anillo de progreso. Un círculo y no una cuarta barra: la pantalla ya
+     tiene tres (global, composición y una por deuda) y otra más se pierde. */
+  .mdebt-ring { flex: none; height: 84px; width: 84px; }
+  .mdebt-ring-track {
+    fill: none;
+    stroke: color-mix(in oklab, var(--m-text) 12%, transparent);
+    stroke-width: 7;
+  }
+  .mdebt-ring-fill {
+    fill: none;
+    stroke: var(--m-income);
+    stroke-linecap: round;
+    stroke-width: 7;
+    transform: rotate(-90deg);
+    transform-origin: 50% 50%;
+    transition: stroke-dasharray .55s cubic-bezier(.2,.8,.2,1);
+  }
+  .mdebt-ring-pct {
+    fill: var(--m-text);
+    font-size: 19px;
+    font-weight: 900;
+    text-anchor: middle;
+  }
+  .mdebt-ring-cap {
+    fill: var(--m-muted);
+    font-size: 8.5px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-anchor: middle;
+    text-transform: uppercase;
+  }
+
+  /* ── Composición de la deuda ───────────────────────────────────── */
+  .mdebt-mix-block { padding: 14px 16px 2px; }
   .mdebt-mix {
     border-radius: 999px;
     display: flex;
-    gap: 2px;
-    height: 7px;
-    margin-top: 13px;
+    gap: 3px;
+    height: 12px;
     overflow: hidden;
   }
   .mdebt-mix i {
     display: block;
     height: 100%;
-    min-width: 3px;      /* una deuda diminuta sigue siendo visible */
+    min-width: 4px;
     transition: width .45s cubic-bezier(.2,.8,.2,1);
   }
+  /* Con nombres, no una barra muda: sin leyenda había que cruzarla
+     mentalmente con la lista de abajo para saber qué era cada tramo. */
+  .mdebt-mix-legend {
+    color: var(--m-muted);
+    display: flex;
+    flex-wrap: wrap;
+    font-size: 10.5px;
+    font-weight: 700;
+    gap: 4px 12px;
+    margin-top: 8px;
+  }
+  .mdebt-mix-legend span { align-items: center; display: flex; gap: 5px; }
+  .mdebt-mix-legend i { border-radius: 3px; height: 8px; width: 8px; }
 
-  /* Estrategia en cristiano */
-  .mdebt-plan { display: flex; gap: 8px; margin: 12px 16px 0; }
-  .mdebt-plan button { background: var(--m-surface); border: 1px solid var(--m-border); border-radius: 14px; color: var(--m-text); flex: 1; padding: 11px 10px; text-align: left; }
-  .mdebt-plan button.on { border-color: var(--m-primary); background: color-mix(in oklab, var(--m-primary) 10%, var(--m-surface)); }
-  .mdebt-plan b { display: block; font-size: 13px; font-weight: 800; }
+  /* ── Estrategia ────────────────────────────────────────────────── */
+  .mdebt-plan { display: flex; gap: 8px; margin: 14px 16px 0; }
+  .mdebt-plan button {
+    background: var(--m-surface);
+    border: 1px solid var(--m-border);
+    border-radius: 15px;
+    color: var(--m-text);
+    flex: 1;
+    padding: 12px 11px;
+    text-align: left;
+    transition: border-color .15s ease, background .15s ease;
+  }
+  .mdebt-plan button.on {
+    background: color-mix(in oklab, var(--m-primary) 14%, var(--m-surface));
+    border-color: var(--m-primary);
+    box-shadow: 0 0 0 1px color-mix(in oklab, var(--m-primary) 30%, transparent);
+  }
+  .mdebt-plan b { display: block; font-size: 13px; font-weight: 850; }
   .mdebt-plan small { color: var(--m-muted); font-size: 11px; line-height: 1.3; }
 
-  .mdebt-card { background: var(--m-surface); border: 1px solid var(--m-border); border-radius: 16px; margin: 12px 16px 0; padding: 15px; }
-  .mdebt-card-title { color: var(--m-muted); font-size: 11px; font-weight: 800; letter-spacing: .07em; margin-bottom: 10px; text-transform: uppercase; }
+  .mdebt-card { background: var(--m-surface); border: 1px solid var(--m-border); border-radius: 18px; margin: 12px 16px 0; padding: 15px; }
+  .mdebt-card-title { color: var(--m-muted); font-size: 10.5px; font-weight: 850; letter-spacing: .09em; margin-bottom: 11px; text-transform: uppercase; }
 
-  /* Este mes paga */
+  /* ── Este mes paga ─────────────────────────────────────────────── */
   .mdebt-pay-row { align-items: center; display: flex; gap: 10px; padding: 9px 0; }
   .mdebt-pay-row + .mdebt-pay-row { border-top: 1px solid var(--m-border); }
   .mdebt-pay-dot { border-radius: 50%; flex: none; height: 10px; width: 10px; }
   .mdebt-pay-name { align-items: center; color: var(--m-text); display: flex; flex: 1; font-size: 13.5px; font-weight: 650; gap: 6px; }
-  .mdebt-pay-target { background: color-mix(in oklab, var(--m-primary) 18%, transparent); border-radius: 6px; color: var(--m-primary); font-size: 10px; font-weight: 800; padding: 1px 7px; text-transform: uppercase; }
+  .mdebt-pay-target { background: color-mix(in oklab, var(--m-primary) 20%, transparent); border-radius: 6px; color: var(--m-primary); font-size: 9.5px; font-weight: 900; letter-spacing: .05em; padding: 2px 7px; text-transform: uppercase; }
   .mdebt-pay-amt { color: var(--m-text); font-size: 14px; font-variant-numeric: tabular-nums; font-weight: 800; text-align: right; }
   .mdebt-pay-amt small { color: var(--m-muted); display: block; font-size: 10px; font-weight: 600; }
   .mdebt-pay-total { align-items: center; border-top: 2px solid var(--m-border); display: flex; justify-content: space-between; margin-top: 4px; padding-top: 11px; }
   .mdebt-pay-total span { color: var(--m-text); font-size: 13px; font-weight: 700; }
-  .mdebt-pay-total b { color: var(--m-text); font-size: 18px; font-variant-numeric: tabular-nums; font-weight: 900; }
+  .mdebt-pay-total b { color: var(--m-text); font-size: 19px; font-variant-numeric: tabular-nums; font-weight: 900; }
 
-  /* Extra con deslizador */
+  /* ── Extra ─────────────────────────────────────────────────────── */
   .mdebt-extra { display: flex; flex-direction: column; gap: 8px; }
   .mdebt-extra-top { align-items: baseline; display: flex; justify-content: space-between; }
   .mdebt-extra-top span { color: var(--m-muted); font-size: 12px; }
-  .mdebt-extra-top b { color: var(--m-text); font-size: 17px; font-variant-numeric: tabular-nums; font-weight: 850; }
+  .mdebt-extra-top b { color: var(--m-text); font-size: 18px; font-variant-numeric: tabular-nums; font-weight: 850; }
   .mdebt-extra input { accent-color: var(--m-primary); width: 100%; }
   .mdebt-extra-note { color: var(--m-income); font-size: 12px; font-weight: 700; }
 
-  .mdebt-section-title { align-items: center; color: var(--m-muted); display: flex; font-size: 12px; font-weight: 700; gap: 8px; letter-spacing: .06em; margin: 20px 16px 8px; text-transform: uppercase; }
-  .mdebt-add-inline { align-items: center; background: color-mix(in oklab, var(--m-primary) 15%, transparent); border-radius: 8px; color: var(--m-primary); display: flex; font-size: 12px; font-weight: 700; gap: 4px; margin-left: auto; padding: 4px 10px; }
+  /* ── LA TARJETA DE UNA DEUDA ───────────────────────────────────── */
+  .mdebt-section-title { align-items: center; color: var(--m-muted); display: flex; font-size: 10.5px; font-weight: 850; gap: 8px; letter-spacing: .09em; margin: 20px 16px 10px; text-transform: uppercase; }
+  .mdebt-add-inline { align-items: center; color: var(--m-primary); display: flex; font-size: 11.5px; font-weight: 800; gap: 4px; margin-left: auto; }
+  .mdebt-list { display: flex; flex-direction: column; gap: 10px; padding: 0 16px; }
 
-  /* Deudas con progreso */
-  .mdebt-list { display: flex; flex-direction: column; gap: 8px; margin: 0 16px; }
-  /* ESPINA DE COLOR. El punto de 11px se perdia entre el texto; una banda
-     lateral se ve de reojo al deslizar y ata la fila con su tramo de la barra
-     de composicion de arriba. */
   .mdebt-debt {
     align-items: stretch;
+    /* El color de la deuda tiñe SU tarjeta. No es decoración: es lo que ata
+       la fila con su tramo de la barra de composición sin necesidad de
+       leyenda, y lo que faltaba para que la pantalla dejara de parecer un
+       listado de texto gris. */
     background:
-      linear-gradient(90deg, color-mix(in oklab, var(--debt, transparent) 9%, transparent), transparent 42%),
+      linear-gradient(135deg, color-mix(in oklab, var(--debt, transparent) 20%, transparent), transparent 58%),
       var(--m-surface);
-    border: 1px solid var(--m-border);
-    border-left: 3px solid var(--debt, var(--m-border));
-    border-radius: 14px;
+    border: 1px solid color-mix(in oklab, var(--debt, var(--m-border)) 30%, var(--m-border));
+    border-radius: 18px;
     display: flex;
     overflow: hidden;
   }
-  /* La deuda OBJETIVO del mes: la que recibe el pago extra. Es la unica
-     decision accionable de la pantalla, asi que se le da un halo de verdad en
-     vez de un borde algo mas claro que el resto. */
+  /* LA DEUDA OBJETIVO del mes: la única decisión accionable de la pantalla.
+     Antes se distinguía por un borde un pelo más claro. */
   .mdebt-debt.target {
-    border-color: color-mix(in oklab, var(--m-primary) 45%, var(--m-border));
-    border-left-color: var(--debt, var(--m-primary));
-    box-shadow: 0 0 0 1px color-mix(in oklab, var(--m-primary) 26%, transparent),
-                0 6px 18px -10px color-mix(in oklab, var(--m-primary) 60%, transparent);
+    border-color: var(--debt, var(--m-primary));
+    box-shadow: 0 0 0 1.5px var(--debt, var(--m-primary)),
+                0 12px 28px -16px var(--debt, var(--m-primary));
   }
+  .mdebt-debt-main { flex: 1; min-width: 0; padding: 14px 15px; text-align: left; }
+
+  .mdebt-debt-head { align-items: center; display: flex; gap: 10px; }
   .mdebt-kind {
     align-items: center;
-    border-radius: 9px;
+    background: color-mix(in oklab, var(--debt, var(--m-text)) 20%, transparent);
+    border: 1px solid color-mix(in oklab, var(--debt, var(--m-text)) 30%, transparent);
+    border-radius: 12px;
+    color: var(--debt, var(--m-text));
     display: flex;
     flex-shrink: 0;
-    height: 26px;
+    height: 36px;
     justify-content: center;
-    width: 26px;
+    width: 36px;
   }
-  .mdebt-debt-main { flex: 1; min-width: 0; padding: 13px 14px; text-align: left; }
-  .mdebt-debt-top { align-items: center; display: flex; gap: 8px; }
-  .mdebt-row-dot { border-radius: 50%; flex-shrink: 0; height: 11px; width: 11px; }
-  .mdebt-debt-top b { color: var(--m-text); flex: 1; font-size: 14px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mdebt-debt-id { flex: 1; min-width: 0; }
+  .mdebt-debt-id b { color: var(--m-text); display: block; font-size: 14.5px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mdebt-debt-id small { color: var(--m-muted); font-size: 11px; font-weight: 650; }
+  .mdebt-target-flag {
+    background: var(--debt, var(--m-primary));
+    border-radius: 7px;
+    color: #06101c;
+    flex-shrink: 0;
+    font-size: 9px;
+    font-weight: 900;
+    letter-spacing: .05em;
+    padding: 3px 7px;
+    text-transform: uppercase;
+  }
+
+  /* LA CIFRA, grande. Es el dato por el que se abre la pantalla y tenía el
+     mismo tamaño que el nombre de la deuda. */
+  .mdebt-debt-amount {
+    color: var(--m-text);
+    font-size: 24px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 900;
+    letter-spacing: -.02em;
+    margin: 12px 0 9px;
+  }
+
+  .mdebt-debt-bar { background: color-mix(in oklab, var(--m-text) 10%, transparent); border-radius: 999px; height: 7px; overflow: hidden; }
+  .mdebt-debt-bar i { border-radius: 999px; display: block; height: 100%; transition: width .35s cubic-bezier(.2,.8,.2,1); }
+  .mdebt-debt-sub { color: var(--m-muted); font-size: 11px; font-variant-numeric: tabular-nums; margin-top: 6px; }
+
+  .mdebt-debt-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+  .mdebt-due { align-items: center; border-radius: 999px; display: inline-flex; font-size: 10.5px; font-weight: 800; gap: 4px; padding: 3px 9px; }
+  .mdebt-due.ok { background: color-mix(in oklab, var(--m-income) 16%, transparent); color: var(--m-income); }
+  .mdebt-due.due-soon { background: color-mix(in oklab, #f59e0b 18%, transparent); color: #f59e0b; }
+  .mdebt-due.due-today,
+  .mdebt-due.overdue { background: color-mix(in oklab, var(--m-expense) 20%, transparent); color: var(--m-expense); }
+  .mdebt-meta-chip { background: color-mix(in oklab, var(--m-text) 7%, transparent); border-radius: 999px; color: var(--m-muted); font-size: 10.5px; font-weight: 700; padding: 3px 9px; }
+
+  /* El botón de pagar, vertical, con el color de la dirección. */
+  .mdebt-debt-pay {
+    align-items: center;
+    border-left: 1px solid color-mix(in oklab, var(--debt, var(--m-border)) 24%, var(--m-border));
+    display: flex;
+    flex-direction: column;
+    font-size: 11px;
+    font-weight: 850;
+    gap: 4px;
+    justify-content: center;
+    padding: 0 16px;
+  }
+  .mdebt-debt.owed .mdebt-debt-pay { background: color-mix(in oklab, var(--m-expense) 14%, transparent); color: var(--m-expense); }
+  .mdebt-debt.owed .mdebt-debt-pay:active { background: color-mix(in oklab, var(--m-expense) 26%, transparent); }
+  .mdebt-debt.owed .mdebt-debt-amount { color: var(--m-expense); }
+
+  /* ── LO QUE TE DEBEN ───────────────────────────────────────────────
+     No es una variante de lo mismo: uno resta de tu patrimonio y el otro
+     suma. Verde contra rojo, decidido antes de leer una palabra. */
+  .mdebt-debt.lent {
+    background:
+      linear-gradient(135deg, color-mix(in oklab, var(--m-income) 20%, transparent), transparent 58%),
+      var(--m-surface);
+    border-color: color-mix(in oklab, var(--m-income) 40%, var(--m-border));
+  }
+  .mdebt-debt.lent .mdebt-kind { background: color-mix(in oklab, var(--m-income) 20%, transparent); border-color: color-mix(in oklab, var(--m-income) 34%, transparent); color: var(--m-income); }
+  .mdebt-debt.lent .mdebt-debt-amount,
+  .mdebt-debt.lent .mdebt-debt-top strong { color: var(--m-income); }
+  .mdebt-debt.lent .mdebt-debt-pay { background: color-mix(in oklab, var(--m-income) 18%, transparent); color: var(--m-income); }
+
+  .mdebt-dir { border-radius: 999px; font-size: 9.5px; font-weight: 900; letter-spacing: .06em; padding: 2px 8px; text-transform: uppercase; }
+  .mdebt-dir.owed { background: color-mix(in oklab, var(--m-expense) 18%, transparent); color: var(--m-expense); }
+  .mdebt-dir.lent { background: color-mix(in oklab, var(--m-income) 18%, transparent); color: var(--m-income); }
+  .mdebt-lent-total { color: var(--m-income); font-size: 13px; font-weight: 850; margin-left: auto; }
+
+  .mdebt-card-badge { background: color-mix(in oklab, var(--m-text) 10%, transparent); border-radius: 6px; color: var(--m-muted); font-size: 9px; font-weight: 800; padding: 2px 6px; text-transform: uppercase; }
   .mdebt-debt-rate { color: var(--m-muted); font-size: 11.5px; }
-  .mdebt-debt-top strong { color: var(--m-text); font-size: 14px; font-variant-numeric: tabular-nums; font-weight: 800; }
-  .mdebt-debt-bar { background: color-mix(in oklab, var(--m-text) 9%, transparent); border-radius: 999px; height: 6px; margin: 9px 0 6px; overflow: hidden; }
-  .mdebt-debt-bar i { border-radius: 999px; display: block; height: 100%; transition: width .3s; }
-  .mdebt-debt-sub { color: var(--m-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
-  .mdebt-debt-pay { align-items: center; background: color-mix(in oklab, var(--m-income) 12%, transparent); border-left: 1px solid var(--m-border); color: var(--m-income); display: flex; flex-direction: column; font-size: 11px; font-weight: 800; gap: 3px; justify-content: center; padding: 0 14px; }
-  .mdebt-debt-pay:active { background: color-mix(in oklab, var(--m-income) 22%, transparent); }
+
   .mdebt-sheet { background: var(--m-surface); border-radius: 24px 24px 0 0; overflow: hidden; }
   .mdebt-sheet header { align-items: center; border-bottom: 1px solid var(--m-border); display: flex; justify-content: space-between; padding: 18px 20px; }
   .mdebt-sheet header span { color: var(--m-text); font-size: 16px; font-weight: 700; }

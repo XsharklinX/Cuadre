@@ -127,7 +127,7 @@ export async function exportExcel(state: FinanceState): Promise<void> {
   })
 
   const buffer   = await wb.xlsx.writeBuffer()
-  const filename  = downloadName('sharky-finanzas', 'xlsx')
+  const filename  = downloadName('cuadre-finanzas', 'xlsx')
   const mimeType  = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
   const blob      = new Blob([buffer], { type: mimeType })
   await saveFile(blob, filename, `Reporte de ${APP_NAME}`, ['xlsx'])
@@ -153,7 +153,7 @@ export async function exportCsv(state: FinanceState): Promise<void> {
   ])
   const csv = [header, ...rows].map(row => row.map(csvField).join(',')).join('\r\n')
   const blob = new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' })
-  const filename = downloadName('sharky-movimientos', 'csv')
+  const filename = downloadName('cuadre-movimientos', 'csv')
   await saveFile(blob, filename, `Movimientos de ${APP_NAME}`, ['csv'])
 }
 
@@ -199,15 +199,15 @@ export async function exportMonthlyPdf(state: FinanceState, month: string, owner
   doc.text(tt('pdfSavings'), 142, y + 8)
   doc.setTextColor(23, 32, 51)
   doc.setFontSize(12)
-  doc.text(fmt(summary.income, state.currency), 24, y + 17)
-  doc.text(fmt(summary.expense, state.currency), 83, y + 17)
-  doc.text(fmt(summary.net, state.currency), 142, y + 17)
+  doc.text(fmt(summary.income, state.currency, { neverMask: true }), 24, y + 17)
+  doc.text(fmt(summary.expense, state.currency, { neverMask: true }), 83, y + 17)
+  doc.text(fmt(summary.net, state.currency, { neverMask: true }), 142, y + 17)
 
   y += 38
   if (executive.topCategory) {
     doc.setFontSize(9)
     doc.setTextColor(102, 112, 133)
-    doc.text(tt('pdfTopCategory', { name: executive.topCategory, amount: fmt(executive.topCategoryAmount, state.currency) }), 16, y)
+    doc.text(tt('pdfTopCategory', { name: executive.topCategory, amount: fmt(executive.topCategoryAmount, state.currency, { neverMask: true }) }), 16, y)
     y += 10
   }
 
@@ -233,7 +233,7 @@ export async function exportMonthlyPdf(state: FinanceState, month: string, owner
     doc.text(tx.note.slice(0, 40), 40, y)
     doc.text((getCategory(tx.categoryId, state.categories)?.name ?? tt('transfersLabel')).slice(0, 22), 116, y)
     const signed = tx.type === 'expense' ? -tx.amount : tx.amount
-    doc.text(fmt(signed, state.currency), 166, y)
+    doc.text(fmt(signed, state.currency, { neverMask: true }), 166, y)
     y += 7
   })
 
@@ -248,7 +248,7 @@ export async function exportMonthlyPdf(state: FinanceState, month: string, owner
     doc.setTextColor(102, 112, 133)
     categories.slice(0, 5).forEach(category => {
       doc.text(category.category.name, 16, y)
-      doc.text(fmt(category.amount, state.currency), 166, y)
+      doc.text(fmt(category.amount, state.currency, { neverMask: true }), 166, y)
       y += 6
     })
   }
@@ -276,7 +276,7 @@ export async function exportMonthlyPdf(state: FinanceState, month: string, owner
       doc.setTextColor(23, 32, 51)
       doc.text(account.name.slice(0, 40), 16, y)
       doc.text(tt(account.type), 116, y)
-      doc.text(fmt(account.balance, account.currency ?? state.currency), 166, y)
+      doc.text(fmt(account.balance, account.currency ?? state.currency, { neverMask: true }), 166, y)
       y += 7
     })
 
@@ -288,7 +288,7 @@ export async function exportMonthlyPdf(state: FinanceState, month: string, owner
     doc.setFontSize(11)
     doc.setTextColor(23, 32, 51)
     doc.text(tt('pdfNetWorth'), 116, y)
-    doc.text(fmt(netWorth, state.currency), 166, y)
+    doc.text(fmt(netWorth, state.currency, { neverMask: true }), 166, y)
   }
 
   // Pie de pagina: fecha de generacion y numero de pagina
@@ -302,7 +302,7 @@ export async function exportMonthlyPdf(state: FinanceState, month: string, owner
     doc.text(tt('pdfPage', { page, total: totalPages }), 178, 290)
   }
 
-  const filename  = downloadName(`sharky-estado-${month}`, 'pdf')
+  const filename  = downloadName(`cuadre-estado-${month}`, 'pdf')
   const pdfBlob = doc.output('blob')
   await saveFile(pdfBlob, filename, `Estado Financiero ${APP_NAME}`, ['pdf'])
 }

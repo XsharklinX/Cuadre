@@ -242,7 +242,7 @@ foreach ($file in @($apkFiles + $aabFiles)) {
   $profile = if ($pathLower -match 'debug') { 'debug' } elseif ($pathLower -match 'release') { 'release' } else { 'build' }
   $abi = if ($file.FullName -match '\\arm64-v8a\\') { 'arm64' } elseif ($file.FullName -match '\\armeabi-v7a\\') { 'armv7' } elseif ($file.FullName -match '\\x86_64\\') { 'x86_64' } elseif ($file.FullName -match '\\x86\\') { 'x86' } else { 'universal' }
   $signed = if ($file.Name -match 'unsigned') { '-unsigned' } else { '' }
-  $name = "`$harky-android-$profile-$abi$signed.$kind"
+  $name = "cuadre-android-$profile-$abi$signed.$kind"
   Copy-Item -LiteralPath $file.FullName -Destination (Join-Path $releaseDir $name) -Force
 }
 

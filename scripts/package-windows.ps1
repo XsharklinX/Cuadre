@@ -37,7 +37,7 @@ try {
 }
 
 $portableSource = Join-Path $targetDir 'sharky.exe'
-$portableTarget = Join-Path $releaseDir '$harky-portable.exe'
+$portableTarget = Join-Path $releaseDir 'cuadre-portable.exe'
 Copy-Item -LiteralPath $portableSource -Destination $portableTarget -Force
 
 $installer = Get-ChildItem -LiteralPath $bundleDir -Filter '*.exe' |
@@ -48,7 +48,7 @@ if (-not $installer) {
   throw 'No se encontro el instalador NSIS generado por Tauri.'
 }
 
-$installerTarget = Join-Path $releaseDir '$harky-setup.exe'
+$installerTarget = Join-Path $releaseDir 'cuadre-setup.exe'
 Copy-Item -LiteralPath $installer.FullName -Destination $installerTarget -Force
 
 $artifacts = @($installerTarget, $portableTarget) | ForEach-Object {

@@ -7,11 +7,11 @@ import { CURRENCIES } from '@/data/currencies'
 import { currentRate } from '@/data/fxAlerts'
 import { fmt } from '@/data/helpers'
 import { useResolvedTheme, type ResolvedTheme } from '@/hooks/useResolvedTheme'
-import { useT } from '@/i18n'
+import { useT, type LangKey } from '@/i18n'
 import { playSoundPreview, playSuccessHaptic } from '@/lib/sound'
 import { useFinance } from '@/store/finance'
 import { useSettings } from '@/store/settings'
-import type { CurrencyCode, DensityName, OverdraftPolicy, ThemeName } from '@/types'
+import type { CurrencyCode, DensityName, OverdraftPolicy, ThemeName, IconName } from '@/types'
 import { MobileAmountSheet } from '../MobileAmountSheet'
 import { SettingsRow, SettingsSheet, type SheetProps } from './shared'
 
@@ -35,7 +35,6 @@ function getThemeLabels(t: ReturnType<typeof useT>): Record<ThemeName, string> {
     ocean: t('themeOceanLabel'),
     sunset: t('themeSunsetLabel'),
     forest: t('themeForestLabel'),
-    sand: t('themeSandLabel'),
   }
 }
 
@@ -55,27 +54,32 @@ function getOverdraftLabels(t: ReturnType<typeof useT>): Record<OverdraftPolicy,
   }
 }
 
-/* La muestra de cada tema usa SU fondo y SU texto reales, no una aproximacion:
-   una vista previa que no coincide con lo que sale al elegirla es peor que no
-   tener vista previa. */
-const themePreviewBg: Record<ResolvedTheme, string> = {
-  dark: '#0a0e16',
-  light: '#f4f7fb',
-  amoled: '#000000',
-  ocean: '#04161f',
-  sunset: '#1a0f1c',
-  forest: '#071612',
-  sand: '#f3ece1',
+/**
+ * LA IDENTIDAD DE CADA TEMA.
+ *
+ * Antes los ocho salian con el mismo cuadrito de color y ningun icono: la
+ * lista pedia elegir entre ocho rectangulos que solo se diferenciaban en el
+ * tono. Nadie prueba un tema asi — no hay nada que invite.
+ *
+ * Ahora cada uno lleva SU icono, SU acento y una frase que dice a que ambiente
+ * suena. La vista previa usa sus colores reales: una muestra que no coincide
+ * con lo que sale al elegirla es peor que no tener muestra.
+ */
+interface ThemeFace {
+  icon: IconName
+  bg: string
+  fg: string
+  accent: string
+  descKey: LangKey
 }
 
-const themePreviewFg: Record<ResolvedTheme, string> = {
-  dark: '#e9eef7',
-  light: '#172033',
-  amoled: '#e9eef7',
-  ocean: '#e2f4f8',
-  sunset: '#fbeaf2',
-  forest: '#e4f5ec',
-  sand: '#2b2318',
+const THEME_FACE: Record<ResolvedTheme, ThemeFace> = {
+  dark:   { icon: 'moon',      bg: '#0a0e16', fg: '#e9eef7', accent: '#5bc0ff', descKey: 'themeDarkDesc' },
+  light:  { icon: 'sun',       bg: '#f4f7fb', fg: '#172033', accent: '#2563eb', descKey: 'themeLightDesc' },
+  amoled: { icon: 'circleDot', bg: '#000000', fg: '#e9eef7', accent: '#8a96ac', descKey: 'themeAmoledDesc' },
+  ocean:  { icon: 'waves',     bg: '#021018', fg: '#dff6fb', accent: '#22d3ee', descKey: 'themeOceanDesc' },
+  sunset: { icon: 'sunrise',   bg: '#17091b', fg: '#ffeaf3', accent: '#fb923c', descKey: 'themeSunsetDesc' },
+  forest: { icon: 'tree',      bg: '#03120c', fg: '#e2f7ea', accent: '#4ade80', descKey: 'themeForestDesc' },
 }
 
 export function SettingsAppearance({ activeSheet, onOpen, onClose, only }: SheetProps & { only?: 'finance' | 'appearance' }) {
@@ -266,6 +270,29 @@ export function SettingsAppearance({ activeSheet, onOpen, onClose, only }: Sheet
             onClick={() => onOpen('language')}
           />
 
+          {/* El 0.15% de la Ley 288-04. Va en Finanzas, no en Apariencia: no
+              es como se ve un numero, es cuanto dinero sale de la cuenta. */}
+          {only !== 'appearance' && (
+            <div className="mset-row">
+              <span className="mset-row-icon" style={{ background: '#f59e0b22', color: '#f59e0b' }}>
+                <Icon name="receipt" size={18} />
+              </span>
+              <div className="mset-row-text">
+                <b>{t('lawTaxLabel')}</b>
+                <small>{t('lawTaxDesc')}</small>
+              </div>
+              <label className="mset-toggle-wrap">
+                <input
+                  type="checkbox"
+                  className="mset-toggle-input"
+                  checked={settings.lawTaxEnabled}
+                  onChange={e => settings.setLawTaxEnabled(e.target.checked)}
+                />
+                <span className="mset-toggle" />
+              </label>
+            </div>
+          )}
+
           {/* MODO PRIVADO. Va junto a los ajustes de como se ven los numeros
               porque es exactamente eso: como se ven. */}
           <div className="mset-row">
@@ -420,23 +447,44 @@ export function SettingsAppearance({ activeSheet, onOpen, onClose, only }: Sheet
 
       {activeSheet === 'theme' && (
         <SettingsSheet title={t('theme')} onClose={onClose}>
-          <div className="mset-sheet-options">
-            {(['system', 'dark', 'light', 'amoled', 'ocean', 'sunset', 'forest', 'sand'] as ThemeName[]).map(theme => {
-              const previewKey = theme === 'system' ? resolvedTheme : theme
+          <div className="mset-theme-grid">
+            {(['system', 'dark', 'light', 'amoled', 'ocean', 'sunset', 'forest'] as ThemeName[]).map(theme => {
+              // "Sistema" no tiene cara propia: toma prestada la del tema que
+              // el SO esta usando ahora mismo, que es lo que el usuario vera.
+              const face = THEME_FACE[theme === 'system' ? resolvedTheme : theme]
+              const on = settings.theme === theme
               return (
                 <button
                   key={theme}
-                  className={`mset-theme-opt${settings.theme === theme ? ' on' : ''}`}
-                  onClick={() => {
-                    settings.setTheme(theme)
-                    onClose()
-                  }}
+                  className={`mset-theme-card${on ? ' on' : ''}`}
+                  aria-pressed={on}
+                  style={{
+                    '--tbg': face.bg,
+                    '--tfg': face.fg,
+                    '--tac': face.accent,
+                  } as React.CSSProperties}
+                  onClick={() => { settings.setTheme(theme); onClose() }}
                 >
-                  <span className="mset-theme-preview" style={{ background: themePreviewBg[previewKey], color: themePreviewFg[previewKey] }}>
-                    <span />
+                  {/*
+                    VISTA PREVIA DE VERDAD: una maqueta diminuta de la app —
+                    barra, tarjeta y cifra— con los colores reales del tema. Un
+                    cuadrito de color plano no dice como se va a ver una
+                    pantalla; esto si.
+                  */}
+                  <span className="mset-theme-mock" aria-hidden="true">
+                    <span className="mset-theme-mock-bar" />
+                    <span className="mset-theme-mock-card">
+                      <i /><b />
+                    </span>
+                    <span className="mset-theme-mock-dot" />
                   </span>
-                  <strong>{themeLabels[theme]}</strong>
-                  {settings.theme === theme && <Icon name="check" size={14} style={{ color: 'var(--accent, #ffdd3d)', marginLeft: 'auto' }} />}
+
+                  <span className="mset-theme-meta">
+                    <span className="mset-theme-ico"><Icon name={face.icon} size={15} /></span>
+                    <strong>{themeLabels[theme]}</strong>
+                    {on && <Icon name="check" size={14} className="mset-theme-check" />}
+                  </span>
+                  <small>{theme === 'system' ? t('themeSystemDesc') : t(face.descKey)}</small>
                 </button>
               )
             })}

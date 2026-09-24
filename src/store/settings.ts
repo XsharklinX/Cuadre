@@ -4,6 +4,8 @@ import type { ThemeName, DensityName, OverdraftPolicy } from '@/types'
 import { isAndroidTauri } from '@/lib/secureBlob'
 import { saveAppLock } from '@/lib/appLockStorage'
 import { EMPTY_SNOOZE, type SnoozeState } from '@/data/updatePrompt'
+import { setPrivacyMasked } from '@/data/helpers'
+import type { ReminderKind } from '@/data/reminderKinds'
 
 interface SettingsState {
   theme:             ThemeName
@@ -58,6 +60,24 @@ interface SettingsState {
    */
   privacyMode: boolean
   /**
+   * Calcular el 0.15% de la Ley 288-04 en los gastos pagados desde una cuenta
+   * de banco.
+   *
+   * Encendido por defecto: el banco lo retiene, asi que no contarlo deja el
+   * libro con mas dinero del que hay. Pero se puede apagar — no todos los
+   * bancos lo aplican igual en todas las operaciones, y es peor pelear con la
+   * app que dejar que el usuario decida.
+   */
+  lawTaxEnabled: boolean
+  /**
+   * Como se ven las tarjetas en Cuentas.
+   *
+   * El carrusel luce con tres y estorba con nueve: hay que deslizar a ciegas
+   * para encontrar una. La lista enseña todas de golpe. No hay una respuesta
+   * buena para todo el mundo, asi que decide el usuario.
+   */
+  cardsView: 'carousel' | 'list'
+  /**
    * Pagos recurrentes (ids de plantilla) que no deben volver a avisar NUNCA.
    * Va aparte de `dismissedAlerts` porque aquel descarta por ocurrencia
    * (`recurring:{id}:{fecha}`) y el aviso reaparecía al mes siguiente con id
@@ -68,6 +88,18 @@ interface SettingsState {
   notifiedAlerts: string[]
   hasSeenOnboarding: boolean
   remindersEnabled: boolean
+  /**
+   * QUE avisos quieres, uno por uno.
+   *
+   * `remindersEnabled` era todo o nada: a quien le molestaba el resumen
+   * semanal solo le quedaba apagarlo TODO, incluido el aviso de que se pasa
+   * del presupuesto. Un interruptor unico para ocho cosas distintas se acaba
+   * apagando por la mas molesta, y con el se van las siete utiles.
+   *
+   * Ausente = encendido, para que las instalaciones existentes no pierdan
+   * avisos al actualizar.
+   */
+  reminderKinds: Partial<Record<ReminderKind, boolean>>
   quickAddNotification: boolean
   /** Muestra la fila de "Rápidos" en el formulario de crear. Hay quien prefiere
    *  el formulario limpio; se puede apagar. */
@@ -125,10 +157,13 @@ interface SettingsState {
   dismissAlert: (id: string) => void
   setUpdateSnooze: (value: SnoozeState) => void
   togglePrivacyMode: () => void
+  setLawTaxEnabled: (v: boolean) => void
+  setCardsView: (v: 'carousel' | 'list') => void
   silenceRecurring: (transactionId: string) => void
   unsilenceRecurring: (transactionId: string) => void
   markAlertNotified: (id: string) => void
   markOnboardingSeen: () => void
+  setReminderKind: (kind: ReminderKind, on: boolean) => void
   setRemindersEnabled: (v: boolean) => void
   setQuickAddNotification: (v: boolean) => void
   setQuickAddsEnabled: (v: boolean) => void
@@ -181,10 +216,13 @@ export const useSettings = create<SettingsState>()(
       dismissedAlerts: [],
       updateSnooze: EMPTY_SNOOZE,
       privacyMode: false,
+      lawTaxEnabled: true,
+      cardsView: 'carousel',
       silencedRecurring: [],
       notifiedAlerts: [],
       hasSeenOnboarding: false,
       remindersEnabled: true,
+      reminderKinds: {},
       quickAddNotification: false,
       quickAddsEnabled: true,
       hiddenShowInMovements: true,
@@ -254,7 +292,15 @@ export const useSettings = create<SettingsState>()(
       dismissAlert: (id) => set(state =>
         state.dismissedAlerts.includes(id) ? state : { dismissedAlerts: [...state.dismissedAlerts, id] }),
       setUpdateSnooze: (updateSnooze) => set({ updateSnooze }),
-      togglePrivacyMode: () => set(state => ({ privacyMode: !state.privacyMode })),
+      setLawTaxEnabled: (lawTaxEnabled) => set({ lawTaxEnabled }),
+      setCardsView: (cardsView) => set({ cardsView }),
+      togglePrivacyMode: () => set(state => {
+        const privacyMode = !state.privacyMode
+        // `fmt` no puede leer el store (lo llaman sitios sin React), asi que
+        // se le empuja el valor. Ver `setPrivacyMasked` en data/helpers.
+        setPrivacyMasked(privacyMode)
+        return { privacyMode }
+      }),
       silenceRecurring: (transactionId) => set(state =>
         state.silencedRecurring.includes(transactionId)
           ? state
@@ -265,6 +311,9 @@ export const useSettings = create<SettingsState>()(
         state.notifiedAlerts.includes(id) ? state : { notifiedAlerts: [...state.notifiedAlerts, id] }),
       markOnboardingSeen: () => set({ hasSeenOnboarding: true }),
       setRemindersEnabled: (remindersEnabled) => set({ remindersEnabled }),
+      setReminderKind: (kind, on) => set(state => ({
+        reminderKinds: { ...state.reminderKinds, [kind]: on },
+      })),
       setQuickAddNotification: (quickAddNotification) => set({ quickAddNotification }),
       setQuickAddsEnabled: (quickAddsEnabled) => set({ quickAddsEnabled }),
       setHiddenShowInMovements: (hiddenShowInMovements) => set({ hiddenShowInMovements }),
@@ -297,11 +346,33 @@ export const useSettings = create<SettingsState>()(
       merge: (persisted, current) => {
         const p = persisted as Partial<SettingsState>
         const oldDark = ['midnight', 'slate', 'carbon']
-        const validThemes: ThemeName[] = ['dark', 'light', 'amoled', 'system']
+        /*
+         * ESTA LISTA HAY QUE AMPLIARLA AL AÑADIR UN TEMA.
+         *
+         * Se quedo en los cuatro originales cuando se añadieron Oceano,
+         * Atardecer y Bosque: elegir uno funcionaba, pero al reabrir la app el
+         * filtro no lo reconocia y lo devolvia al anterior. El tema parecia
+         * "no guardarse" sin que nada fallara a la vista.
+         *
+         * `sand` NO esta: se retiro, y quien lo tuviera puesto cae al tema
+         * oscuro en vez de quedarse con un tema que ya no existe.
+         */
+        const validThemes: ThemeName[] = [
+          'dark', 'light', 'amoled', 'system', 'ocean', 'sunset', 'forest',
+        ]
         const theme = oldDark.includes(p.theme as string)
           ? 'dark'
           : validThemes.includes(p.theme as ThemeName) ? (p.theme as ThemeName) : current.theme
         return { ...current, ...p, theme }
+      },
+      /*
+       * El modo privado se guarda, asi que tiene que seguir tapando al
+       * reabrir. Sin esto, `fmt` arrancaba con la bandera en false y los
+       * montos salian a la vista un instante —o para siempre, hasta tocar el
+       * interruptor— con el ajuste marcado como encendido.
+       */
+      onRehydrateStorage: () => (state) => {
+        setPrivacyMasked(state?.privacyMode ?? false)
       },
     },
   ),

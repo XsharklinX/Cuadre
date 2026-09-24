@@ -1005,6 +1005,23 @@ export const useFinance = create<FinanceState>()(
       restoreBackup: (data) => set(s => restoreFinanceDataWithSnapshot(s, data)),
     }),
     {
+      /*
+       * ⚠ ESTE NOMBRE NO SE CAMBIA. NUNCA.
+       *
+       * Es la llave del almacenamiento donde vive el LIBRO ENTERO del usuario:
+       * cuentas, movimientos, categorias, metas. Renombrarla no migra nada —
+       * simplemente deja de encontrar los datos, y cada usuario abre la app con
+       * todo en blanco y sin forma de recuperarlo.
+       *
+       * La app se llama Cuadre desde hace versiones y estas claves siguen
+       * diciendo "sharky" A PROPOSITO: el nombre de una llave es un detalle de
+       * almacenamiento, no de marca. Lo que el usuario ve ya dice Cuadre.
+       *
+       * Lo mismo vale para las otras 22 claves `sharky-*` de `store/` y
+       * `data/`, y para el identificador `com.sharky.miapp` de Android:
+       * cambiarlo publica una app DISTINTA en Play y abandona a todos los
+       * usuarios actuales.
+       */
       name:    'sharky-finance-v2',
       storage: createJSONStorage(() => localStorage),
       merge: (persisted, current) => ({ ...current, ...sanitizeFinanceData(persisted) }),

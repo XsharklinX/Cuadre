@@ -27,7 +27,15 @@ internal const val BACKUP_HOUR_KEY = "hour"
 internal const val BACKUP_LAST_SUCCESS_KEY = "last_success_at"
 internal const val BACKUP_LAST_ATTEMPT_KEY = "last_attempt_at"
 internal const val BACKUP_LAST_ERROR_KEY = "last_error"
-internal const val BACKUP_FILE_NAME = "sharky-backup-semanal.json"
+/*
+ * EL MISMO NOMBRE QUE USA EL LADO JS (`useWeeklyAutoBackup.ts`).
+ *
+ * Los dos escriben el respaldo semanal —este worker cuando la app esta
+ * cerrada, el JS cuando esta abierta— sobre el MISMO archivo. Si se separan,
+ * la carpeta acaba con dos respaldos distintos y el usuario restaura el que no
+ * era sin que nada se lo advierta. Cambiar uno obliga a cambiar el otro.
+ */
+internal const val BACKUP_FILE_NAME = "cuadre-backup-semanal.json"
 internal const val BACKUP_MIME = "application/json"
 
 /** Margen para no re-ejecutar dentro de la misma semana aunque el worker despierte varias veces. */

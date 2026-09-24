@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="public/icon.svg" width="88" alt="$harky" />
+<img src="public/icon.svg" width="88" alt="Cuadre" />
 
-# $harky
+# Cuadre
 
 **Finanzas personales para República Dominicana, sin depender de una hoja de Excel.**
 
@@ -11,7 +11,7 @@
 ![Stack](https://img.shields.io/badge/stack-React%20%2B%20Tauri%20%2B%20TypeScript-22c55e?style=flat-square)
 ![Estado](https://img.shields.io/badge/estado-en%20desarrollo%20activo-2563eb?style=flat-square)
 
-[Descargar](#instalación) · [Funcionalidades](#qué-puedes-hacer-con-harky) · [Capturas](#así-se-ve) · [Desarrollo](#empezar-a-desarrollar) · [Roadmap](ROADMAP.md)
+[Descargar](#instalación) · [Funcionalidades](#qué-puedes-hacer-con-cuadre) · [Capturas](#así-se-ve) · [Desarrollo](#empezar-a-desarrollar) · [Roadmap](ROADMAP.md)
 
 </div>
 
@@ -19,7 +19,7 @@
 
 ## Por qué existe
 
-Casi todas las apps de finanzas personales que llegan a República Dominicana están pensadas para otro país: no reconocen los bancos locales, muestran todo en dólares por defecto y nadie les enseña a leer un estado de cuenta de Banreservas o del Popular. $harky nació de la frustración de llevar las cuentas en una hoja de cálculo que se desactualizaba cada dos semanas.
+Casi todas las apps de finanzas personales que llegan a República Dominicana están pensadas para otro país: no reconocen los bancos locales, muestran todo en dólares por defecto y nadie les enseña a leer un estado de cuenta de Banreservas o del Popular. Cuadre nació de la frustración de llevar las cuentas en una hoja de cálculo que se desactualizaba cada dos semanas.
 
 Es una app mobile-first — pensada primero para tu teléfono, no para un dashboard de escritorio — que registra tus movimientos, entiende tus presupuestos, te avisa cuando algo se sale de lo normal y no necesita internet para funcionar. La sincronización en la nube existe, pero es opcional: tus datos viven en tu dispositivo primero.
 
@@ -42,7 +42,7 @@ Es una app mobile-first — pensada primero para tu teléfono, no para un dashbo
 </tr>
 </table>
 
-## Qué puedes hacer con $harky
+## Qué puedes hacer con Cuadre
 
 ### Registrar y entender tu dinero
 
@@ -66,7 +66,7 @@ Un catálogo de más de 40 servicios (Netflix, Spotify, gimnasios, seguros...) p
 
 ### Inteligencia financiera con acciones, no solo gráficas
 
-$harky detecta anomalías de gasto, tendencias por categoría y patrones que ni tú habías notado — como un cargo recurrente que nunca marcaste como suscripción. Cada hallazgo viene con un botón de acción directa: ajustar el presupuesto, convertir el gasto en recurrente, etc. No es un reporte bonito que archivas y olvidas.
+Cuadre detecta anomalías de gasto, tendencias por categoría y patrones que ni tú habías notado — como un cargo recurrente que nunca marcaste como suscripción. Cada hallazgo viene con un botón de acción directa: ajustar el presupuesto, convertir el gasto en recurrente, etc. No es un reporte bonito que archivas y olvidas.
 
 ### Simulador de deudas
 
@@ -103,28 +103,28 @@ PIN, patrón o huella/rostro para abrir la app, cifrados en el Keystore de Andro
 
 ## Plataformas
 
-$harky no es una sola app — es el mismo código corriendo en tres sitios:
+Cuadre no es una sola app — es el mismo código corriendo en tres sitios:
 
-| Plataforma | Cómo se instala | Motor |
-|---|---|---|
-| **Android** | APK / Play Store | Tauri 2 nativo |
+| Plataforma    | Cómo se instala                                   | Motor                  |
+| ------------- | ------------------------------------------------- | ---------------------- |
+| **Android**   | APK / Play Store                                  | Tauri 2 nativo         |
 | **Web (PWA)** | "Agregar a pantalla de inicio" desde el navegador | Vite + vite-plugin-pwa |
-| **Windows** | Instalador `.exe` o versión portable | Tauri 2 desktop |
+| **Windows**   | Instalador `.exe` o versión portable              | Tauri 2 desktop        |
 
 Las funciones que dependen del hardware del teléfono (OCR nativo, notificaciones bancarias, widget, biometría) solo están disponibles en Android — en la PWA y en Windows tienes el resto de la app completa.
 
 ## Stack técnico
 
-| Capa | Tecnología |
-|---|---|
-| Frontend | React 18 + TypeScript (strict) |
-| Bundler | Vite 6 |
-| Estado | Zustand 5 |
-| App nativa | Tauri 2 (Rust) — Android y Windows |
-| Gráficas | Recharts |
-| Exportación | jsPDF, ExcelJS, html2canvas |
-| OCR | ML Kit (Android) / Tesseract.js (web) |
-| Tests | Vitest (unitarios) + Playwright (E2E) |
+| Capa        | Tecnología                            |
+| ----------- | ------------------------------------- |
+| Frontend    | React 18 + TypeScript (strict)        |
+| Bundler     | Vite 6                                |
+| Estado      | Zustand 5                             |
+| App nativa  | Tauri 2 (Rust) — Android y Windows    |
+| Gráficas    | Recharts                              |
+| Exportación | jsPDF, ExcelJS, html2canvas           |
+| OCR         | ML Kit (Android) / Tesseract.js (web) |
+| Tests       | Vitest (unitarios) + Playwright (E2E) |
 
 ## Arquitectura
 
@@ -172,7 +172,7 @@ cargo check --manifest-path src-tauri/Cargo.toml
 
 ```bash
 npm run package:android -- -Debug -Target aarch64
-adb install -r release/android/$harky-android-debug-universal.apk
+adb install -r release/android/cuadre-android-debug-universal.apk
 ```
 
 Guía completa en [docs/ANDROID.md](docs/ANDROID.md).
@@ -183,7 +183,7 @@ Guía completa en [docs/ANDROID.md](docs/ANDROID.md).
 npm run package:windows
 ```
 
-Genera `release/windows/$harky-setup.exe` (instalador) y `$harky-portable.exe`. La carpeta `release/` no se versiona — los binarios se publican en [GitHub Releases](https://github.com/XsharklinX/Sharky-Coin/releases).
+Genera `release/windows/cuadre-setup.exe` (instalador) y `cuadre-portable.exe`. La carpeta `release/` no se versiona — los binarios se publican en [GitHub Releases](https://github.com/XsharklinX/Sharky-Coin/releases).
 
 ## Seguridad y privacidad
 

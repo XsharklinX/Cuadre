@@ -1,19 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="widget_add_expense">− Gasto</string>
-    <string name="widget_add_income">+ Ingreso</string>
-    <string name="widget_balance_label">Saldo total</string>
-    <string name="widget_budgets_description">Progreso de tus presupuestos de $harky</string>
-    <string name="widget_budgets_title">Presupuestos</string>
-    <string name="widget_converter_base">1 unidad en %1$s</string>
-    <string name="widget_converter_description">Tasas de cambio en vivo de $harky</string>
-    <string name="widget_converter_title">Conversor</string>
-    <string name="widget_converter_updated">Actualizado %1$s</string>
-    <string name="widget_delta_down">▼ %1$d%% este mes</string>
-    <string name="widget_delta_flat">Sin cambio este mes</string>
-    <string name="widget_delta_up">▲ %1$d%% este mes</string>
-    <string name="widget_description">Saldo total de $harky y accesos rápidos</string>
-    <string name="widget_empty_state">Abre $harky para sincronizar</string>
-    <string name="widget_net_worth">Patrimonio total</string>
     <string name="widget_quickadd_description">Acceso directo: agregar un gasto</string>
 </resources>

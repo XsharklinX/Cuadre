@@ -208,43 +208,14 @@
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
             android:theme="@style/Theme.MlkitScanner" />
 
-        <!-- Plugin home-widget: widget de pantalla de inicio con saldo,
-             presupuesto y proximo pago (ver sharky-home-widget-plugin).
+        <!-- Plugin home-widget: el acceso rapido "+" para anotar un gasto
+             desde la pantalla de inicio.
+             En 1.9.8 se retiraron los otros tres (saldo, presupuestos y
+             conversor): repetian pantallas que ya estaban a un toque dentro de
+             la app y nadie los usaba. Un widget que se usa vale mas que tres
+             que estorban.
              NOTA: este directorio se regenera con `tauri android init` — si eso
              ocurre, hay que volver a agregar este <receiver>. -->
-        <receiver
-            android:name="com.sharky.finanzas.homewidget.SharkyBalanceWidgetProvider"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/sharky_balance_widget_info" />
-        </receiver>
-
-        <receiver
-            android:name="com.sharky.finanzas.homewidget.SharkyBudgetWidgetProvider"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/sharky_budgets_widget_info" />
-        </receiver>
-
-        <receiver
-            android:name="com.sharky.finanzas.homewidget.SharkyConverterWidgetProvider"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/sharky_converter_widget_info" />
-        </receiver>
-
         <receiver
             android:name="com.sharky.finanzas.homewidget.SharkyQuickAddWidgetProvider"
             android:exported="true">

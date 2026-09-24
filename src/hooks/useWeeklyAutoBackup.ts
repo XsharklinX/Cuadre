@@ -44,7 +44,7 @@ export function useWeeklyAutoBackup() {
       try {
         const json = JSON.stringify(createBackup(useFinance.getState()))
         const blob = new Blob([json], { type: 'application/json' })
-        await saveToAppFolder(blob, 'sharky-backup-semanal.json', weeklyBackupFolder)
+        await saveToAppFolder(blob, 'cuadre-backup-semanal.json', weeklyBackupFolder)
         setLastWeeklyBackupAt(new Date().toISOString())
       } catch {
         // Se reintenta en el próximo arranque

@@ -79,38 +79,39 @@
      Cada uno cambia el TONO de la app entera, no solo su claridad: son
      ambientes distintos, no tres grises. */
 
-  /* OCEANO. Azul profundo con verde caribe. */
+  /* OCEANO — agua profunda del Caribe.
+     Fondo casi negro con base azul-verde y una superficie que sube de tono,
+     como mirar hacia arriba desde el fondo. El acento turquesa es el unico
+     color saturado, asi que manda sin competir. */
   .app[data-theme="ocean"] {
-    --bg: #04161f; --surface: #0b2430; --surface-2: #103040;
-    --text: #e2f4f8; --text-dim: #79a7b4;
-    --border: rgba(126,214,233,.10);
-    --track: rgba(126,214,233,.09); --track-strong: rgba(126,214,233,.18);
-    --bg-glow: radial-gradient(1200px 600px at 78% -8%, rgba(34,197,205,.16), transparent 62%);
+    --bg: #021018; --surface: #0a2836; --surface-2: #113c4f;
+    --text: #dff6fb; --text-dim: #6fa8b8;
+    --border: rgba(45,212,229,.14);
+    --track: rgba(45,212,229,.10); --track-strong: rgba(45,212,229,.22);
+    --bg-glow: radial-gradient(1100px 620px at 70% -12%, rgba(34,211,238,.26), transparent 64%),
+               radial-gradient(900px 520px at 12% 108%, rgba(16,120,140,.22), transparent 62%);
   }
-  /* ATARDECER. Ciruela y ambar: calido sin dejar de ser oscuro. */
+  /* ATARDECER — la ultima media hora de luz.
+     Ciruela profunda abajo, ambar arriba: el degradado imita el cielo, no un
+     fondo plano teñido. Es el tema mas calido sin dejar de ser oscuro. */
   .app[data-theme="sunset"] {
-    --bg: #1a0f1c; --surface: #271629; --surface-2: #341e36;
-    --text: #fbeaf2; --text-dim: #b08aa4;
-    --border: rgba(255,180,200,.11);
-    --track: rgba(255,180,200,.09); --track-strong: rgba(255,180,200,.18);
-    --bg-glow: radial-gradient(1200px 600px at 78% -8%, rgba(249,115,22,.17), transparent 62%);
+    --bg: #17091b; --surface: #2a1230; --surface-2: #3d1c40;
+    --text: #ffeaf3; --text-dim: #bd8aa6;
+    --border: rgba(255,154,158,.15);
+    --track: rgba(255,154,158,.11); --track-strong: rgba(255,154,158,.23);
+    --bg-glow: radial-gradient(1100px 600px at 78% -10%, rgba(251,146,60,.30), transparent 62%),
+               radial-gradient(900px 500px at 8% 105%, rgba(190,24,93,.24), transparent 60%);
   }
-  /* BOSQUE. Verde hondo, el mas reposado de los oscuros. */
+  /* BOSQUE — luz filtrada entre hojas.
+     El mas reposado: verde hondo, poco contraste de color y mucho de
+     luminosidad, para leer cifras largo rato sin cansarse. */
   .app[data-theme="forest"] {
-    --bg: #071612; --surface: #0e251e; --surface-2: #143228;
-    --text: #e4f5ec; --text-dim: #7ba894;
-    --border: rgba(134,239,172,.10);
-    --track: rgba(134,239,172,.08); --track-strong: rgba(134,239,172,.17);
-    --bg-glow: radial-gradient(1200px 600px at 78% -8%, rgba(34,197,94,.14), transparent 62%);
-  }
-  /* ARENA. Segundo tema CLARO, calido, de papel: quien no soporta el fondo
-     oscuro tenia una sola opcion y era un blanco que deslumbra. */
-  .app[data-theme="sand"] {
-    --bg: #f3ece1; --surface: #fffaf3; --surface-2: #e9dfd0;
-    --text: #2b2318; --text-dim: #6b5b46;
-    --border: rgba(43,35,24,.12);
-    --track: rgba(43,35,24,.08); --track-strong: rgba(43,35,24,.16);
-    --bg-glow: radial-gradient(1100px 560px at 82% -10%, rgba(180,130,60,.12), transparent 58%);
+    --bg: #03120c; --surface: #0b2419; --surface-2: #123625;
+    --text: #e2f7ea; --text-dim: #74a98d;
+    --border: rgba(74,222,128,.13);
+    --track: rgba(74,222,128,.10); --track-strong: rgba(74,222,128,.21);
+    --bg-glow: radial-gradient(1100px 600px at 72% -10%, rgba(34,197,94,.24), transparent 62%),
+               radial-gradient(800px 480px at 15% 106%, rgba(13,148,136,.18), transparent 60%);
   }
 
   .app[data-density="compact"] { --card-pad: 14px; --gap: 12px; --radius: 13px; }

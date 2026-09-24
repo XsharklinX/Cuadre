@@ -11,21 +11,19 @@ import type { CurrencyCode } from '@/types'
  * Ahora significa lo unico que puede significar: mostrar los montos sin
  * centavos.
  */
+/**
+ * El enmascarado del modo privado NO vive aqui: vive en `fmt`.
+ *
+ * Estuvo aqui y era un colador — catorce archivos llaman a `fmt()` sin pasar
+ * por este hook. Se suscribe igual a `privacyMode` para que las pantallas se
+ * repinten al encenderlo; el valor que devuelve lo decide `fmt`.
+ */
 export function useFmt() {
   const decimals = useMoneyDecimals()
-  const privacy = useSettings(s => s.privacyMode)
+  useSettings(s => s.privacyMode)
   return (n: number, currency: CurrencyCode | string) =>
-    privacy ? MASK : fmt(n, currency as CurrencyCode, { decimals })
+    fmt(n, currency as CurrencyCode, { decimals })
 }
-
-/**
- * Lo que se ve en modo privado.
- *
- * Ancho fijo y sin signo: con el monto real detras, un "−" delator o un texto
- * mas largo en unos sitios que en otros seguiria contando cuanto hay. Tapar a
- * medias no es tapar.
- */
-export const MASK = '••••'
 
 /**
  * Decimales que el usuario quiere ver: `0` si pidio ocultar los centavos,

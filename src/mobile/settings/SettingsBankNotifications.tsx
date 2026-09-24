@@ -14,6 +14,8 @@ import { isBatteryExempt } from '@/lib/localReminders'
 import { MobileBatteryGuide } from '../MobileBatteryGuide'
 import { SettingsRow, SettingsSheet, type SheetProps } from './shared'
 import { ACCT_ICONS, useBankSuggestionActions } from './bankSuggestionActions'
+import { REMINDER_KINDS, isReminderKindOn, type ReminderKind } from '@/data/reminderKinds'
+import type { IconName } from '@/types'
 
 const isAndroidTauri = isTauri() && /android/i.test(navigator.userAgent)
 
@@ -39,6 +41,16 @@ const VERDICT_LABEL_KEY: Record<DebugVerdict, string> = {
   'telecom': 'verdictTelecom',
   'not-financial': 'verdictNotFinancial',
   'no-tx-signal': 'verdictNoTxSignal',
+}
+
+/** Cada tipo de aviso con su cara: sin ellas, siete filas de texto identico. */
+const KIND_ICON: Record<ReminderKind, IconName> = {
+  budget: 'wallet', recurring: 'repeat', lowfunds: 'alert',
+  goal: 'target', weekly: 'chart', fx: 'coins', anomaly: 'trend',
+}
+const KIND_TINT: Record<ReminderKind, string> = {
+  budget: '#a78bfa', recurring: '#5bc0ff', lowfunds: '#ff6b8a',
+  goal: '#35d0a2', weekly: '#ffdd3d', fx: '#f59e0b', anomaly: '#ff9f0a',
 }
 
 export function SettingsBankNotifications({ activeSheet, onOpen, onClose, grouped }: SheetProps & { grouped?: boolean }) {
@@ -178,6 +190,42 @@ export function SettingsBankNotifications({ activeSheet, onOpen, onClose, groupe
           </label>
         </div>
       )}
+      {/*
+        QUE avisos quieres, uno por uno.
+
+        El interruptor de arriba era todo o nada: a quien le molestaba el
+        resumen semanal solo le quedaba apagarlo TODO, y con el se iban los
+        siete utiles — incluido el aviso de que se esta pasando del
+        presupuesto. Un interruptor unico para siete cosas distintas se acaba
+        apagando por la mas molesta.
+
+        Solo aparece con los recordatorios encendidos: elegir cuales quieres
+        entre unos que no van a llegar no significa nada.
+      */}
+      {isAndroidTauri && settings.remindersEnabled && (
+        <div className="mset-kinds">
+          <span className="mset-kinds-title">{t('reminderKindsTitle')}</span>
+          {REMINDER_KINDS.map(kind => (
+            <label key={kind} className="mset-kind-row">
+              <span className="mset-kind-ico" style={{ background: `${KIND_TINT[kind]}22`, color: KIND_TINT[kind] }}>
+                <Icon name={KIND_ICON[kind]} size={15} />
+              </span>
+              <span className="mset-kind-text">
+                <b>{t(`reminderKind_${kind}` as Parameters<typeof t>[0])}</b>
+                <small>{t(`reminderKindDesc_${kind}` as Parameters<typeof t>[0])}</small>
+              </span>
+              <input
+                type="checkbox"
+                className="mset-toggle-input"
+                checked={isReminderKindOn(settings.reminderKinds, kind)}
+                onChange={e => settings.setReminderKind(kind, e.target.checked)}
+              />
+              <span className="mset-toggle" />
+            </label>
+          ))}
+        </div>
+      )}
+
       {isAndroidTauri && (
         <div className="mset-row">
           <span className="mset-row-icon" style={{ background: '#5b9bff22', color: '#5b9bff' }}>

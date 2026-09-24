@@ -148,7 +148,15 @@ export async function syncHomeWidgetSnapshot(): Promise<void> {
   }
 }
 
-export type WidgetKind = 'balance' | 'budgets' | 'converter' | 'quickadd'
+/**
+ * Los widgets que existen.
+ *
+ * En 1.9.8 se retiraron Saldo, Presupuestos y Conversor: repetian pantallas
+ * que ya estaban a un toque dentro de la app y no daban nada que la app no
+ * diera mejor. Queda el acceso rapido "+", que si hace algo que solo se puede
+ * hacer desde la pantalla de inicio: anotar un gasto sin abrir nada.
+ */
+export type WidgetKind = 'quickadd'
 
 export interface WidgetDiagnostics {
   /** El dispositivo permite el diálogo nativo de "añadir widget". */
@@ -172,21 +180,13 @@ export async function getWidgetDiagnostics(): Promise<WidgetDiagnostics | null> 
     const { invoke } = await import('@tauri-apps/api/core')
     const raw = await invoke<{
       supported: boolean
-      balance: number
-      budgets: number
-      converter: number
       quickadd: number
       lastSyncedAt: number
       hasSnapshot: boolean
     }>('plugin:home-widget|get_diagnostics')
     return {
       supported: raw.supported,
-      installed: {
-        balance: raw.balance,
-        budgets: raw.budgets,
-        converter: raw.converter,
-        quickadd: raw.quickadd,
-      },
+      installed: { quickadd: raw.quickadd },
       lastSyncedAt: raw.lastSyncedAt > 0 ? new Date(raw.lastSyncedAt) : null,
       hasSnapshot: raw.hasSnapshot,
     }
@@ -212,12 +212,13 @@ export async function refreshHomeWidgets(): Promise<boolean> {
 }
 
 /**
- * Pide al sistema añadir un widget a la pantalla de inicio: 'balance' (saldo,
- * por defecto) o 'budgets' (presupuestos). Devuelve 'requested' si se mostró
- * el diálogo nativo, 'unsupported' si el dispositivo no lo permite, o
- * 'unavailable' fuera de Android+Tauri.
+ * Pide al sistema añadir el acceso rápido "+" a la pantalla de inicio.
+ *
+ * Devuelve 'requested' si se mostró el diálogo nativo, 'unsupported' si el
+ * dispositivo no lo permite (muchos launchers no lo soportan), o 'unavailable'
+ * fuera de Android+Tauri.
  */
-export async function requestPinHomeWidget(widget: WidgetKind = 'balance'): Promise<'requested' | 'unsupported' | 'unavailable'> {
+export async function requestPinHomeWidget(widget: WidgetKind = 'quickadd'): Promise<'requested' | 'unsupported' | 'unavailable'> {
   if (!isAndroidTauri()) return 'unavailable'
   try {
     const { invoke } = await import('@tauri-apps/api/core')
