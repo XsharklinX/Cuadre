@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { applyImportedBalances, assertAvailableBalance, canDeleteAccount, canDeleteCategory, recomputeAccountBalances, restoreFinanceDataWithSnapshot, sanitizeFinanceData } from './finance'
+import { applyImportedBalances, assertAvailableBalance, canDeleteAccount, canDeleteCategory, recomputeAccountBalances, recomputeGoalsSaved, restoreFinanceDataWithSnapshot, sanitizeFinanceData } from './finance'
 import { accountMovementsTotal } from '@/data/helpers'
 import { listRecoverySnapshots } from '@/data/recovery'
-import type { Account, GoalContribution, Transaction } from '@/types'
+import type { Account, Goal, GoalContribution, Transaction } from '@/types'
 import type { FinanceState } from './finance'
 
 const accounts: Account[] = [
@@ -137,6 +137,34 @@ describe('sanitizeFinanceData', () => {
     expect(data.categories.map(category => category.id)).toEqual(['food'])
     expect(data.transactions.map(transaction => transaction.id)).toEqual(['valid', 'broken'])
     expect(data.transactions.find(transaction => transaction.id === 'broken')?.categoryId).toBe('food')
+  })
+})
+
+describe('recomputeGoalsSaved', () => {
+  const goal = (over: Partial<Goal> = {}): Goal => ({
+    id: 'goal', name: 'Viaje', target: 1000, saved: 0, color: '#fff', icon: 'target', ...over,
+  } as Goal)
+  const aportes: GoalContribution[] = [
+    { id: 'c1', goalId: 'goal', fromAccountId: 'bank', amount: 200, date: '2026-01-01' },
+    { id: 'c2', goalId: 'otra', fromAccountId: 'bank', amount: 999, date: '2026-01-02' },
+  ]
+
+  it('reconcilia lo ahorrado contra apertura + aportes de ESA meta', () => {
+    const [r] = recomputeGoalsSaved([goal({ openingSaved: 50, saved: 7777 })], aportes)
+    expect(r.saved).toBe(250)
+  })
+
+  /* Sin apertura guardada se back-deriva, para no inventar un ahorro que el
+     usuario nunca tuvo al abrir la meta. */
+  it('back-deriva la apertura cuando falta', () => {
+    const [r] = recomputeGoalsSaved([goal({ saved: 300 })], aportes)
+    expect(r.openingSaved).toBe(100)
+    expect(r.saved).toBe(300)
+  })
+
+  it('es idempotente', () => {
+    const una = recomputeGoalsSaved([goal({ openingSaved: 50, saved: 7777 })], aportes)
+    expect(recomputeGoalsSaved(una, aportes)[0].saved).toBe(una[0].saved)
   })
 })
 

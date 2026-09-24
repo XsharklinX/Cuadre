@@ -584,6 +584,16 @@ export interface FinanceState {
   // Integridad: recalcula los saldos desde apertura + movimientos.
   // Devuelve cuántas cuentas estaban derivadas (se corrigieron).
   recomputeBalances: () => number
+  /**
+   * Recalcula UNA cuenta. Devuelve true si estaba descuadrada.
+   *
+   * «Recalcular» lo arreglaba todo a la vez, y eso obliga a aceptar el
+   * arreglo de cuentas que quizá no querías tocar. Con varias descuadradas,
+   * todo-o-nada es una mala oferta.
+   */
+  recomputeAccount: (id: string) => boolean
+  /** Igual, para UNA meta: su ahorro contra `apertura + aportes`. */
+  recomputeGoal: (id: string) => boolean
 
   // Redondea al entero más cercano todos los montos (quita centavos). Crea un
   // punto de recuperación antes, porque es destructivo. Devuelve cuántos
@@ -967,6 +977,32 @@ export const useFinance = create<FinanceState>()(
       }),
 
       // ── Integridad de saldos ───────────────────────────
+      recomputeAccount: (id) => {
+        const { accounts, transactions, goalContributions } = get()
+        const before = accounts.find(a => a.id === id)
+        if (!before) return false
+        const recomputed = recomputeAccountBalances(accounts, transactions, goalContributions)
+        const after = recomputed.find(a => a.id === id)
+        if (!after) return false
+        const moved = Math.abs(after.balance - before.balance) > 0.005
+          || Math.abs((after.secondaryBalance ?? 0) - (before.secondaryBalance ?? 0)) > 0.005
+        // Solo se reemplaza ESA cuenta: las demas se quedan como estaban,
+        // descuadradas o no.
+        set({ accounts: accounts.map(a => a.id === id ? after : a) })
+        return moved
+      },
+
+      recomputeGoal: (id) => {
+        const { goals, goalContributions } = get()
+        const before = goals.find(g => g.id === id)
+        if (!before) return false
+        const after = recomputeGoalsSaved(goals, goalContributions).find(g => g.id === id)
+        if (!after) return false
+        const moved = Math.abs(after.saved - before.saved) > 0.005
+        set({ goals: goals.map(g => g.id === id ? after : g) })
+        return moved
+      },
+
       recomputeBalances: () => {
         const { accounts, transactions, goals, goalContributions } = get()
         const recomputedAccounts = recomputeAccountBalances(accounts, transactions, goalContributions)

@@ -78,6 +78,13 @@ interface SettingsState {
    */
   cardsView: 'carousel' | 'list'
   /**
+   * Descuadres de Salud de datos que el usuario ya revisó y da por buenos.
+   *
+   * Guarda la huella del descuadre CONCRETO (cuenta + importe), no la cuenta:
+   * si la diferencia cambia, vuelve a avisar. Ver `data/healthDismissals.ts`.
+   */
+  dismissedDrifts: string[]
+  /**
    * Pagos recurrentes (ids de plantilla) que no deben volver a avisar NUNCA.
    * Va aparte de `dismissedAlerts` porque aquel descarta por ocurrencia
    * (`recurring:{id}:{fecha}`) y el aviso reaparecía al mes siguiente con id
@@ -159,6 +166,11 @@ interface SettingsState {
   togglePrivacyMode: () => void
   setLawTaxEnabled: (v: boolean) => void
   setCardsView: (v: 'carousel' | 'list') => void
+  dismissDrift: (key: string) => void
+  /** Devuelve todos a la vista. */
+  restoreDrifts: () => void
+  /** Suelta las huellas que ya no corresponden a ningún descuadre vivo. */
+  pruneDrifts: (liveKeys: string[]) => void
   silenceRecurring: (transactionId: string) => void
   unsilenceRecurring: (transactionId: string) => void
   markAlertNotified: (id: string) => void
@@ -218,6 +230,7 @@ export const useSettings = create<SettingsState>()(
       privacyMode: false,
       lawTaxEnabled: true,
       cardsView: 'carousel',
+      dismissedDrifts: [],
       silencedRecurring: [],
       notifiedAlerts: [],
       hasSeenOnboarding: false,
@@ -294,6 +307,14 @@ export const useSettings = create<SettingsState>()(
       setUpdateSnooze: (updateSnooze) => set({ updateSnooze }),
       setLawTaxEnabled: (lawTaxEnabled) => set({ lawTaxEnabled }),
       setCardsView: (cardsView) => set({ cardsView }),
+      dismissDrift: (key) => set(state => state.dismissedDrifts.includes(key)
+        ? state
+        : { dismissedDrifts: [...state.dismissedDrifts, key] }),
+      restoreDrifts: () => set({ dismissedDrifts: [] }),
+      pruneDrifts: (liveKeys) => set(state => {
+        const next = state.dismissedDrifts.filter(k => liveKeys.includes(k))
+        return next.length === state.dismissedDrifts.length ? state : { dismissedDrifts: next }
+      }),
       togglePrivacyMode: () => set(state => {
         const privacyMode = !state.privacyMode
         // `fmt` no puede leer el store (lo llaman sitios sin React), asi que

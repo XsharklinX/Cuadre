@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Icon } from '@/components/ui/Icon'
 import { APP_VERSION, RELEASE_NOTES, countByKind, parseReleaseItems, type ReleaseItemKind } from '@/data/release'
 import { dateLocale } from '@/data/helpers'
@@ -93,6 +93,17 @@ export function MobileWhatsNew({
     [],
   )
 
+  /*
+   * SOLO LA VERSION NUEVA, Y EL RESTO PLEGADO.
+   *
+   * Esto pintaba las CATORCE versiones de golpe en una hoja al 100% de ancho:
+   * ocupaba la pantalla entera y habia que desplazarse por un historial que
+   * nadie pidio. Quien abre "Novedades" tras actualizar viene a ver QUE trae
+   * lo que acaba de instalar.
+   */
+  const [showAll, setShowAll] = useState(false)
+  const shown = showAll ? notes : notes.slice(0, 1)
+
   const formatDate = (date: string) =>
     new Date(`${date}T00:00:00`).toLocaleDateString(dateLocale(lang), {
       year: 'numeric', month: 'long', day: 'numeric',
@@ -110,7 +121,7 @@ export function MobileWhatsNew({
           {highlightLatest && <p className="mnews-intro">{t('whatsNewIntro')}</p>}
 
           <ol className="mnews-list">
-            {notes.map((note, i) => {
+            {shown.map((note, i) => {
               const isCurrent = note.version === APP_VERSION
               return (
                 <li key={note.version} className={`mnews-entry${isCurrent && highlightLatest ? ' current' : ''}`}>
@@ -179,6 +190,12 @@ export function MobileWhatsNew({
               )
             })}
           </ol>
+
+          {!showAll && notes.length > 1 && (
+            <button className="mnews-more" onClick={() => setShowAll(true)}>
+              {t('whatsNewOlder').replace('{n}', String(notes.length - 1))}
+            </button>
+          )}
 
           <button className="mnews-done" onClick={close}>{t('gotItLabel')}</button>
         </section>

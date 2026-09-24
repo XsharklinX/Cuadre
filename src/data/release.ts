@@ -94,6 +94,17 @@ export function countByKind(items: ReleaseItem[]): Record<ReleaseItemKind, numbe
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '1.9.9',
+    date: '2026-09-24',
+    title: 'Detalles que molestaban',
+    items: [
+      'nuevo: En Salud de datos puedes marcar un descuadre como revisado. Si la diferencia cambia, vuelve a avisarte.',
+      'nuevo: Puedes recalcular una sola cuenta o una sola meta, sin tocar las demas.',
+      'arreglo: Cuando una meta de ahorro no cuadraba, Salud de datos avisaba pero no decia cual era. Ahora la nombra.',
+      'mejor: Esta pantalla de novedades. Ahora se ve la version nueva y las anteriores quedan a un toque.',
+    ],
+  },
+  {
     version: '1.9.8',
     date: '2026-09-24',
     title: 'Tus cuentas, como se ven de verdad',

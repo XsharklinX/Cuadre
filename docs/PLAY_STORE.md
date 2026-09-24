@@ -30,11 +30,11 @@ Long version (changelog style):
 
 ## 3. Privacy policy / Terms of use URLs
 
-Once GitHub Pages is enabled for this repo (`XsharklinX/Sharky-Coin`,
+Once GitHub Pages is enabled for this repo (`XsharklinX/Cuadre`,
 serving from `/docs`), the public URLs are:
 
-- Privacy Policy: `https://xsharklinx.github.io/Sharky-Coin/privacy.html`
-- Terms of Use: `https://xsharklinx.github.io/Sharky-Coin/terms.html`
+- Privacy Policy: `https://xsharklinx.github.io/Cuadre/privacy.html`
+- Terms of Use: `https://xsharklinx.github.io/Cuadre/terms.html`
 
 Use the Privacy Policy URL in **Play Console → App content → Privacy policy**.
 
@@ -88,7 +88,7 @@ isn't the newer one yet.
 
 ## 7. Outstanding before submission
 
-- [ ] Enable GitHub Pages for `XsharklinX/Sharky-Coin` (`/docs` folder) and
+- [ ] Enable GitHub Pages for `XsharklinX/Cuadre` (`/docs` folder) and
       verify `privacy.html` / `terms.html` load publicly.
 - [ ] Content rating questionnaire (Play Console → App content).
 - [ ] Store listing assets: icon, feature graphic, phone screenshots

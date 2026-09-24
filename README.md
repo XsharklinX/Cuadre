@@ -183,7 +183,7 @@ Guía completa en [docs/ANDROID.md](docs/ANDROID.md).
 npm run package:windows
 ```
 
-Genera `release/windows/cuadre-setup.exe` (instalador) y `cuadre-portable.exe`. La carpeta `release/` no se versiona — los binarios se publican en [GitHub Releases](https://github.com/XsharklinX/Sharky-Coin/releases).
+Genera `release/windows/cuadre-setup.exe` (instalador) y `cuadre-portable.exe`. La carpeta `release/` no se versiona — los binarios se publican en [GitHub Releases](https://github.com/XsharklinX/Cuadre/releases).
 
 ## Seguridad y privacidad
 

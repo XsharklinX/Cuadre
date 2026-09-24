@@ -14,7 +14,8 @@ import { useDialogA11y } from './useDialogA11y'
 import { useMobileBackDismiss } from './useMobileBackDismiss'
 import { getScheduledBackupStatus, pickBackupFolder, runBackupNow, type ScheduledBackupStatus } from '@/lib/scheduledBackup'
 import { SheetPortal } from './SheetPortal'
-import type { Account } from '@/types'
+import type { Account, Goal } from '@/types'
+import { driftKey, pendingDrifts } from '@/data/healthDismissals'
 
 /**
  * SALUD DE DATOS — la pantalla que responde "¿cuadra lo que dice la app con lo
@@ -34,6 +35,20 @@ interface Drift {
   primary: number
   /** Diferencia del segundo libro de una tarjeta. */
   secondary: number
+}
+
+/**
+ * Una meta cuyo ahorro guardado no coincide con `apertura + aportes`.
+ *
+ * Ya se contaba (`driftedGoals` ponia el veredicto en ambar), pero no se
+ * nombraba en ningun sitio: el usuario veia "algo no cuadra" y una lista de
+ * cuentas donde no estaba el problema. Un aviso que no dice de que habla es
+ * el que enseña a ignorar la pantalla.
+ */
+interface GoalDrift {
+  goal: Goal
+  /** Diferencia del ahorro (esperado − guardado). */
+  diff: number
 }
 
 export function MobileDataHealth({ onClose }: { onClose: () => void }) {
@@ -62,7 +77,7 @@ export function MobileDataHealth({ onClose }: { onClose: () => void }) {
    * descuadradas" sin decir cuáles ni por cuánto no deja hacer nada: el
    * usuario necesita saber dónde mirar en su estado de cuenta.
    */
-  const drifts = useMemo<Drift[]>(() => {
+  const allDrifts = useMemo<Drift[]>(() => {
     return state.accounts.flatMap(account => {
       if (account.openingBalance === undefined) return []
       const expected = account.openingBalance
@@ -81,7 +96,63 @@ export function MobileDataHealth({ onClose }: { onClose: () => void }) {
     })
   }, [state])
 
-  const healthy = drifts.length === 0 && health.driftedGoals === 0
+  /*
+   * Las metas descuadradas, con su nombre y su diferencia: un aviso que no
+   * dice de que meta habla no se puede atender.
+   */
+  const allGoalDrifts = useMemo<GoalDrift[]>(() => {
+    return state.goals.flatMap(goal => {
+      if (goal.openingSaved === undefined) return []
+      const contributed = state.goalContributions
+        .filter(c => c.goalId === goal.id)
+        .reduce((sum, c) => sum + c.amount, 0)
+      const diff = (goal.openingSaved + contributed) - goal.saved
+      return Math.abs(diff) > 0.005 ? [{ goal, diff }] : []
+    })
+  }, [state])
+
+  /*
+   * Lo omitido se descuenta AQUI, no en el calculo: la lista completa sigue
+   * existiendo para poder limpiar las huellas viejas y para poder devolverlo
+   * todo a la vista.
+   */
+  const dismissedDrifts = useSettings(st => st.dismissedDrifts)
+  const dismissDrift = useSettings(st => st.dismissDrift)
+  const restoreDrifts = useSettings(st => st.restoreDrifts)
+  const pruneDrifts = useSettings(st => st.pruneDrifts)
+  const recomputeAccount = useFinance(st => st.recomputeAccount)
+  const recomputeGoal = useFinance(st => st.recomputeGoal)
+
+  const fingerprint = (d: Drift) => ({ accountId: d.account.id, primary: d.primary, secondary: d.secondary })
+  const drifts = useMemo(
+    () => pendingDrifts(dismissedDrifts, allDrifts.map(d => ({ ...d, ...fingerprint(d) }))),
+    [dismissedDrifts, allDrifts],
+  )
+  /* Las metas comparten la lista de omitidos; el prefijo evita que la huella
+     de una meta choque con la de una cuenta del mismo id. */
+  const goalFingerprint = (d: GoalDrift) => ({ accountId: `goal:${d.goal.id}`, primary: d.diff, secondary: 0 })
+  const goalDrifts = useMemo(
+    () => pendingDrifts(dismissedDrifts, allGoalDrifts.map(d => ({ ...d, ...goalFingerprint(d) }))),
+    [dismissedDrifts, allGoalDrifts],
+  )
+  const dismissedCount = (allDrifts.length - drifts.length) + (allGoalDrifts.length - goalDrifts.length)
+
+  /*
+   * Al abrir se sueltan las huellas que ya no corresponden a ningun descuadre
+   * vivo. Sin esto la lista crece sin fin, y una huella antigua podria volver
+   * a coincidir por casualidad con un descuadre futuro del mismo importe —
+   * justo el que no queremos silenciar.
+   */
+  useEffect(() => {
+    pruneDrifts([
+      ...allDrifts.map(d => driftKey(fingerprint(d))),
+      ...allGoalDrifts.map(d => driftKey(goalFingerprint(d))),
+    ])
+    // Solo al abrir y cuando cambian los descuadres reales.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allDrifts, allGoalDrifts])
+
+  const healthy = drifts.length === 0 && goalDrifts.length === 0
 
   const runRecompute = async () => {
     const ok = await confirm({
@@ -124,30 +195,113 @@ export function MobileDataHealth({ onClose }: { onClose: () => void }) {
 
           {/* Que NO cuadra y POR CUANTO: sin el monto, el usuario no sabe que
               buscar en su estado de cuenta. */}
-          {drifts.length > 0 && (
+          {(drifts.length > 0 || goalDrifts.length > 0) && (
             <div className="mhealth-drifts">
               {drifts.map(({ account, primary, secondary }) => (
                 <div key={account.id} className="mhealth-drift">
-                  <span className="mhealth-drift-dot" style={{ background: account.color }} />
-                  <div className="mhealth-drift-info">
-                    <strong>{account.name}</strong>
-                    <small>{t('expectedVsStored')}</small>
+                  <div className="mhealth-drift-top">
+                    <span className="mhealth-drift-dot" style={{ background: account.color }} />
+                    <div className="mhealth-drift-info">
+                      <strong>{account.name}</strong>
+                      <small>{t('expectedVsStored')}</small>
+                    </div>
+                    <div className="mhealth-drift-amounts">
+                      {Math.abs(primary) > 0.005 && (
+                        <span className={primary > 0 ? 'up' : 'down'}>
+                          {primary > 0 ? '+' : '−'}{fmtVal(Math.abs(primary), accountCurrency(account, state.currency))}
+                        </span>
+                      )}
+                      {Math.abs(secondary) > 0.005 && account.secondaryCurrency && (
+                        <span className={secondary > 0 ? 'up' : 'down'}>
+                          {secondary > 0 ? '+' : '−'}{fmtVal(Math.abs(secondary), account.secondaryCurrency)}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div className="mhealth-drift-amounts">
-                    {Math.abs(primary) > 0.005 && (
-                      <span className={primary > 0 ? 'up' : 'down'}>
-                        {primary > 0 ? '+' : '−'}{fmtVal(Math.abs(primary), accountCurrency(account, state.currency))}
+
+                  {/*
+                    DOS SALIDAS, no una.
+
+                    Antes lo unico posible era «Recalcular», que arregla TODAS
+                    las cuentas a la vez. Con varias descuadradas eso es una
+                    mala oferta, y para un descuadre que el usuario ya reviso
+                    y da por bueno no habia salida ninguna: el aviso se
+                    quedaba encendido para siempre, y un aviso que no se puede
+                    atender enseña a ignorar la pantalla entera.
+                  */}
+                  <div className="mhealth-drift-actions">
+                    <button onClick={() => {
+                      const moved = recomputeAccount(account.id)
+                      toast(
+                        moved
+                          ? t('accountRecalculated').replace('{name}', account.name)
+                          : t('balancesOk'),
+                        { icon: 'check', type: 'ok' },
+                      )
+                    }}>
+                      <Icon name="refresh" size={13} /> {t('fixThisOneLabel')}
+                    </button>
+                    <button className="ghost" onClick={() => {
+                      dismissDrift(driftKey({ accountId: account.id, primary, secondary }))
+                      toast(t('driftDismissedToast'), { icon: 'check', type: 'ok' })
+                    }}>
+                      {t('driftDismissLabel')}
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              {/* Las metas, en la misma lista y con la misma salida: para el
+                  usuario es el mismo problema — un numero que no cuadra. */}
+              {goalDrifts.map(({ goal, diff }) => (
+                <div key={goal.id} className="mhealth-drift">
+                  <div className="mhealth-drift-top">
+                    <span className="mhealth-drift-dot" style={{ background: goal.color }} />
+                    <div className="mhealth-drift-info">
+                      <strong>{goal.name}</strong>
+                      <small>{t('goalSavedDrift')}</small>
+                    </div>
+                    <div className="mhealth-drift-amounts">
+                      <span className={diff > 0 ? 'up' : 'down'}>
+                        {diff > 0 ? '+' : '−'}{fmtVal(Math.abs(diff), state.currency)}
                       </span>
-                    )}
-                    {Math.abs(secondary) > 0.005 && account.secondaryCurrency && (
-                      <span className={secondary > 0 ? 'up' : 'down'}>
-                        {secondary > 0 ? '+' : '−'}{fmtVal(Math.abs(secondary), account.secondaryCurrency)}
-                      </span>
-                    )}
+                    </div>
+                  </div>
+
+                  <div className="mhealth-drift-actions">
+                    <button onClick={() => {
+                      const moved = recomputeGoal(goal.id)
+                      toast(
+                        moved
+                          ? t('goalRecalculated').replace('{name}', goal.name)
+                          : t('balancesOk'),
+                        { icon: 'check', type: 'ok' },
+                      )
+                    }}>
+                      <Icon name="refresh" size={13} /> {t('fixThisOneLabel')}
+                    </button>
+                    <button className="ghost" onClick={() => {
+                      dismissDrift(driftKey({ accountId: `goal:${goal.id}`, primary: diff, secondary: 0 }))
+                      toast(t('driftDismissedToast'), { icon: 'check', type: 'ok' })
+                    }}>
+                      {t('driftDismissLabel')}
+                    </button>
                   </div>
                 </div>
               ))}
             </div>
+          )}
+
+          {/* Lo omitido no desaparece: se dice cuanto hay y se puede deshacer.
+              Esconder algo sin dejar rastro es como se pierde dinero. */}
+          {dismissedCount > 0 && (
+            <button className="mhealth-restore" onClick={() => {
+              restoreDrifts()
+              toast(t('driftsRestoredToast'), { icon: 'refresh' })
+            }}>
+              {t('driftsDismissedCount').replace('{n}', String(dismissedCount))}
+              <span>{t('showAgainLabel')}</span>
+            </button>
           )}
 
           {/* BACKUP. Es la parte de "salud de datos" que de verdad decide si se
