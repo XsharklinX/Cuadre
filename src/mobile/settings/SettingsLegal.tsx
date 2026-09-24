@@ -348,7 +348,11 @@ export function SettingsLegal({ activeSheet, onOpen, onClose }: SheetProps) {
     setSending(true)
     try {
       const result = await submitFeedback(commentText)
-      toast(result === 'sent' ? t('thanksForComment') : t('commentQueued'), { icon: 'check', type: 'ok' })
+      if (result === 'failed') { toast(t('couldNotOpenMail'), { icon: 'alert' }); return }
+      // No se dice "gracias por tu comentario": todavia no lo ha enviado, lo
+      // tiene delante en su app de correo. Prometer un envio que aun no ocurrio
+      // es como acaba la gente creyendo que escribio y nadie le contesto.
+      toast(t('commentOpenedInMail'), { icon: 'check', type: 'ok' })
       setCommentText('')
       onClose()
     } finally {

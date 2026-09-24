@@ -23,6 +23,31 @@
   .mhome-balance-row strong { font-size: 13px; font-weight: 850; font-variant-numeric: tabular-nums; }
   .mhome-balance-row strong.expense { color: var(--m-expense); }
   .mhome-balance-row strong.muted-amt { color: var(--m-muted); }
+
+  /* Una tarjeta de credito ocupa varias lineas: su deuda en pesos, su deuda en
+     divisa extranjera (si la tiene) y lo que le queda disponible. Se agrupan en
+     un bloque para que se lean como UNA tarjeta y no como tres cuentas. */
+  .mhome-balance-card {
+    background: color-mix(in oklab, var(--m-text) 3.5%, transparent);
+    border-radius: 12px;
+    margin: 4px 0;
+    padding: 4px 10px 6px;
+  }
+  .mhome-balance-row.sub { min-height: 24px; padding-left: 17px; }
+  .mhome-balance-row.sub .mhome-balance-acct-name { font-size: 11.5px; letter-spacing: .04em; }
+  .mhome-balance-row.sub strong { font-size: 12px; }
+  /* El DISPONIBLE es la cifra con la que se decide si se puede comprar algo,
+     asi que se separa de las deudas con una linea y se pinta en verde. */
+  .mhome-balance-avail {
+    align-items: baseline;
+    border-top: 1px dashed color-mix(in oklab, var(--m-text) 12%, transparent);
+    display: flex;
+    justify-content: space-between;
+    margin-top: 4px;
+    padding-top: 5px;
+  }
+  .mhome-balance-avail span { color: var(--m-muted); font-size: 11px; font-weight: 700; }
+  .mhome-balance-avail b { color: var(--m-income); font-size: 13px; font-variant-numeric: tabular-nums; font-weight: 850; }
   /* Encabezado de la sección de tarjetas de crédito dentro del desglose: deja
      claro que su deuda va aparte y NO cuenta en el balance total. */
   .mhome-balance-credit-head {

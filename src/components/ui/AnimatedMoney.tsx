@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useFinance } from '@/store/finance'
-import { fmt, fmtCompact } from '@/data/helpers'
+import { fmt } from '@/data/helpers'
 import type { CurrencyCode } from '@/types'
 
 interface Props {
@@ -35,7 +35,9 @@ export function AnimatedMoney({ value, compact, decimals, style, className, curr
     return () => { cancelAnimationFrame(raf); from.current = value }
   }, [value])
 
-  const text = compact ? fmtCompact(disp, currency) : fmt(disp, currency, { decimals })
+  // `compact` = el usuario pidio ocultar los centavos. Antes llamaba a
+  // `fmtCompact`, que es un alias de `fmt` y por tanto SEGUIA mostrandolos.
+  const text = fmt(disp, currency, { decimals: compact ? 0 : decimals })
   return (
     <span style={{ fontVariantNumeric: 'tabular-nums', ...style }} className={className}>
       {text}

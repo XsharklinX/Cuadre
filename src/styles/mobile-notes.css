@@ -48,13 +48,21 @@
   .mnote-filters button.on { background: var(--m-primary); border-color: transparent; color: var(--m-primary-text); }
   .mnote-noresults { color: var(--m-muted); font-size: 13px; padding: 30px 0; text-align: center; }
 
+  /* LA TARJETA DE UNA LISTA.
+     Era una caja gris con una rayita de color de 4px: todas iguales, y el
+     color —lo unico que distingue una lista de otra de un vistazo— casi no se
+     veia. Ahora el color de la lista TINE la tarjeta entera, en suave, y la
+     franja se ensancha. Se sigue leyendo igual de bien, pero la pantalla deja
+     de ser una lista de cajas grises. */
   .mnote-card {
-    background: var(--m-surface);
-    border: 1px solid var(--m-border);
+    background:
+      linear-gradient(135deg, color-mix(in oklab, var(--note, transparent) 13%, transparent), transparent 62%),
+      var(--m-surface);
+    border: 1px solid color-mix(in oklab, var(--note, var(--m-border)) 26%, var(--m-border));
     border-radius: 18px;
     color: var(--m-text);
     overflow: hidden;
-    padding: 14px 14px 14px 17px;
+    padding: 14px 14px 14px 20px;
     position: relative;
     text-align: left;
     width: 100%;
@@ -62,12 +70,34 @@
   }
   .mnote-card:active { transform: scale(.99); background: color-mix(in oklab, var(--m-text) 4%, var(--m-surface)); }
   /* Franja de color a la izquierda — distingue la lista de un vistazo. */
-  .mnote-card-strip { bottom: 0; left: 0; position: absolute; top: 0; width: 4px; }
-  .mnote-card.pinned { border-color: color-mix(in oklab, var(--m-primary) 40%, var(--m-border)); }
+  .mnote-card-strip { border-radius: 0 3px 3px 0; bottom: 0; left: 0; position: absolute; top: 0; width: 6px; }
+  .mnote-card.pinned {
+    border-color: color-mix(in oklab, var(--m-primary) 45%, var(--m-border));
+    box-shadow: 0 0 0 1px color-mix(in oklab, var(--m-primary) 22%, transparent);
+  }
+  /* LISTA TERMINADA. Sin esto, una lista al 100% se ve igual que una a medias
+     y hay que leer el contador para saberlo: la satisfaccion de terminar algo
+     se la estaba quedando la app. */
+  .mnote-card.done { border-color: color-mix(in oklab, var(--m-income) 42%, var(--m-border)); }
+  .mnote-card.done .mnote-card-body b { opacity: .72; text-decoration: line-through; text-decoration-color: color-mix(in oklab, var(--m-income) 70%, transparent); }
+  .mnote-card.done::after {
+    background: color-mix(in oklab, var(--m-income) 16%, transparent);
+    border-radius: 999px;
+    color: var(--m-income);
+    content: '✓';
+    font-size: 11px;
+    font-weight: 900;
+    padding: 2px 8px;
+    position: absolute;
+    right: 12px;
+    top: 12px;
+  }
   .mnote-pin-star { color: var(--m-primary); flex: none; }
   .mnote-card-body b { align-items: center; display: flex; gap: 5px; }
   /* Anillo de progreso (checklists sin precios) */
   .mnote-card-ring { flex: none; height: 38px; position: relative; width: 38px; }
+  /* El chip del icono pasa de adorno a ancla visual de la tarjeta. */
+  .mnote-card .mnote-chip { border-radius: 13px; height: 42px; width: 42px; }
   .mnote-card-ring em { color: var(--m-text); font-size: 11px; font-style: normal; font-variant-numeric: tabular-nums; font-weight: 850; left: 50%; position: absolute; top: 50%; transform: translate(-50%, -50%); }
   .mnote-card-top { align-items: center; display: flex; gap: 12px; }
   .mnote-card-body { flex: 1; min-width: 0; }
@@ -243,6 +273,40 @@
   .mnote-totrow b { font-variant-numeric: tabular-nums; font-weight: 800; }
   .mnote-totrow.big span { color: var(--m-text); font-size: 13.5px; font-weight: 700; }
   .mnote-totrow.big b { font-size: 19px; }
+
+  /* TOPE DE GASTO. El color hace el trabajo: verde alcanza, ambar justo, rojo
+     te pasaste. Es la respuesta a "me alcanza", y una respuesta se lee de un
+     vistazo o no sirve — quien esta en el pasillo del super no va a comparar
+     dos cifras mentalmente. */
+  .mnote-budget {
+    align-items: center;
+    background: var(--m-surface);
+    border: 1px solid var(--m-border);
+    border-radius: 14px;
+    color: var(--m-text);
+    display: flex;
+    font-size: 12.5px;
+    gap: 8px;
+    margin-top: 10px;
+    padding: 12px 14px;
+    width: 100%;
+  }
+  .mnote-budget span { color: var(--m-muted); font-weight: 650; }
+  .mnote-budget b { font-variant-numeric: tabular-nums; font-weight: 800; }
+  .mnote-budget em {
+    font-size: 11.5px;
+    font-style: normal;
+    font-weight: 750;
+    margin-left: auto;
+    text-align: right;
+  }
+  .mnote-budget.ok    { border-color: color-mix(in oklab, #35d0a2 38%, var(--m-border)); }
+  .mnote-budget.ok    em { color: #35d0a2; }
+  .mnote-budget.close { border-color: color-mix(in oklab, #f59e0b 45%, var(--m-border)); background: color-mix(in oklab, #f59e0b 7%, var(--m-surface)); }
+  .mnote-budget.close em { color: #f59e0b; }
+  .mnote-budget.over  { border-color: color-mix(in oklab, var(--m-expense) 50%, var(--m-border)); background: color-mix(in oklab, var(--m-expense) 9%, var(--m-surface)); }
+  .mnote-budget.over  em { color: var(--m-expense); }
+  .mnote-budget.over  b { color: var(--m-expense); }
 
   .mnote-warn {
     align-items: center; background: color-mix(in oklab, #f59e0b 14%, transparent); border: 1px solid color-mix(in oklab, #f59e0b 30%, transparent);

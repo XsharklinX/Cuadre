@@ -1,0 +1,4 @@
+"$schema" = "schemas/schema.json"
+[default]
+description = "Permite preguntarle a Google Play si hay una actualizacion, descargarla e instalarla sin salir de la app."
+permissions = ["allow-check", "allow-start", "allow-install"]

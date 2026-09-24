@@ -423,17 +423,28 @@ export function MobileTransactionList({
           </div>
           {/* Chips de acción FUERA de la fila scrolleable: quedan fijos a la
               derecha y siempre visibles (antes se salían de vista al hacer scroll). */}
+          {/* SOLO EL ICONO. Con la palabra, estos dos chips se comian ~140px y
+              los filtros de al lado quedaban cortados a mitad: la fila mostraba
+              "Todos · Gastos · Ingresos · Tr" y parecia rota. El icono del
+              embudo se entiende solo, y el contador sigue diciendo cuantos
+              filtros hay puestos. */}
           {showSearchChip && (
-            <button className={`mobile-search-chip${activeFilters > 0 ? ' has-filters' : ''}`} onClick={() => { setFilterOnly(false); setSearchOpen(true) }}>
+            <button
+              className={`mobile-search-chip icon-only${activeFilters > 0 ? ' has-filters' : ''}`}
+              aria-label={t('search')}
+              onClick={() => { setFilterOnly(false); setSearchOpen(true) }}
+            >
               <Icon name="search" size={16} />
-              {t('search')}
               {activeFilters > 0 && <span className="mobile-filter-badge">{activeFilters}</span>}
             </button>
           )}
           {showFilterChip && (
-            <button className={`mobile-search-chip${activeFilters > 0 ? ' has-filters' : ''}`} onClick={() => { setFilterOnly(true); setSearchOpen(true) }}>
-              <Icon name="sliders" size={15} />
-              {t('filterLabel')}
+            <button
+              className={`mobile-search-chip icon-only${activeFilters > 0 ? ' has-filters' : ''}`}
+              aria-label={t('filterLabel')}
+              onClick={() => { setFilterOnly(true); setSearchOpen(true) }}
+            >
+              <Icon name="sliders" size={16} />
               {activeFilters > 0 && <span className="mobile-filter-badge">{activeFilters}</span>}
             </button>
           )}
@@ -560,6 +571,15 @@ export function MobileTransactionList({
             <h2>{selected.type === 'transfer' ? t('transfer') : selected.note}</h2>
             <strong className={selected.type === 'income' ? 'income' : ''}>{signedAmount(selected, currency, compactNumbers)}</strong>
 
+            {/* LA DESCRIPCIÓN, arriba y con su propio espacio.
+                No es una fila más de la tabla: es texto que alguien se tomó la
+                molestia de escribir, y a los tres meses suele ser lo único que
+                explica un gasto. Enterrarla entre "Fecha" y "Cuenta" sería
+                tratarla como un dato de sistema. */}
+            {selected.description && (
+              <p className="mobile-tx-description">{selected.description}</p>
+            )}
+
             <dl>
               <div><dt>{t('date')}</dt><dd>{dateLabel(selected.date, locale)}</dd></div>
               <div><dt>{t('category')}</dt><dd>{(() => {
@@ -588,6 +608,22 @@ export function MobileTransactionList({
                   </dd></div>
                 </>
               )}
+              {/* Cargos del banco: el monto guardado YA los incluye, así que
+                  sin desglosarlos el usuario ve un número que no cuadra con el
+                  precio que vio en la tienda. */}
+              {selected.fees?.length ? (
+                <div><dt>{t('bankFeesLabel')}</dt><dd>
+                  {selected.fees.map(fee => fmt(fee.amount, currency)).join(' + ')}
+                </dd></div>
+              ) : null}
+              {selected.recurring && (
+                <div><dt>{t('repeatsLabel')}</dt><dd>
+                  {t(selected.recurring === 'weekly' ? 'weekly' : 'monthly')}
+                </dd></div>
+              )}
+              {selected.tags?.length ? (
+                <div><dt>{t('tagsLabel')}</dt><dd>{selected.tags.join(' · ')}</dd></div>
+              ) : null}
             </dl>
 
             <div className="mobile-detail-actions">

@@ -15,6 +15,7 @@ import { estimatedMonthlyRate, firstMonthDayDate, nextWeekdayDate, projectArriva
 import { MobileDatePicker } from './MobileDatePicker'
 import { MobileAmountSheet } from './MobileAmountSheet'
 import type { CurrencyCode, Goal, GoalAutoContribute, IconName, RecurrenceFrequency, ViewProps } from '@/types'
+import { useMoneyDecimals } from '@/hooks/useFmt'
 import { useMobileBackDismiss } from './useMobileBackDismiss'
 import { useDialogA11y } from './useDialogA11y'
 import { useSubmitGuard } from './useSubmitGuard'
@@ -172,6 +173,7 @@ function GoalNumpad({
 
 function GoalCard({ goal, currency, projection, onClick }: { goal: Goal; currency: string; projection?: string | null; onClick: () => void }) {
   const t = useT()
+  const moneyDecimals = useMoneyDecimals()
   const p = pct(goal.saved, goal.target)
   const cur = currency as Parameters<typeof fmt>[1]
   const today = localToday()
@@ -188,7 +190,7 @@ function GoalCard({ goal, currency, projection, onClick }: { goal: Goal; currenc
           <span className="mgl-card-amounts">
             {/* Sin centavos: son dos cifras seguidas en una sola linea y con
                 decimales la meta se cortaba ("de RD$ 80,..."). */}
-            {fmt(goal.saved, cur, { decimals: 0 })} <span className="mgl-dim">{t('of')} {fmt(goal.target, cur, { decimals: 0 })}</span>
+            {fmt(goal.saved, cur, { decimals: moneyDecimals })} <span className="mgl-dim">{t('of')} {fmt(goal.target, cur, { decimals: moneyDecimals })}</span>
           </span>
         </div>
         <span className="mgl-pct" style={{ color: goal.color }}>{p}%</span>
@@ -1001,6 +1003,7 @@ function ContributeSheet({ goal, currency, onClose }: { goal: Goal; currency: st
 
 export function MobileGoals(_props: ViewProps) {
   const t = useT()
+  const moneyDecimals = useMoneyDecimals()
   const { accounts, goals, goalContributions, addGoal, updateGoal, deleteGoal, restoreGoal, currency } = useFinance()
   const [sheet, setSheet] = useState<Sheet>(null)
   const [contributeGoal, setContributeGoal] = useState<Goal | null>(null)
@@ -1061,7 +1064,7 @@ export function MobileGoals(_props: ViewProps) {
               <span className="mgl-sum-label">{t('savings')}</span>
               {/* Esta fila lleva DOS datos (cobertura y monto) en el ancho de
                   una: con centavos el monto se cortaba. */}
-              <strong className="mgl-sum-value">{savingsCoverage}% · {fmt(backedSavings, cur, { decimals: 0 })}</strong>
+              <strong className="mgl-sum-value">{savingsCoverage}% · {fmt(backedSavings, cur, { decimals: moneyDecimals })}</strong>
             </div>
           </div>
         </div>

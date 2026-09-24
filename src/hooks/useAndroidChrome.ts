@@ -7,6 +7,13 @@ const PALETTE: Record<ThemeName, { bg: string; surface: string; scheme: 'dark' |
   amoled: { bg: '#000000', surface: '#0a0a0a', scheme: 'dark' },
   light: { bg: '#f4f7fb', surface: '#ffffff', scheme: 'light' },
   system: { bg: '#0a0e16', surface: '#111827', scheme: 'dark' },
+  // Los temas de color: la barra de estado tiene que llevar el MISMO fondo que
+  // la app o queda una franja de otro tono arriba, que es lo que delata que un
+  // tema esta a medio hacer.
+  ocean:  { bg: '#04161f', surface: '#0b2430', scheme: 'dark' },
+  sunset: { bg: '#1a0f1c', surface: '#271629', scheme: 'dark' },
+  forest: { bg: '#071612', surface: '#0e251e', scheme: 'dark' },
+  sand:   { bg: '#f3ece1', surface: '#fffaf3', scheme: 'light' },
 }
 
 function upsertMeta(name: string, content: string) {

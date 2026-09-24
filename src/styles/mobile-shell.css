@@ -106,6 +106,47 @@
     --m-brand-line: rgba(20,32,58,.12);
   }
 
+  /* ── Temas de color en movil ────────────────────────────────────────
+     Los tokens base los define `base.css`; aqui van los que el movil tiene
+     aparte (verdes/rojos, sombras y la banda de marca). Sin esto, elegir
+     "Oceano" dejaba una cabecera azul-gris del tema oscuro sobre un fondo
+     turquesa: el sintoma clasico de un tema a medio hacer. */
+  .mobile-app[data-theme="ocean"] {
+    --m-income: #2ee6b0;
+    --m-expense: #ff7a8f;
+    --m-brand-band: linear-gradient(150deg, #0b2f3e 0%, #0a2633 55%, #061d27 100%);
+    --m-elevation: 0 12px 32px rgba(0,20,28,.45);
+    --m-elevation-sm: 0 6px 18px rgba(0,20,28,.34);
+  }
+  .mobile-app[data-theme="sunset"] {
+    --m-income: #4ade9b;
+    --m-expense: #ff6f91;
+    --m-brand-band: linear-gradient(150deg, #3b1f3c 0%, #2f1830 55%, #241227 100%);
+    --m-elevation: 0 12px 32px rgba(28,8,26,.48);
+    --m-elevation-sm: 0 6px 18px rgba(28,8,26,.36);
+  }
+  .mobile-app[data-theme="forest"] {
+    --m-income: #4ade80;
+    --m-expense: #ff7a7a;
+    --m-brand-band: linear-gradient(150deg, #103025 0%, #0c281f 55%, #081d17 100%);
+    --m-elevation: 0 12px 32px rgba(0,22,14,.45);
+    --m-elevation-sm: 0 6px 18px rgba(0,22,14,.34);
+  }
+  /* ARENA es CLARO: hereda los ajustes del tema claro (verdes/rojos legibles
+     sobre fondo claro, sombras tintadas) pero en tono calido. */
+  .mobile-app[data-theme="sand"] {
+    --m-income: #0f7a56;
+    --m-expense: #c0392f;
+    --m-elevation: 0 12px 32px rgba(70,52,28,.13);
+    --m-elevation-sm: 0 6px 18px rgba(70,52,28,.09);
+    --m-brand-band: linear-gradient(150deg, #e7d6bd 0%, #f0e4d3 55%, #f7efe4 100%);
+    --m-brand-on: #2b2318;
+    --m-brand-on-dim: rgba(43,35,24,.62);
+    --m-brand-layer: rgba(43,35,24,.07);
+    --m-brand-layer-strong: rgba(43,35,24,.14);
+    --m-brand-line: rgba(43,35,24,.13);
+  }
+
   .app.mobile-app {
     display: block;
     grid-template-columns: none;
@@ -1675,6 +1716,13 @@
   }
   .mobile-movement-tools .mobile-filter-chips { flex: 1; min-width: 0; }
   .mobile-movement-tools .mobile-search-chip { flex-shrink: 0; }
+  /* Chip de solo icono: cuadrado, sin el hueco que deja el texto ausente. */
+  .mobile-search-chip.icon-only {
+    justify-content: center;
+    min-width: 36px;
+    padding: 0;
+    width: 36px;
+  }
   .mobile-balance-breakdown-inline {
     border-left: 0;
     border-radius: 0;
@@ -1693,6 +1741,11 @@
     gap: 6px;
     overflow-x: auto;
     scrollbar-width: none;
+    /* Sin esto, el ultimo chip se recorta a ras y parece un fallo de dibujo.
+       Con el degradado, el corte se lee como "hay mas hacia la derecha". */
+    mask-image: linear-gradient(to right, #000 calc(100% - 18px), transparent);
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 18px), transparent);
+    padding-right: 4px;
   }
   .mobile-filter-chips::-webkit-scrollbar { display: none; }
   .mobile-filter-chips button,
@@ -2239,6 +2292,31 @@
     height: 40px;
     width: 100%;
   }
+
+  /* Descarga en curso. La barra tiene un minimo visible: una barra vacia al
+     empezar se lee como "no esta pasando nada" y ahi es cuando la gente cierra
+     el dialogo creyendo que fallo. */
+  .mup-progress {
+    background: color-mix(in oklab, var(--text-dim) 22%, transparent);
+    border-radius: 999px;
+    height: 6px;
+    margin: 4px 0 2px;
+    overflow: hidden;
+    width: 100%;
+  }
+  .mup-progress i {
+    background: var(--accent, #ffdd3d);
+    border-radius: 999px;
+    display: block;
+    height: 100%;
+    transition: width .35s ease;
+  }
+  .mup-progress-label {
+    color: var(--text-dim);
+    font-size: 12.5px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+  }
   .mobile-transaction-sheet section {
     background:
       linear-gradient(180deg,
@@ -2258,6 +2336,22 @@
   .mobile-transaction-sheet h2 {
     font-size: 24px;
     margin-bottom: 8px;
+  }
+
+  /* La descripcion NO es una fila de la tabla: es texto que alguien escribio.
+     Va arriba, con aire y ancho completo, respetando sus saltos de linea. */
+  .mobile-tx-description {
+    background: color-mix(in oklab, var(--m-text, #f8fafc) 5%, transparent);
+    border-left: 3px solid color-mix(in oklab, var(--m-text, #f8fafc) 22%, transparent);
+    border-radius: 4px 12px 12px 4px;
+    color: var(--m-text, #f8fafc);
+    font-size: 14px;
+    line-height: 1.55;
+    margin: 14px 0 4px;
+    padding: 12px 14px;
+    text-align: left;
+    white-space: pre-wrap;
+    word-break: break-word;
   }
   .mobile-transaction-sheet dl div {
     background: color-mix(in oklab, var(--m-text, #f8fafc) 6%, transparent);
@@ -3220,3 +3314,11 @@
 /* Separación entre los bloques del centro de notificaciones. */
 .mnc-group { display: grid; gap: 0; margin-bottom: 18px; }
 .mnc-group:last-child { margin-bottom: 0; }
+
+  /* El ojo del modo privado, encendido: no basta con cambiar el icono — con
+     los montos tapados hay que poder ver de un vistazo POR QUE estan tapados,
+     o parece que la app se rompio. */
+  .mobile-icon-btn.on {
+    background: color-mix(in oklab, var(--accent, #ffdd3d) 20%, transparent);
+    color: var(--accent, #ffdd3d);
+  }

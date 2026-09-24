@@ -52,7 +52,7 @@
             android:maxLines="1"
             android:text="@string/widget_balance_label"
             android:textAllCaps="true"
-            android:textColor="#6E7688"
+            android:textColor="@color/widget_text_dim"
             android:textSize="9sp"
             android:textStyle="bold" />
 
@@ -74,7 +74,7 @@
             android:includeFontPadding="false"
             android:maxLines="1"
             android:text="--"
-            android:textColor="#F2F5FB"
+            android:textColor="@color/widget_text"
             android:textSize="24sp"
             android:textStyle="bold" />
 
@@ -86,7 +86,7 @@
             android:ellipsize="end"
             android:includeFontPadding="false"
             android:maxLines="1"
-            android:textColor="#6E7688"
+            android:textColor="@color/widget_text_dim"
             android:textSize="11sp"
             android:textStyle="bold"
             android:visibility="gone" />

@@ -177,8 +177,7 @@ fn take_pending_shared_files(app: tauri::AppHandle) -> Result<Vec<SharedFile>, S
 ///
 /// Es una RED DE SEGURIDAD para el deep link. El plugin `deep-link` deberia
 /// entregar `sharky://shortcut/...` por `onOpenUrl`/`getCurrent`, pero en la
-/// practica (ver el comentario en `store/auth.ts`) hay dispositivos donde el
-/// evento no llega en warm-start — la app pasa a primer plano pero se queda en
+/// practica hay dispositivos donde el evento no llega en warm-start — la app pasa a primer plano pero se queda en
 /// Inicio. El flujo de "compartir" ya esquiva ese problema escribiendo un
 /// marcador desde MainActivity; esto hace lo mismo para los atajos. Se consume
 /// una sola vez (se borra al leerlo).
@@ -336,6 +335,7 @@ pub fn run() {
         builder = builder.plugin(tauri_plugin_keystore::init());
         builder = builder.plugin(tauri_plugin_home_widget::init());
         builder = builder.plugin(tauri_plugin_play_billing::init());
+        builder = builder.plugin(tauri_plugin_in_app_update::init());
     }
 
     builder

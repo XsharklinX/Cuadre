@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Tema oscuro. Es el que tenian los widgets siempre, ahora solo cuando toca. -->
+<resources>
+    <color name="widget_surface">#0F1420</color>
+    <color name="widget_stroke">#1E2536</color>
+    <color name="widget_text">#F2F5FB</color>
+    <color name="widget_text_dim">#8A96AC</color>
+    <color name="widget_accent">#5BC0FF</color>
+    <color name="widget_on_accent">#06121F</color>
+    <color name="widget_income">#35D0A2</color>
+    <color name="widget_expense">#FF6B8A</color>
+    <color name="widget_warn">#F59E0B</color>
+    <color name="widget_track">#1FFFFFFF</color>
+
+    <!-- El boton "+" conserva su degradado propio: es el unico widget que el
+         usuario reconoce por su aspecto, y homogeneizarlo con el resto seria
+         quitarle justo lo que funciona. -->
+    <color name="widget_fab_top">#6493FF</color>
+    <color name="widget_fab_mid">#17A38E</color>
+    <color name="widget_fab_bottom">#2F63E6</color>
+    <color name="widget_fab_edge">#40FFFFFF</color>
+    <color name="widget_fab_ink">#FFFFFF</color>
+</resources>

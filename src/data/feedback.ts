@@ -1,112 +1,77 @@
-import { supabase } from '@/lib/supabase'
-import { useAuth } from '@/store/auth'
 import { useSettings } from '@/store/settings'
 import { isTauri } from '@/hooks/useTauri'
-import { APP_VERSION } from '@/data/release'
+import { APP_NAME, APP_VERSION } from '@/data/release'
 import { log } from '@/lib/logger'
 
 /**
- * Comentarios de usuarios (Configuración → Comentarios).
+ * COMENTARIOS DE USUARIOS, sin servidor.
  *
- * El texto se inserta en la tabla `feedback` de Supabase (RLS: solo INSERT,
- * nadie puede leerla desde el cliente) y la Edge Function `notify-feedback`
- * lo reenvía por correo al desarrollador. El correo destino vive como secret
- * del servidor — nunca en el cliente.
+ * Antes esto insertaba el texto en una tabla de Supabase y una función del
+ * servidor lo reenviaba por correo. Todo ese camino existía para conseguir
+ * algo que el teléfono ya sabe hacer solo: mandar un correo.
  *
- * Si no hay conexión (la app es offline-first), el comentario se encola en
- * localStorage y se reintenta al abrir la app o al enviar el siguiente.
+ * Ahora el botón abre la app de correo del usuario con el mensaje YA ESCRITO
+ * y el contexto técnico (versión, plataforma, idioma) añadido al final. Lo
+ * único que le queda por hacer es darle a enviar.
+ *
+ * Lo que se gana no es solo quitar una dependencia: el comentario sale desde
+ * SU correo, así que se le puede responder. Con la tabla, el mensaje llegaba
+ * sin remitente al que contestar salvo que hubiera iniciado sesión — y la
+ * sesión ya no existe.
+ *
+ * Lo que se pierde: no hay envío silencioso ni cola offline. A cambio, el
+ * usuario ve su mensaje antes de mandarlo y tiene copia en enviados, que es
+ * más honesto que un "gracias por tu comentario" sobre una petición de red que
+ * pudo fallar.
  */
 
-const QUEUE_KEY = 'sharky-feedback-queue-v1'
-const MAX_QUEUE = 20
+/** A dónde van los comentarios. Mismo buzón que "Escríbenos". */
+export const FEEDBACK_EMAIL = 'contactosharklin@gmail.com'
+
 const MAX_LENGTH = 4000
-
-interface QueuedFeedback {
-  message: string
-  app_version: string
-  platform: string
-  language: string
-  user_email: string | null
-  queued_at: string
-}
-
-function readQueue(): QueuedFeedback[] {
-  try {
-    return JSON.parse(localStorage.getItem(QUEUE_KEY) ?? '[]') as QueuedFeedback[]
-  } catch {
-    return []
-  }
-}
-
-function writeQueue(queue: QueuedFeedback[]): void {
-  localStorage.setItem(QUEUE_KEY, JSON.stringify(queue.slice(0, MAX_QUEUE)))
-}
 
 function detectPlatform(): string {
   if (isTauri()) return /android/i.test(navigator.userAgent) ? 'android' : 'windows'
   return 'web'
 }
 
-function buildEntry(message: string): QueuedFeedback {
-  return {
-    message: message.trim().slice(0, MAX_LENGTH),
-    app_version: APP_VERSION,
-    platform: detectPlatform(),
-    language: useSettings.getState().language,
-    user_email: useAuth.getState().user?.email ?? null,
-    queued_at: new Date().toISOString(),
-  }
+/**
+ * El pie técnico. Sin esto, la mitad de los comentarios obligan a escribir de
+ * vuelta preguntando "¿qué versión tienes?", y ahí se pierde a la persona.
+ */
+function contextFooter(): string {
+  const s = useSettings.getState()
+  return [
+    '',
+    '---',
+    `${APP_NAME} ${APP_VERSION} · ${detectPlatform()} · ${s.language}`,
+  ].join('\n')
 }
 
-async function insertFeedback(entry: QueuedFeedback): Promise<void> {
-  if (!supabase) throw new Error('cloud-not-configured')
-  const { queued_at: _queuedAt, ...row } = entry
-  const { error } = await supabase.from('feedback').insert({
-    ...row,
-    user_id: useAuth.getState().user?.mode === 'cloud' ? useAuth.getState().user?.id : null,
-  })
-  if (error) throw new Error(error.message)
-}
-
-/** Reintenta enviar comentarios encolados. Silencioso: los fallos se re-encolan. */
-export async function flushPendingFeedback(): Promise<void> {
-  if (!supabase || !navigator.onLine) return
-  const queue = readQueue()
-  if (queue.length === 0) return
-  const remaining: QueuedFeedback[] = []
-  for (const entry of queue) {
-    try {
-      await insertFeedback(entry)
-    } catch (error) {
-      log.error('No se pudo reenviar un comentario encolado', error)
-      remaining.push(entry)
-    }
-  }
-  writeQueue(remaining)
+export function buildFeedbackMailto(message: string): string {
+  const subject = `${APP_NAME} · comentario`
+  const body = message.trim().slice(0, MAX_LENGTH) + contextFooter()
+  return `mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
 }
 
 /**
- * Envía un comentario. Devuelve `'sent'` si llegó a la nube, `'queued'` si se
- * guardó localmente para reintentar (sin conexión o error transitorio).
+ * Abre el correo del sistema con el comentario dentro.
+ *
+ * Nunca un `<a href="mailto:">` ni `location.href`: en el WebView de Android
+ * eso intenta NAVEGAR a una url que el WebView no entiende y la app se queda
+ * en una pantalla en blanco. Tiene que salir por el sistema operativo.
  */
-export async function submitFeedback(message: string): Promise<'sent' | 'queued'> {
-  const entry = buildEntry(message)
-  if (!entry.message) throw new Error('empty')
-
-  // Aprovecha el envío para drenar la cola pendiente
-  void flushPendingFeedback()
-
-  if (!supabase) {
-    writeQueue([...readQueue(), entry])
-    return 'queued'
-  }
-
+export async function submitFeedback(message: string): Promise<'opened' | 'failed'> {
+  if (!message.trim()) return 'failed'
+  const url = buildFeedbackMailto(message)
   try {
-    await insertFeedback(entry)
-    return 'sent'
+    const { openUrl } = await import('@tauri-apps/plugin-opener')
+    await openUrl(url)
+    return 'opened'
   } catch (error) {
-    log.error('No se pudo enviar el comentario, se encola', error)
-    writeQueue([...readQueue(), entry])
-    return 'queued'
+    log.warn('feedback: no se pudo abrir el correo por el sistema', error)
+    // Navegador, o plugin ausente: el camino de toda la vida.
+    const opened = window.open(url, '_blank', 'noopener')
+    return opened ? 'opened' : 'failed'
   }
 }

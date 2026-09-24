@@ -33,7 +33,7 @@
         android:gravity="center"
         android:includeFontPadding="false"
         android:text="+"
-        android:textColor="#FFFFFF"
+        android:textColor="@color/widget_fab_ink"
         android:textSize="30sp"
         android:textStyle="bold" />
 

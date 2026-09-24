@@ -75,6 +75,44 @@
     --track: rgba(255,255,255,.06); --track-strong: rgba(255,255,255,.12);
     --bg-glow: radial-gradient(1200px 600px at 78% -8%, color-mix(in oklab, var(--accent) 9%, transparent), transparent 60%);
   }
+  /* ── Temas de color ────────────────────────────────────────────────
+     Cada uno cambia el TONO de la app entera, no solo su claridad: son
+     ambientes distintos, no tres grises. */
+
+  /* OCEANO. Azul profundo con verde caribe. */
+  .app[data-theme="ocean"] {
+    --bg: #04161f; --surface: #0b2430; --surface-2: #103040;
+    --text: #e2f4f8; --text-dim: #79a7b4;
+    --border: rgba(126,214,233,.10);
+    --track: rgba(126,214,233,.09); --track-strong: rgba(126,214,233,.18);
+    --bg-glow: radial-gradient(1200px 600px at 78% -8%, rgba(34,197,205,.16), transparent 62%);
+  }
+  /* ATARDECER. Ciruela y ambar: calido sin dejar de ser oscuro. */
+  .app[data-theme="sunset"] {
+    --bg: #1a0f1c; --surface: #271629; --surface-2: #341e36;
+    --text: #fbeaf2; --text-dim: #b08aa4;
+    --border: rgba(255,180,200,.11);
+    --track: rgba(255,180,200,.09); --track-strong: rgba(255,180,200,.18);
+    --bg-glow: radial-gradient(1200px 600px at 78% -8%, rgba(249,115,22,.17), transparent 62%);
+  }
+  /* BOSQUE. Verde hondo, el mas reposado de los oscuros. */
+  .app[data-theme="forest"] {
+    --bg: #071612; --surface: #0e251e; --surface-2: #143228;
+    --text: #e4f5ec; --text-dim: #7ba894;
+    --border: rgba(134,239,172,.10);
+    --track: rgba(134,239,172,.08); --track-strong: rgba(134,239,172,.17);
+    --bg-glow: radial-gradient(1200px 600px at 78% -8%, rgba(34,197,94,.14), transparent 62%);
+  }
+  /* ARENA. Segundo tema CLARO, calido, de papel: quien no soporta el fondo
+     oscuro tenia una sola opcion y era un blanco que deslumbra. */
+  .app[data-theme="sand"] {
+    --bg: #f3ece1; --surface: #fffaf3; --surface-2: #e9dfd0;
+    --text: #2b2318; --text-dim: #6b5b46;
+    --border: rgba(43,35,24,.12);
+    --track: rgba(43,35,24,.08); --track-strong: rgba(43,35,24,.16);
+    --bg-glow: radial-gradient(1100px 560px at 82% -10%, rgba(180,130,60,.12), transparent 58%);
+  }
+
   .app[data-density="compact"] { --card-pad: 14px; --gap: 12px; --radius: 13px; }
   .app[data-density="comfy"]   { --card-pad: 26px; --gap: 22px; --radius: 18px; }
 

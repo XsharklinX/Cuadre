@@ -9,7 +9,7 @@ permissions = [
     "allow-pick-backup-folder",
     "allow-schedule-weekly-backup",
     "allow-cancel-weekly-backup",
-    "allow-run-backup-now",
+    "allow-run-backup-now", "allow-battery-status", "allow-open-battery-settings",
     "allow-get-backup-status",
     "allow-set-system-bars",
     "allow-set-quick-add-notification",

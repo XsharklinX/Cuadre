@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Cuadre",
-  "version": "1.9.5",
+  "version": "1.9.7",
   "identifier": "com.sharky.miapp",
   "build": {
     "frontendDist": "../dist",
@@ -21,7 +21,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self' https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' asset: data: blob: https://*.googleusercontent.com; connect-src 'self' ipc: http://ipc.localhost https://fonts.googleapis.com https://fonts.gstatic.com https://accounts.google.com https://oauth2.googleapis.com https://hfzwcfvyrbwcbnrzgajj.supabase.co wss://hfzwcfvyrbwcbnrzgajj.supabase.co https://open.er-api.com; frame-src https://accounts.google.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' asset: data: blob:; connect-src 'self' ipc: http://ipc.localhost https://fonts.googleapis.com https://fonts.gstatic.com https://open.er-api.com; frame-src 'none'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
     }
   },
   "plugins": {
@@ -43,12 +43,6 @@
             "sharky"
           ],
           "host": "notification"
-        },
-        {
-          "scheme": [
-            "sharky"
-          ],
-          "host": "auth"
         }
       ]
     }
@@ -73,6 +67,6 @@
     "copyright": "Copyright (c) 2026 $harky",
     "category": "Finance",
     "shortDescription": "Finanzas personales",
-    "longDescription": "Registra ingresos, gastos, presupuestos, metas de ahorro, sincronizacion cloud e importacion bancaria."
+    "longDescription": "Registra ingresos, gastos, presupuestos, metas de ahorro e importacion bancaria. Todo en tu dispositivo."
   }
 }

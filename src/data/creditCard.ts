@@ -238,6 +238,14 @@ export interface CardAsDebt {
    * progreso salga 0% — honesto — en vez de inventar un origen.
    */
   originalBalance?: number
+  /**
+   * Dia limite de pago de la tarjeta, si esta configurado.
+   *
+   * La tarjeta ya lo guardaba (`paymentDay`) y la pantalla de Deuda no lo
+   * miraba: la unica deuda con fecha de verdad conocida era justo la que salia
+   * sin fecha.
+   */
+  dueDay?: number
   /** Marca de origen: esta deuda NO se edita a mano, se deriva de la cuenta. */
   fromAccountId: string
 }
@@ -258,6 +266,7 @@ export function creditCardsAsDebts(accounts: Account[], base: CurrencyCode = 'DO
       // le presente al usuario como suyo.
       minPayment: minimumPayment(account) ?? used * 0.05,
       color: account.color,
+      dueDay: account.paymentDay,
       fromAccountId: account.id,
     }))
 }

@@ -11,7 +11,7 @@ import { useDev } from '@/store/dev'
 import { useDismissals } from '@/store/dismissals'
 import { useSettings } from '@/store/settings'
 import { useT } from '@/i18n'
-import { DevBackup, DevClock, DevLedger, DevNotifications, DevQueue, DevRating } from './DevTools'
+import { DevBackup, DevClock, DevLedger, DevNotifications, DevQueue, DevRating, DevUpdate } from './DevTools'
 import { SettingsRow, SettingsSheet, type SheetProps } from './shared'
 
 /**
@@ -91,7 +91,19 @@ export function SettingsDev({ activeSheet, onOpen, onClose }: SheetProps) {
 
       {activeSheet === 'dev' && (
         <SettingsSheet title={t('devSection')} onClose={onClose}>
-          <div className="mset-sheet-body">
+          {/*
+            MODO CONSOLA.
+            El panel se ve distinto al resto de la app a propósito. No es
+            decoración: son herramientas que borran datos, viajan en el tiempo
+            y sabotean saldos, y tienen que SENTIRSE como otro sitio. Cuando un
+            entorno peligroso se ve igual que la pantalla de ajustes normal, se
+            toca con la misma confianza que un interruptor de tema.
+          */}
+          <div className="mset-sheet-body mset-dev-mode">
+            <div className="mset-dev-banner">
+              <span className="mset-dev-prompt">cuadre@dev</span>
+              <span className="mset-dev-blink" aria-hidden="true">█</span>
+            </div>
             <p className="mset-dev-warn">
               <Icon name="alert" size={14} /> {t('devDangerNote')}
             </p>
@@ -144,6 +156,7 @@ export function SettingsDev({ activeSheet, onOpen, onClose }: SheetProps) {
 
             <DevQueue />
             <DevNotifications />
+            <DevUpdate />
             <DevBackup />
             <DevLedger />
 

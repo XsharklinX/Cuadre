@@ -19,6 +19,7 @@ import { useMobileBackDismiss } from '@/mobile/useMobileBackDismiss'
 import { useSubmitGuard } from '@/mobile/useSubmitGuard'
 import { SheetPortal } from '@/mobile/SheetPortal'
 import type { CurrencyCode, IconName, RecurrenceFrequency, Transaction, TxSplit, TxType } from '@/types'
+import { MobileDescriptionSheet } from '@/mobile/MobileDescriptionSheet'
 
 function currencyPrefix(c: CurrencyCode): string {
   return CURRENCIES[c].symbol
@@ -60,6 +61,8 @@ export function TransactionForm({ value, mkey, onClose, onDelete }: {
   const [entryCurrency,  setEntryCurrency]  = useState<CurrencyCode | null>(null)
   const [currencyPicker, setCurrencyPicker] = useState(false)
   const [note,           setNote]           = useState('')
+  const [description,    setDescription]    = useState('')
+  const [descOpen,       setDescOpen]       = useState(false)
   const [date,           setDate]           = useState(`${mkey}-01`)
   const [accountId,      setAccountId]      = useState(accounts[0]?.id ?? '')
   const [categoryId,     setCategoryId]     = useState('')
@@ -81,6 +84,8 @@ export function TransactionForm({ value, mkey, onClose, onDelete }: {
     if (value.type === 'transfer') {
       setAmount(value.amount)
       setNote(value.note)
+    setDescription(value.description ?? '')
+      setDescription(value.description ?? '')
       setDate(value.date)
       setFromAccount(value.fromAccount ?? '')
       setToAccount(value.toAccount ?? '')
@@ -161,7 +166,7 @@ export function TransactionForm({ value, mkey, onClose, onDelete }: {
     if (!beginSubmit()) return
 
     try {
-      updateTx(value.id, { amount, date, note: note.trim() || t('transfer'), fromAccount, toAccount })
+      updateTx(value.id, { amount, date, note: note.trim() || t('transfer'), description: description.trim() || undefined, fromAccount, toAccount })
     } catch (err) {
       endSubmit()
       toast(err instanceof Error ? err.message : t('couldNotSave'), { icon: 'alert' }); return
@@ -200,7 +205,7 @@ export function TransactionForm({ value, mkey, onClose, onDelete }: {
     // borre su rastro en vez de dejarlo con la tasa vieja.
     const entry = buildTxEntry(amount, routing)
     const fields = {
-      type, note: note.trim(), date, accountId, categoryId: mainCategoryId,
+      type, note: note.trim(), description: description.trim() || undefined, date, accountId, categoryId: mainCategoryId,
       ...entry,
       splits: cleanSplits,
       ...(recurring ? {
@@ -360,10 +365,24 @@ export function TransactionForm({ value, mkey, onClose, onDelete }: {
 
           {/* Detail rows */}
           <div className="mpr-form-rows txf-rows">
+            {/* CONCEPTO, no "Descripcion": es el texto corto que se ve en la
+                lista. La descripcion larga es la fila de abajo, y llamar
+                "Descripcion" a las dos dejaba al usuario sin saber cual
+                rellenaba. */}
             <button className="mpr-form-row" onClick={() => setSub('note')}>
               <Icon name="edit" size={16} style={{ color: 'var(--m-muted)', flexShrink: 0 }} />
-              <span className="mpr-form-row-label">{t('descriptionLabel')}</span>
+              <span className="mpr-form-row-label">{t('conceptLabel')}</span>
               <span className={note ? 'mpr-form-row-val' : 'mpr-form-row-dim'}>{note || t('requiredLabel')}</span>
+              {arrow}
+            </button>
+
+            {/* La descripcion larga: opcional siempre. */}
+            <button className="mpr-form-row" onClick={() => setDescOpen(true)}>
+              <Icon name="clipboard" size={16} style={{ color: 'var(--m-muted)', flexShrink: 0 }} />
+              <span className="mpr-form-row-label">{t('descriptionLabel')}</span>
+              <span className={description ? 'mpr-form-row-val txf-desc-preview' : 'mpr-form-row-dim'}>
+                {description || t('optionalLabel')}
+              </span>
               {arrow}
             </button>
 
@@ -556,6 +575,15 @@ export function TransactionForm({ value, mkey, onClose, onDelete }: {
           onClose={() => setSub(null)}
         />
       )}
+
+      {descOpen && (
+        <MobileDescriptionSheet
+          value={description}
+          onDone={value => { setDescription(value); setDescOpen(false) }}
+          onClose={() => setDescOpen(false)}
+        />
+      )}
+
 
       {sub === 'note' && (
         <MobileTextSheet

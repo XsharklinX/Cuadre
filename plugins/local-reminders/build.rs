@@ -10,6 +10,10 @@ const COMMANDS: &[&str] = &[
     "schedule_weekly_backup",
     "cancel_weekly_backup",
     "run_backup_now",
+    // Guia de bateria: sin la exencion, Android mata el trabajo de fondo. Se
+    // comprobo en un telefono real (retrasos de +17h en WorkManager).
+    "battery_status",
+    "open_battery_settings",
     "get_backup_status",
     // Ajusta el color de los iconos de las barras del sistema según el tema.
     "set_system_bars",

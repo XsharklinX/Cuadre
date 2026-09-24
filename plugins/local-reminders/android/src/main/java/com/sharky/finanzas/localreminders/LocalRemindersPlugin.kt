@@ -8,6 +8,8 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.pm.LabeledIntent
+import android.os.PowerManager
+import android.provider.Settings
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -359,6 +361,55 @@ class LocalRemindersPlugin(private val activity: Activity) : Plugin(activity) {
         } catch (_: SecurityException) {
             // POST_NOTIFICATIONS no concedido — no se puede mostrar.
         }
+    }
+
+    /**
+     * ¿Está la app exenta de la optimización de batería?
+     *
+     * Es la diferencia entre que Android respete el trabajo en segundo plano
+     * (detección de movimientos, respaldo semanal, recordatorios) o lo mate y
+     * lo difiera horas. Se comprobó en un teléfono real: sin la exención, los
+     * trabajos de WorkManager se retrasaban más de 17 horas.
+     */
+    @Command
+    fun batteryStatus(invoke: Invoke) {
+        val power = activity.getSystemService(Context.POWER_SERVICE) as PowerManager
+        val ret = JSObject()
+        ret.put("exempt", power.isIgnoringBatteryOptimizations(activity.packageName))
+        invoke.resolve(ret)
+    }
+
+    /**
+     * Abre la LISTA de optimización de batería del sistema, no el diálogo de
+     * petición directa.
+     *
+     * El diálogo de un toque (`ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`)
+     * exige el permiso `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`, que Google
+     * considera restringido y obliga a justificar en Play Console — y retira
+     * apps que lo usan sin justificación aceptada. La lista no pide permiso
+     * ninguno y lleva al mismo sitio; el coste es un toque más, guiado por la
+     * pantalla que abre esto.
+     */
+    @Command
+    fun openBatterySettings(invoke: Invoke) {
+        val intents = listOf(
+            Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS),
+            // Respaldo: los ajustes de la propia app. Existen SIEMPRE, incluso
+            // en los fabricantes que esconden la pantalla anterior.
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = android.net.Uri.fromParts("package", activity.packageName, null)
+            },
+        )
+        for (intent in intents) {
+            try {
+                activity.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                invoke.resolve(JSObject().apply { put("opened", true) })
+                return
+            } catch (_: ActivityNotFoundException) {
+                // Se prueba el siguiente.
+            }
+        }
+        invoke.resolve(JSObject().apply { put("opened", false) })
     }
 
     @Command

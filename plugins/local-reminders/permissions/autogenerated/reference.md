@@ -12,6 +12,8 @@ Permite sincronizar el snapshot de datos, programar/cancelar recordatorios local
 - `allow-schedule-weekly-backup`
 - `allow-cancel-weekly-backup`
 - `allow-run-backup-now`
+- `allow-battery-status`
+- `allow-open-battery-settings`
 - `allow-get-backup-status`
 - `allow-set-system-bars`
 - `allow-set-quick-add-notification`
@@ -31,6 +33,32 @@ Permite sincronizar el snapshot de datos, programar/cancelar recordatorios local
 <tr>
 <td>
 
+`local-reminders:allow-battery-status`
+
+</td>
+<td>
+
+Enables the battery_status command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`local-reminders:deny-battery-status`
+
+</td>
+<td>
+
+Denies the battery_status command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `local-reminders:allow-cancel-reminders`
 
 </td>
@@ -180,6 +208,32 @@ Enables the get_backup_status command without any pre-configured scope.
 <td>
 
 Denies the get_backup_status command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`local-reminders:allow-open-battery-settings`
+
+</td>
+<td>
+
+Enables the open_battery_settings command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`local-reminders:deny-open-battery-settings`
+
+</td>
+<td>
+
+Denies the open_battery_settings command without any pre-configured scope.
 
 </td>
 </tr>

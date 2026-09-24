@@ -796,6 +796,30 @@ function AccountEditorSheet({
   const [fields, setFields] = useState<Omit<Account, 'id'>>(account ?? EMPTY_ACCOUNT)
   const [confirmDel, setConfirmDel] = useState(false)
   const allAccounts = useFinance(st => st.accounts)
+  const allTxns = useFinance(st => st.transactions)
+
+  /*
+   * LA DEUDA DE UNA TARJETA NO SE TECLEA: SE DEBE.
+   *
+   * Escribir la deuda a mano parecia inofensivo y rompia el sistema entero.
+   * El libro vive de una invariante —saldo = apertura + movimientos—, asi que
+   * al teclear una deuda la app tenia que mover la APERTURA para que cuadrara.
+   * Resultado: una deuda sin un solo gasto detras. Al recalcular, el libro
+   * hacia lo unico que podia hacer —sumar lo que habia— y aparecia "dinero que
+   * no tienes". El usuario lo describio exacto: "eso quiere decir que falta un
+   * gasto registrado".
+   *
+   * Asi que en una tarjeta QUE YA TIENE MOVIMIENTOS la cifra es de solo
+   * lectura: se mueve gastando y pagando, o con «Conciliar saldo», que deja un
+   * ajuste VISIBLE en el libro en vez de un numero salido de la nada.
+   *
+   * Sigue siendo editable en una tarjeta sin movimientos: ahi el saldo ES la
+   * apertura, no hay nada que contradecir y es la unica forma de decirle a la
+   * app con cuanta deuda empiezas.
+   */
+  const cardHasLedger = !!account && allTxns.some(tx =>
+    tx.accountId === account.id || tx.fromAccount === account.id || tx.toAccount === account.id)
+  const debtLocked = fields.type === 'credit' && cardHasLedger
   // Tipos que este editor puede ofrecer: excluye efectivo si ya existe, salvo
   // que la cuenta que se edita SEA el efectivo.
   const allowedTypes = creatableTypes(allAccounts, account?.type)
@@ -821,6 +845,20 @@ function AccountEditorSheet({
   useMobileBackDismiss(sub !== null, () => setSub(null))
   useMobileBackDismiss(sub === null, onClose)
   const dialogRef = useDialogA11y<HTMLDivElement>(onClose, sub === null)
+
+  /** La misma fila, sin destino: se ve igual, no se puede tocar. */
+  const lockedRow = (
+    label: string,
+    icon: Parameters<typeof Icon>[0]['name'],
+    display: string,
+  ) => (
+    <button className="mpr-form-row mpr-form-row-locked" onClick={() => toast(t('cardDebtLockedToast'), { icon: 'lock' })}>
+      <Icon name={icon} size={15} style={{ color: 'var(--m-muted)', flexShrink: 0 }} />
+      <span className="mpr-form-row-label">{label}</span>
+      <span className="mpr-form-row-val">{display}</span>
+      <Icon name="lock" size={12} style={{ color: 'var(--m-muted)', flexShrink: 0 }} />
+    </button>
+  )
 
   const row = (
     label: string,
@@ -970,7 +1008,7 @@ function AccountEditorSheet({
                   tarjeta pasaba a "no debes nada" y el boton de pagar ofrecia
                   RD$ 0.00 con una deuda real encima. */}
               {fields.type === 'credit'
-                ? row(
+                ? (debtLocked ? lockedRow : row)(
                     fields.balance > 0 ? t('cardInFavorLabel') : t('cardOwedLabel'),
                     'coins',
                     /* La MAGNITUD, no la deuda: con saldo a favor
@@ -991,10 +1029,16 @@ function AccountEditorSheet({
                   con el cupo entero libre y el boton de pagar ofreciendo cero.
                   Las dos filas escriben el MISMO campo, asi que siempre
                   cuadran: disponible = limite - deuda. */}
-              {fields.type === 'credit' && !!fields.limit && row(
-                t('cardAvailableLabel'), 'wallet',
-                fmt(availableFromBalance(fields.balance, fields.limit), fields.currency ?? currency),
-                false, 'available')}
+              {fields.type === 'credit' && !!fields.limit && (debtLocked
+                ? lockedRow(t('cardAvailableLabel'), 'wallet',
+                    fmt(availableFromBalance(fields.balance, fields.limit), fields.currency ?? currency))
+                : row(t('cardAvailableLabel'), 'wallet',
+                    fmt(availableFromBalance(fields.balance, fields.limit), fields.currency ?? currency),
+                    false, 'available'))}
+
+              {/* Por que no se puede tocar, dicho donde se intenta tocar. Un
+                  campo gris sin explicacion se lee como un fallo de la app. */}
+              {debtLocked && <p className="mpr-form-hint">{t('cardDebtLockedHint')}</p>}
 
               {row(t('currency'), 'dollar',
                 fields.currency && fields.currency !== currency

@@ -3222,7 +3222,7 @@ dependencies = [
 
 [[package]]
 name = "sharky"
-version = "1.9.5"
+version = "1.9.7"
 dependencies = [
  "base64 0.22.1",
  "keyring",
@@ -3236,6 +3236,7 @@ dependencies = [
  "tauri-plugin-dialog",
  "tauri-plugin-fs",
  "tauri-plugin-home-widget",
+ "tauri-plugin-in-app-update",
  "tauri-plugin-keystore",
  "tauri-plugin-local-reminders",
  "tauri-plugin-mlkit-ocr",
@@ -3720,6 +3721,17 @@ dependencies = [
 
 [[package]]
 name = "tauri-plugin-home-widget"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "tauri-plugin-in-app-update"
 version = "0.1.0"
 dependencies = [
  "serde",

@@ -1,11 +1,14 @@
 import { useCallback, useMemo, useRef, useState, type TouchEvent as ReactTouchEvent } from 'react'
+import { AccountPickerRow } from '@/components/ui/AccountPickerRow'
 import { Icon } from '@/components/ui/Icon'
+import { NoteSuggestionList } from '@/components/ui/NoteSuggestionList'
 import { toast } from '@/components/ui/Toast'
 import { deleteWithUndo } from '@/lib/undoDelete'
 import { useDialogs } from '@/components/ui/DialogProvider'
 import { OPERATORS, cleanAmount, evaluateExpression, lastOperatorIndex, lastSegment } from '@/data/amountExpression'
 import { isDuplicateTransaction } from '@/data/bankCsv'
 import { accountCurrency, fmt, fmtCompact, localToday } from '@/data/helpers'
+import { checkOverdraft } from '@/data/overdraft'
 import { ACCENT_COLORS } from '@/constants'
 import { dateLocale } from '@/data/helpers'
 import { CURRENCIES } from '@/data/seed'
@@ -25,6 +28,7 @@ import { useQuickAdds } from '@/store/quickAdds'
 import { openNativeScanner } from '@/lib/mlkitOcr'
 import { recognizeReceipt, type ReceiptOcrResult } from '@/lib/receiptOcr'
 import { MobileDatePicker } from './MobileDatePicker'
+import { MobileDescriptionSheet } from './MobileDescriptionSheet'
 import type { Category, CurrencyCode, IconName, RecurrenceFrequency, Transaction } from '@/types'
 import type { BatchReceiptInput } from './MobileReceiptBatch'
 import { useMobileBackDismiss } from './useMobileBackDismiss'
@@ -61,7 +65,7 @@ function startsInHorizontalScroller(node: EventTarget | null): boolean {
   // Scrollers horizontales conocidos del formulario (Rápidos, chips): un swipe
   // ahí es para desplazarlos, NUNCA para cambiar de pestaña — aunque en ese
   // momento haya pocos elementos y no lleguen a desbordar.
-  if (target.closest('.mobile-quickadds-row, .mobile-note-chips')) return true
+  if (target.closest('.mobile-quickadds-row')) return true
   // Genérico: cualquier ancestro que de hecho se desplace en horizontal.
   let el: HTMLElement | null = target
   while (el && !el.classList.contains('mobile-create-scroll')) {
@@ -128,6 +132,9 @@ export function MobileCreateFlow({
   const [fromAccount, setFromAccount] = useState('')
   const [toAccount, setToAccount] = useState('')
   const [note, setNote] = useState('')
+  /** Descripción larga, opcional. Vive en su propia hoja: ver MobileDescriptionSheet. */
+  const [description, setDescription] = useState('')
+  const [descOpen, setDescOpen] = useState(false)
   const [noteFocused, setNoteFocused] = useState(false)
   const [categoryEditorOpen, setCategoryEditorOpen] = useState(false)
   // Categoría que se está editando (pulsación larga en la grilla). null = crear.
@@ -142,6 +149,8 @@ export function MobileCreateFlow({
   })
   const [formError, setFormError] = useState<string | null>(null)
   const [triedSave, setTriedSave] = useState(false)
+  /** Ya se le avisó de que se pasa del saldo: el siguiente toque confirma. */
+  const [overdraftAck, setOverdraftAck] = useState(false)
   const [shaking,   setShaking]   = useState(false)
   const [recurring, setRecurring] = useState(false)
   const [recurFreq, setRecurFreq] = useState<RecurrenceFrequency>('monthly')
@@ -214,19 +223,12 @@ export function MobileCreateFlow({
   const feeTotal = totalFees(feeLines)
   const validTransfer = mode === 'transfer' && !!fromAccount && !!toAccount && fromAccount !== toAccount
 
-  // Notas anteriores únicas para el modo + categoría actual (autocompletar)
-  const pastNotes = useMemo(() => {
-    const seen = new Set<string>()
-    const result: string[] = []
-    for (const tx of transactions) {
-      if (tx.type !== mode || !tx.note) continue
-      if (categoryId && tx.categoryId !== categoryId) continue
-      const n = tx.note.trim()
-      if (n && !seen.has(n)) { seen.add(n); result.push(n) }
-      if (result.length >= 20) break
-    }
-    return result
-  }, [transactions, mode, categoryId])
+  /* Las sugerencias de concepto viven en `NoteSuggestionList`, sobre el motor
+     `data/noteSuggestions.ts`. Aqui habia una version propia que devolvia las
+     20 primeras notas en el orden en que aparecian en el libro —sin contar
+     usos, sin mirar la fecha, y descartando por completo lo de otras
+     categorias— y las pintaba como una tira de chips que habia que barrer en
+     horizontal para leer. */
 
   // Save is only allowed when account is explicitly selected
   const canSave = amount > 0 && date && (
@@ -258,7 +260,7 @@ export function MobileCreateFlow({
   const transferPickerRef = useDialogA11y<HTMLDivElement>(() => setTransferPicker(null), !!transferPicker)
   const scanMenuRef = useDialogA11y<HTMLDivElement>(() => setScanMenuOpen(false), scanMenuOpen)
 
-  const switchMode = useCallback((next: MobileTxMode) => { setMode(next); setCategoryId(null); setNote(''); setAccountId(null); setTriedSave(false); setFormError(null) }, [])
+  const switchMode = useCallback((next: MobileTxMode) => { setMode(next); setCategoryId(null); setNote(''); setDescription(''); setAccountId(null); setTriedSave(false); setFormError(null) }, [])
 
   const cycleMode = useCallback((direction: 1 | -1) => {
     const currentIndex = MODE_ORDER.indexOf(mode)
@@ -488,8 +490,41 @@ export function MobileCreateFlow({
       triggerShake()
       return
     }
+
+    /*
+     * GASTAR MÁS DE LO QUE HAY.
+     *
+     * Este aviso existía sólo en el modal de escritorio. Aquí, que es por
+     * donde la gente añade sus gastos de verdad, no se consultaba nada: el
+     * ajuste "Avisarme" —que además viene de fábrica— no hacía absolutamente
+     * nada. Por eso nadie sabía explicar para qué servía.
+     *
+     * Avisa UNA vez y deja pasar a la segunda pulsación. Un diálogo modal
+     * sería más aparatoso y se acabaría cerrando sin leer; el aviso se queda
+     * escrito en el formulario, con la cifra exacta en la que queda la cuenta,
+     * y el siguiente toque en Guardar es la confirmación.
+     */
+    if (mode === 'expense') {
+      const check = checkOverdraft(activeAccount ?? undefined, amount + feeTotal, settings.overdraftPolicy)
+      if (check.verdict === 'block') {
+        setFormError(t('overdraftBlockedError').replace('{name}', activeAccount?.name ?? ''))
+        setTriedSave(true)
+        triggerShake()
+        return
+      }
+      if (check.verdict === 'warn' && !overdraftAck) {
+        setFormError(t('overdraftWarnPrompt')
+          .replace('{name}', activeAccount?.name ?? '')
+          .replace('{amount}', fmt(Math.abs(check.resultingBalance), targetCurrency)))
+        setOverdraftAck(true)
+        triggerShake()
+        return
+      }
+    }
+
     setTriedSave(false)
     setFormError(null)
+    setOverdraftAck(false)
     if (!beginSubmit()) return
     try {
       let duplicate = false
@@ -513,6 +548,7 @@ export function MobileCreateFlow({
           ...(feeLines.length ? { fees: feeLines } : {}),
           ...(toSecondary ? { onSecondaryBalance: true as const } : {}),
           note: finalNote,
+          ...(description.trim() ? { description: description.trim() } : {}),
           categoryId: activeCategory!.id,
           accountId: activeAccountId!,
           ...(recurring ? {
@@ -533,6 +569,7 @@ export function MobileCreateFlow({
         { icon: duplicate ? 'alert' : 'check', type: duplicate ? undefined : 'ok' },
       )
       setAmountText('')
+      setDescription('')
       setNote('')
       setCategoryId(null)
       setAccountId(null)
@@ -1015,6 +1052,18 @@ export function MobileCreateFlow({
           </button>
         )}
 
+        {/* Lo que ya escribiste, encima del campo y solo mientras escribes.
+            Es el camino por el que se registra casi todo, asi que es donde
+            mas se nota no tener que teclear "Supermercado Nacional" entero
+            cada semana. */}
+        {noteFocused && (
+          <NoteSuggestionList
+            query={note}
+            categoryId={categoryId ?? undefined}
+            onPick={value => { setNote(value); noteInputRef.current?.blur() }}
+          />
+        )}
+
         {/* Quick row: account · note · date — kept inside this same compact panel */}
         <div className="mobile-create-quick-row">
           <div className="mobile-quick-note-input">
@@ -1057,23 +1106,19 @@ export function MobileCreateFlow({
               <Icon name="repeat" size={16} />
             </button>
           )}
+          {/* Descripción larga. Un icono y no un campo: es opcional, y un
+              cuadro de párrafo siempre visible convierte "apuntar un gasto" en
+              "rellenar un formulario". Se enciende cuando hay algo escrito,
+              para que no quede escondida. */}
+          <button
+            className={`mobile-quick-icon-btn${description ? ' on' : ''}`}
+            onClick={() => setDescOpen(true)}
+            aria-pressed={!!description}
+            aria-label={t('descriptionLabel')}
+          >
+            <Icon name="clipboard" size={16} />
+          </button>
         </div>
-
-        {/* Chips de notas anteriores — visibles solo mientras se escribe la nota */}
-        {noteFocused && pastNotes.length > 0 && (
-          <div className="mobile-note-chips">
-            {pastNotes.map(n => (
-              <button
-                key={n}
-                className="mobile-note-chip"
-                onMouseDown={e => e.preventDefault()}
-                onClick={() => { setNote(n); noteInputRef.current?.blur() }}
-              >
-                {n}
-              </button>
-            ))}
-          </div>
-        )}
 
         {/* Numpad + Done — escondidos mientras se escribe la nota, para no competir con el teclado del SO */}
         {!noteFocused && (
@@ -1170,16 +1215,12 @@ export function MobileCreateFlow({
             ) : (
               <div className="mobile-picker-list">
                 {accounts.map(account => (
-                  <button key={account.id}
-                    className={`mobile-picker-row${account.id === activeAccountId ? ' active' : ''}`}
-                    onClick={() => { setAccountId(account.id); setAccountPicker(false); setTriedSave(false) }}>
-                    <span style={{ color: account.color }}>
-                      <Icon name={ACCT_ICONS[account.type] ?? 'wallet'} size={22} />
-                    </span>
-                    <b>{account.name}</b>
-                    <small>{fmtCompact(account.balance, accountCurrency(account, currency))}</small>
-                    {account.id === activeAccountId && <Icon name="check" size={16} style={{ color: 'var(--accent, #ffdd3d)', marginLeft: 4 }} />}
-                  </button>
+                  <AccountPickerRow
+                    key={account.id}
+                    account={account}
+                    selected={account.id === activeAccountId}
+                    onSelect={() => { setAccountId(account.id); setAccountPicker(false); setTriedSave(false) }}
+                  />
                 ))}
               </div>
             )}
@@ -1258,6 +1299,14 @@ export function MobileCreateFlow({
           value={date}
           onChange={setDate}
           onClose={() => setDatePicker(false)}
+        />
+      )}
+
+      {descOpen && (
+        <MobileDescriptionSheet
+          value={description}
+          onDone={value => { setDescription(value); setDescOpen(false) }}
+          onClose={() => setDescOpen(false)}
         />
       )}
 

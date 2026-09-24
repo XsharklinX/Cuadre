@@ -113,7 +113,13 @@ describe('sanitizeFinanceData', () => {
     expect(data.transactions.map(transaction => transaction.id)).toEqual(['tx'])
   })
 
-  it('descarta categorias corruptas y movimientos que dependen de ellas', () => {
+  /*
+   * La CATEGORIA corrupta se va; el MOVIMIENTO no. Antes se iban los dos, y
+   * eso borraba un gasto real del usuario por un defecto en otro registro.
+   * Perder la categoria de un gasto es molesto; perder el gasto es perder
+   * dinero del libro.
+   */
+  it('descarta categorias corruptas pero RESCATA los movimientos que dependian de ellas', () => {
     const data = sanitizeFinanceData({
       accounts: [{ id: 'cash', name: 'Efectivo', short: 'Cash', type: 'cash', color: '#fff', balance: 500, last4: null }],
       categories: [
@@ -129,7 +135,8 @@ describe('sanitizeFinanceData', () => {
       currency: 'DOP',
     })
     expect(data.categories.map(category => category.id)).toEqual(['food'])
-    expect(data.transactions.map(transaction => transaction.id)).toEqual(['valid'])
+    expect(data.transactions.map(transaction => transaction.id)).toEqual(['valid', 'broken'])
+    expect(data.transactions.find(transaction => transaction.id === 'broken')?.categoryId).toBe('food')
   })
 })
 

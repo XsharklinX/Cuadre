@@ -59,7 +59,21 @@ export function parseReleaseItems(items: string[]): ReleaseItem[] {
     const lower = raw.toLowerCase()
     for (const [prefix, kind] of PREFIXES) {
       if (lower.startsWith(prefix)) {
-        return { kind, text: raw.slice(prefix.length).trim() }
+        const body = raw.slice(prefix.length).trim()
+        /*
+         * Marcador de importancia: `arreglo: !`
+         *
+         * El `!` NO se imprime — marca la línea para que se pinte destacada.
+         * Antes se escribía "GRAVE -" dentro del texto y salía literal en la
+         * pantalla del usuario, que ni sabe ni tiene por qué saber qué es un
+         * fallo grave: solo quiere leer qué cambió.
+         */
+        const important = body.startsWith('!')
+        return {
+          kind,
+          text: important ? body.slice(1).trim() : body,
+          ...(important ? { highlight: true } : {}),
+        }
       }
     }
     // Compatibilidad con las entradas antiguas, que no llevan prefijo.
@@ -80,11 +94,53 @@ export function countByKind(items: ReleaseItem[]): Record<ReleaseItemKind, numbe
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '1.9.7',
+    date: '2026-09-24',
+    title: 'Se actualiza sola, y detecta de verdad',
+    items: [
+      'nuevo: Cuando salga una version nueva, la app te avisa y se actualiza sola. Antes te mandaba a la tienda y tenias que buscar el boton alli.',
+      'nuevo: Puedes anadirle una descripcion a un gasto: con quien fuiste, que incluia, el numero de factura. Es opcional.',
+      'nuevo: Al tocar un movimiento se ve todo: su descripcion, los cargos del banco por separado y si se repite.',
+      'nuevo: Las listas de compra recuerdan los precios. Escribes "pollo" y entra con lo que pagaste la ultima vez.',
+      'nuevo: Ponle un tope a una lista: "voy al super con 3.000" y la app te dice si te alcanza antes de salir de casa.',
+      'mejor: Las tarjetas de credito muestran lo que tienes DISPONIBLE y su deuda en las dos monedas, tanto en su ficha como en el balance total. Antes solo salia lo que debias en pesos.',
+      'mejor: Deudas se rediseno: se ve de que esta hecha tu deuda, y lo que te deben se distingue de lo que debes.',
+      'arreglo: ! El aviso de nueva version llevaba mucho tiempo sin aparecer. Ya funciona.',
+      'mejor: Las listas se ven mejor: cada una lleva su color de verdad y las terminadas se distinguen solas.',
+      'nuevo: Modo privado: tapa todos los montos de un toque, desde la barra de arriba. Para cuando alguien puede ver tu pantalla.',
+      'nuevo: Cuatro temas nuevos: Oceano, Atardecer, Bosque y Arena (claro y calido).',
+      'mejor: El patrimonio neto ahora cuenta tus deudas registradas y el dinero que te deben. Antes solo miraba las cuentas.',
+      'mejor: En Suscripciones, las sugerencias salen de tres en tres y se pueden descartar todas de una vez.',
+      'arreglo: ! La deteccion de transacciones decia "Servicio activo" en verde y no detectaba nada: el permiso de Android y el interruptor de la app eran dos cosas distintas y solo se veia una. Ahora conceder el permiso enciende la deteccion.',
+      'mejor: Los widgets siguen el tema del sistema y, en Android 12 o superior, toman los colores de tu fondo de pantalla. Antes eran siempre oscuros.',
+    ],
+  },
+  {
+    version: '1.9.6',
+    date: '2026-09-23',
+    title: 'Tus deudas, en condiciones',
+    items: [
+      'nuevo: Las deudas se registran completas: dia de pago, hasta cuando duran, a quien le debes y de que tipo son. La app te dice cuantas cuotas faltan y avisa antes del vencimiento.',
+      'nuevo: Si pones hasta cuando dura la deuda, la app calcula sola la cuota que te liquida en ese plazo.',
+      'nuevo: Historial de pagos de cada deuda, y ya puedes apuntar el dinero que TE DEBEN.',
+      'nuevo: Guia para que Android no duerma la app, con los pasos de tu marca. Si la duerme, deja de registrar tus movimientos sin avisarte.',
+      'nuevo: Si tienes una tarjeta con el disponible escrito donde va la deuda, la app te lo pregunta y lo corrige en un toque.',
+      'nuevo: Al escribir el concepto te aparece lo que ya habias puesto antes, empezando por la categoria en la que estas.',
+      'mejor: Al escribir, el campo se queda pegado al teclado. En el selector de cuentas cada tarjeta muestra sus ultimos 4 digitos.',
+      'mejor: En una tarjeta con movimientos, la deuda ya no se teclea: la mueven tus gastos y pagos. Para cuadrarla con el banco esta "Conciliar saldo".',
+      'arreglo: ! Pagar una deuda no descontaba el dinero de ninguna cuenta. Ahora todo pago sale de una cuenta que tu eliges.',
+      'arreglo: ! Un movimiento podia borrarse solo al reabrir la app, y la deuda en dolares de una tarjeta desaparecia al recalcular.',
+      'arreglo: El ajuste de sobregiro no hacia nada. Ahora avisa de verdad y se llama "Saldo en negativo".',
+      'arreglo: "Ocultar centavos" no funcionaba, y "Tu semana" mostraba los montos sin centavos aunque los tuvieras activados.',
+      'mejor: La app ya no envia nada a ningun servidor: tus datos financieros no salen del telefono.',
+    ],
+  },
+  {
     version: '1.9.5',
     date: '2026-09-20',
     title: 'Tu tarjeta, como la lee tu banco',
     items: [
-      'arreglo: GRAVE - una tarjeta con el disponible escrito en el saldo salia como si no se hubiera usado: el cupo entero libre y el boton de pagar ofreciendo cero.',
+      'arreglo: ! Una tarjeta con el disponible escrito en el saldo salia como si no se hubiera usado: el cupo entero libre y el boton de pagar ofreciendo cero.',
       'nuevo: Ya puedes escribir lo que te queda DISPONIBLE en la tarjeta, que es lo que muestra tu banco. La app calcula sola lo que debes.',
       'arreglo: La fila de saldo a favor mostraba RD$ 0.00 teniendo dinero a favor.',
       'arreglo: Desde la notificacion fija, "Gasto" no abria nada si era lo ultimo que habias abierto. "Ingreso" si. Ahora los dos.',
@@ -104,8 +160,8 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     date: '2026-09-20',
     title: 'Las tarjetas, cuadrando de verdad',
     items: [
-      'arreglo: GRAVE - en una tarjeta de credito, el saldo que escribias se guardaba al reves: tecleabas lo que debias y la app entendia que el banco te debia a ti. La tarjeta decia "no debes nada" y el boton de pagar ofrecia RD$ 0.00.',
-      'arreglo: GRAVE - al editar una cuenta, "Detalles" se recortaba solo y dejaba visible una sola fila: no se podia cambiar ni el limite, ni el banco, ni el ciclo, ni nada.',
+      'arreglo: ! en una tarjeta de credito, el saldo que escribias se guardaba al reves: tecleabas lo que debias y la app entendia que el banco te debia a ti. La tarjeta decia "no debes nada" y el boton de pagar ofrecia RD$ 0.00.',
+      'arreglo: ! al editar una cuenta, "Detalles" se recortaba solo y dejaba visible una sola fila: no se podia cambiar ni el limite, ni el banco, ni el ciclo, ni nada.',
       'nuevo: Ya puedes pagar la linea en dolares de tu tarjeta por separado, con su propio saldo y su propio boton.',
       'arreglo: Los centavos volvieron a la franja de Movimientos.',
       'mejor: Las notificaciones abren desde el lateral derecho, sin tapar la barra de abajo.',
@@ -151,7 +207,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
       'mejor: "Anual" ahora vive dentro del periodo anual de Analisis.',
       'mejor: Las notificaciones se ordenaron por lo que pide tu atencion.',
       'mejor: La app abre casi 2 segundos mas rapido.',
-      'arreglo: GRAVE - la deuda en dolares no contaba en tu patrimonio.',
+      'arreglo: ! la deuda en dolares no contaba en tu patrimonio.',
       'arreglo: Los gastos en dolares se veian como pesos en el historial de la cuenta.',
       'arreglo: La ficha de una cuenta se veia rota: cabecera pegada y grafico sin dibujar.',
       'arreglo: Ahora puedes tocar un movimiento del historial para editarlo.',

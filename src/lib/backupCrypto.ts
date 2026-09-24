@@ -2,9 +2,7 @@ import { tt } from '@/i18n'
 
 /**
  * Cifrado simétrico con passphrase (PBKDF2 + AES-GCM vía Web Crypto) para
- * proteger backups. Extraído de `data/cloudBackup.ts` a un módulo neutral
- * para poder reusarlo también en el backup/restore local de archivos, sin
- * acoplar ese flujo a Supabase.
+ * proteger backups exportados a un archivo.
  */
 export interface EncryptedEnvelope {
   version: 1

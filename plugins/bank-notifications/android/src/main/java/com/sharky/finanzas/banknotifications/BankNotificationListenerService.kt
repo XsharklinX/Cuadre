@@ -2,6 +2,7 @@ package com.sharky.finanzas.banknotifications
 
 import android.app.Notification
 import android.content.ComponentName
+import android.util.Log
 import android.content.Context
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
@@ -33,6 +34,7 @@ class BankNotificationListenerService : NotificationListenerService() {
         // app abierta). La app los drena al abrir/volver al foreground vía el
         // comando `take_pending`. FILE_LOCK serializa lecturas/escrituras entre
         // el servicio (que escribe) y el plugin (que lee y limpia).
+        private const val TAG = "CuadreBankNotif"
         internal const val PENDING_FILE = "bank_pending.json"
         internal val FILE_LOCK = Any()
         private const val MAX_PENDING = 60
@@ -125,8 +127,24 @@ class BankNotificationListenerService : NotificationListenerService() {
 
         val text = parts.filterNotNull().distinct().joinToString("\n").trim()
 
-        if (!looksLikeBankNotification(sbn.packageName, title.orEmpty(), "${title.orEmpty()}\n$text")) return
+        if (!looksLikeBankNotification(sbn.packageName, title.orEmpty(), "${title.orEmpty()}\n$text")) {
+            Log.d(TAG, "descartada: ${sbn.packageName} (no parece de banco)")
+            return
+        }
 
+        /*
+         * Registro deliberado.
+         *
+         * Este servicio era completamente MUDO: cuando la deteccion no
+         * funcionaba no habia forma de saber si Android no entregaba nada, si
+         * el filtro lo descartaba o si fallaba al guardarlo — habia que
+         * razonarlo leyendo el codigo. Dos lineas de log convierten un dia de
+         * deduccion en un `adb logcat`.
+         *
+         * NO se registra el contenido, solo el paquete: el texto lleva montos y
+         * numeros de tarjeta, y eso no va a un log.
+         */
+        Log.d(TAG, "capturada: ${sbn.packageName}")
         // 1) Persistir SIEMPRE (sobreviva o no la app abierta).
         persistPending(sbn.packageName, title.orEmpty(), text, sbn.postTime)
         // 2) Si la app está abierta, "despertar" al JS para que drene ya mismo.

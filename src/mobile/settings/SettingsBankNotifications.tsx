@@ -10,6 +10,8 @@ import { useDismissals } from '@/store/dismissals'
 import { useFinance } from '@/store/finance'
 import { useSettings } from '@/store/settings'
 import { translateCategoryName, useT } from '@/i18n'
+import { isBatteryExempt } from '@/lib/localReminders'
+import { MobileBatteryGuide } from '../MobileBatteryGuide'
 import { SettingsRow, SettingsSheet, type SheetProps } from './shared'
 import { ACCT_ICONS, useBankSuggestionActions } from './bankSuggestionActions'
 
@@ -47,6 +49,8 @@ export function SettingsBankNotifications({ activeSheet, onOpen, onClose, groupe
   const t = useT()
   const debug = useBankNotificationsDebug()
   const [showDiag, setShowDiag] = useState(false)
+  const [batteryGuide, setBatteryGuide] = useState(false)
+  const [batteryExempt, setBatteryExempt] = useState<boolean | null>(null)
   const [granted, setGranted] = useState<boolean | null>(null)
   // "Vinculado" se rastrea aparte de "concedido": tras actualizar el APK Android
   // desvincula el listener y deja de detectar, aunque el permiso siga concedido.
@@ -60,6 +64,16 @@ export function SettingsBankNotifications({ activeSheet, onOpen, onClose, groupe
   const restoreAll = dismissals.restoreAll
 
   useEffect(() => {
+    let cancelled = false
+    const check = () => { void isBatteryExempt().then(v => { if (!cancelled) setBatteryExempt(v) }) }
+    check()
+    // Al volver de los ajustes del sistema, el estado pudo cambiar.
+    const onVisible = () => { if (document.visibilityState === 'visible') check() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => { cancelled = true; document.removeEventListener('visibilitychange', onVisible) }
+  }, [])
+
+  useEffect(() => {
     if (!isTauri()) return
     let cancelled = false
     // Consultar el estado también PIDE el re-vínculo si hiciera falta, así que
@@ -68,8 +82,33 @@ export function SettingsBankNotifications({ activeSheet, onOpen, onClose, groupe
       if (cancelled) return
       setGranted(status.granted)
       setConnected(status.connected)
+
+      /*
+       * CONCEDER EL PERMISO ENCIENDE LA DETECCION.
+       *
+       * Habia DOS interruptores independientes: el permiso especial de Android
+       * y este de la app. La tarjeta de estado solo miraba el primero, asi que
+       * el usuario concedia el permiso —que es la parte dificil, en una
+       * pantalla del sistema, buscando la app en una lista— veia "Servicio
+       * activo" en verde, y la deteccion seguia apagada. No detectaba nada y
+       * la app le decia que todo estaba bien.
+       *
+       * Conceder ese permiso es un acto deliberado que solo sirve para esto:
+       * ya es el consentimiento. Pedir un segundo si despues de lo dificil es
+       * una trampa.
+       *
+       * Solo la primera vez (`enabledSince === 0`): si alguien lo apago a
+       * proposito y dejo el permiso puesto, su decision se respeta.
+       */
+      if (status.granted && status.connected && !suggestions.enabled && !suggestions.enabledSince) {
+        suggestions.setEnabled(true)
+        toast(t('detectionAutoEnabled'), { icon: 'check', type: 'ok' })
+      }
     })
     return () => { cancelled = true }
+    // Se re-evalua al abrir la pantalla, no cuando cambian `suggestions` o `t`:
+    // incluirlos re-consultaria a Android en cada pulsacion de un interruptor.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSheet])
 
   const handleOpenSettings = async () => {
@@ -93,15 +132,29 @@ export function SettingsBankNotifications({ activeSheet, onOpen, onClose, groupe
         ? t('accessGranted')
         : t('accessGrantedNotBound')
 
-  // Estado de salud del servicio para el health card (color + título).
-  const health = granted == null ? 'checking' : connected ? 'ok' : granted ? 'warn' : 'bad'
+  /*
+   * La tarjeta mira la CADENA ENTERA, no solo el permiso.
+   *
+   * Antes decia "Servicio activo" en verde con la deteccion apagada: el
+   * permiso estaba dado y el servicio vinculado, pero la app no drenaba nada.
+   * Un estado verde que no significa "funciona" es peor que uno rojo — manda
+   * al usuario a buscar el problema donde no esta.
+   */
+  const health = granted == null
+    ? 'checking'
+    : !granted ? 'bad'
+    : !connected ? 'warn'
+    : !suggestions.enabled ? 'off'
+    : 'ok'
   const healthTitle = health === 'ok'
     ? t('detectionServiceActive')
-    : health === 'warn'
-      ? t('detectionServiceIdle')
-      : health === 'bad'
-        ? t('detectionServiceNoAccess')
-        : t('checking')
+    : health === 'off'
+      ? t('detectionServiceOff')
+      : health === 'warn'
+        ? t('detectionServiceIdle')
+        : health === 'bad'
+          ? t('detectionServiceNoAccess')
+          : t('checking')
 
   const card = (
     <div className="mset-card">
@@ -165,11 +218,19 @@ export function SettingsBankNotifications({ activeSheet, onOpen, onClose, groupe
         sublabel={t('transactionDetectionSub')}
         value={suggestions.items.length ? t('capturedCount').replace('{count}', String(suggestions.items.length)) : undefined}
         onClick={() => onOpen('bankNotifications')} />
+      {/* La guia tiene que vivir AQUI y no solo en el aviso de arranque: quien
+          lo descarta una vez no tendria forma de volver, y es justo el ajuste
+          del que depende que todo lo de esta pantalla siga funcionando. */}
+      <SettingsRow icon="bolt" iconColor="#ff9f0a" label={t('batteryTitle')}
+        sublabel={t('batteryNudgeBody')}
+        value={batteryExempt === null ? undefined : batteryExempt ? t('batteryStatusOk') : t('batteryStatusMissing')}
+        onClick={() => setBatteryGuide(true)} />
     </div>
   )
 
   return (
     <>
+      {batteryGuide && <MobileBatteryGuide onClose={() => setBatteryGuide(false)} />}
       {grouped ? card : (
         <div className="mset-section">
           <div className="mset-section-label">{t('notificationsSection')}</div>
@@ -191,9 +252,11 @@ export function SettingsBankNotifications({ activeSheet, onOpen, onClose, groupe
               <span className="mset-health-ico"><Icon name="shield" size={20} /></span>
               <div className="mset-health-text">
                 <b>{healthTitle}</b>
-                <small>{debug.drainCount > 0
-                  ? `${relativeTime(debug.lastDrainAt, t)} · ${t('detectionDeliveredCount').replace('{n}', String(debug.lastPendingCount))}`
-                  : accessLabel}</small>
+                <small>{health === 'off'
+                  ? t('detectionServiceOffDesc')
+                  : debug.drainCount > 0
+                    ? `${relativeTime(debug.lastDrainAt, t)} · ${t('detectionDeliveredCount').replace('{n}', String(debug.lastPendingCount))}`
+                    : accessLabel}</small>
               </div>
               <span className="mset-health-dot" />
             </div>

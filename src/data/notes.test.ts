@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { APP_NAME } from '@/data/release'
-import { itemLineTotal, noteProgress, noteShareText, noteTotals, orderedItems, type Note, type NoteItem } from './notes'
+import { itemLineTotal, noteProgress, noteShareText, noteTotals, orderedItems, type Note, type NoteItem, budgetState, budgetLeft } from './notes'
 
 const item = (over: Partial<NoteItem>): NoteItem => ({ id: over.id ?? 'i', text: 'x', done: false, ...over })
 
@@ -109,5 +109,47 @@ describe('noteShareText', () => {
     const text = noteShareText(n, money)
     expect(text).toContain('Idea')
     expect(text).toContain('Comprar regalo de Ana')
+  })
+})
+
+describe('tope de gasto de una lista', () => {
+  const lista = (items: Array<{ price?: number; qty?: number }>, budget?: number): Note => ({
+    id: 'n1', title: 'Super', type: 'shopping', color: '#fff', icon: 'cart',
+    createdAt: 0, updatedAt: 0, budget,
+    items: items.map((it, i) => ({ id: `i${i}`, text: `x${i}`, done: false, ...it })),
+  })
+
+  it('sin tope no opina', () => {
+    expect(budgetState(lista([{ price: 500 }]))).toBe('none')
+    expect(budgetState(lista([{ price: 500 }], 0))).toBe('none')
+    expect(budgetLeft(lista([{ price: 500 }]))).toBeNull()
+  })
+
+  it('holgado', () => {
+    expect(budgetState(lista([{ price: 1_000 }], 3_000))).toBe('ok')
+    expect(budgetLeft(lista([{ price: 1_000 }], 3_000))).toBe(2_000)
+  })
+
+  it('avisa cuando queda poco margen', () => {
+    expect(budgetState(lista([{ price: 2_800 }], 3_000))).toBe('close')
+  })
+
+  it('pasado de tope', () => {
+    expect(budgetState(lista([{ price: 3_400 }], 3_000))).toBe('over')
+    expect(budgetLeft(lista([{ price: 3_400 }], 3_000))).toBe(-400)
+  })
+
+  /*
+   * Se mide contra el TOTAL estimado, no contra lo ya marcado: la pregunta es
+   * "me alcanza para todo esto", y responderla con lo que ya echaste al
+   * carrito llegaria siempre tarde — en la caja.
+   */
+  it('cuenta todo lo de la lista, no solo lo ya marcado', () => {
+    const n = lista([{ price: 1_000 }, { price: 2_500 }], 3_000)
+    expect(budgetState(n)).toBe('over')
+  })
+
+  it('las cantidades cuentan', () => {
+    expect(budgetState(lista([{ price: 500, qty: 8 }], 3_000))).toBe('over')
   })
 })

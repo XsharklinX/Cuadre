@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import type { ThemeName, DensityName, OverdraftPolicy } from '@/types'
 import { isAndroidTauri } from '@/lib/secureBlob'
 import { saveAppLock } from '@/lib/appLockStorage'
+import { EMPTY_SNOOZE, type SnoozeState } from '@/data/updatePrompt'
 
 interface SettingsState {
   theme:             ThemeName
@@ -37,6 +38,25 @@ interface SettingsState {
   fontScale: number
   compactNumbers: boolean
   dismissedAlerts: string[]
+  /**
+   * Cuántas veces y cuándo se pospuso el aviso de actualizar.
+   *
+   * Va aquí y no en `dismissedAlerts` porque no es un "ya lo vi": es un
+   * historial con el que se decide cuánto insistir. Ver `data/updatePrompt.ts`.
+   */
+  updateSnooze: SnoozeState
+  /**
+   * MODO PRIVADO: los montos salen tapados (•••) en toda la app.
+   *
+   * Abrir la app de tus finanzas en la guagua, en la fila del banco o con
+   * alguien al lado significa enseñarle a un desconocido cuanto ganas y cuanto
+   * debes. Hasta ahora la unica defensa era el bloqueo con PIN, que es todo o
+   * nada: o no ves nada, o lo ve todo el mundo.
+   *
+   * Tapa solo las CIFRAS. Las categorias, las fechas y los conceptos se
+   * quedan: se puede seguir usando la app con normalidad.
+   */
+  privacyMode: boolean
   /**
    * Pagos recurrentes (ids de plantilla) que no deben volver a avisar NUNCA.
    * Va aparte de `dismissedAlerts` porque aquel descarta por ocurrencia
@@ -103,6 +123,8 @@ interface SettingsState {
   setSoundVolume: (v: number) => void
   setCompactNumbers: (v: boolean) => void
   dismissAlert: (id: string) => void
+  setUpdateSnooze: (value: SnoozeState) => void
+  togglePrivacyMode: () => void
   silenceRecurring: (transactionId: string) => void
   unsilenceRecurring: (transactionId: string) => void
   markAlertNotified: (id: string) => void
@@ -157,6 +179,8 @@ export const useSettings = create<SettingsState>()(
       soundVolume: 0.55,
       compactNumbers: false,
       dismissedAlerts: [],
+      updateSnooze: EMPTY_SNOOZE,
+      privacyMode: false,
       silencedRecurring: [],
       notifiedAlerts: [],
       hasSeenOnboarding: false,
@@ -229,6 +253,8 @@ export const useSettings = create<SettingsState>()(
       setCompactNumbers: (compactNumbers) => set({ compactNumbers }),
       dismissAlert: (id) => set(state =>
         state.dismissedAlerts.includes(id) ? state : { dismissedAlerts: [...state.dismissedAlerts, id] }),
+      setUpdateSnooze: (updateSnooze) => set({ updateSnooze }),
+      togglePrivacyMode: () => set(state => ({ privacyMode: !state.privacyMode })),
       silenceRecurring: (transactionId) => set(state =>
         state.silencedRecurring.includes(transactionId)
           ? state

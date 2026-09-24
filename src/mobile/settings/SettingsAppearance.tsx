@@ -6,7 +6,7 @@ import { ACCENT_COLORS } from '@/constants'
 import { CURRENCIES } from '@/data/currencies'
 import { currentRate } from '@/data/fxAlerts'
 import { fmt } from '@/data/helpers'
-import { useResolvedTheme } from '@/hooks/useResolvedTheme'
+import { useResolvedTheme, type ResolvedTheme } from '@/hooks/useResolvedTheme'
 import { useT } from '@/i18n'
 import { playSoundPreview, playSuccessHaptic } from '@/lib/sound'
 import { useFinance } from '@/store/finance'
@@ -32,6 +32,10 @@ function getThemeLabels(t: ReturnType<typeof useT>): Record<ThemeName, string> {
     light: t('themeLightLabel'),
     amoled: t('themeAmoledLabel'),
     system: t('themeSystemLabel'),
+    ocean: t('themeOceanLabel'),
+    sunset: t('themeSunsetLabel'),
+    forest: t('themeForestLabel'),
+    sand: t('themeSandLabel'),
   }
 }
 
@@ -51,16 +55,27 @@ function getOverdraftLabels(t: ReturnType<typeof useT>): Record<OverdraftPolicy,
   }
 }
 
-const themePreviewBg: Record<'dark' | 'light' | 'amoled', string> = {
+/* La muestra de cada tema usa SU fondo y SU texto reales, no una aproximacion:
+   una vista previa que no coincide con lo que sale al elegirla es peor que no
+   tener vista previa. */
+const themePreviewBg: Record<ResolvedTheme, string> = {
   dark: '#0a0e16',
   light: '#f4f7fb',
   amoled: '#000000',
+  ocean: '#04161f',
+  sunset: '#1a0f1c',
+  forest: '#071612',
+  sand: '#f3ece1',
 }
 
-const themePreviewFg: Record<'dark' | 'light' | 'amoled', string> = {
+const themePreviewFg: Record<ResolvedTheme, string> = {
   dark: '#e9eef7',
   light: '#172033',
   amoled: '#e9eef7',
+  ocean: '#e2f4f8',
+  sunset: '#fbeaf2',
+  forest: '#e4f5ec',
+  sand: '#2b2318',
 }
 
 export function SettingsAppearance({ activeSheet, onOpen, onClose, only }: SheetProps & { only?: 'finance' | 'appearance' }) {
@@ -251,6 +266,27 @@ export function SettingsAppearance({ activeSheet, onOpen, onClose, only }: Sheet
             onClick={() => onOpen('language')}
           />
 
+          {/* MODO PRIVADO. Va junto a los ajustes de como se ven los numeros
+              porque es exactamente eso: como se ven. */}
+          <div className="mset-row">
+            <span className="mset-row-icon" style={{ background: '#5bc0ff22', color: '#5bc0ff' }}>
+              <Icon name="lock" size={18} />
+            </span>
+            <div className="mset-row-text">
+              <b>{t('privacyModeLabel')}</b>
+              <small>{t('privacyModeDesc')}</small>
+            </div>
+            <label className="mset-toggle-wrap">
+              <input
+                type="checkbox"
+                className="mset-toggle-input"
+                checked={settings.privacyMode}
+                onChange={settings.togglePrivacyMode}
+              />
+              <span className="mset-toggle" />
+            </label>
+          </div>
+
           <div className="mset-row">
             <span className="mset-row-icon" style={{ background: '#a78bfa22', color: '#a78bfa' }}>
               <Icon name="chart" size={18} />
@@ -385,7 +421,7 @@ export function SettingsAppearance({ activeSheet, onOpen, onClose, only }: Sheet
       {activeSheet === 'theme' && (
         <SettingsSheet title={t('theme')} onClose={onClose}>
           <div className="mset-sheet-options">
-            {(['dark', 'light', 'amoled', 'system'] as ThemeName[]).map(theme => {
+            {(['system', 'dark', 'light', 'amoled', 'ocean', 'sunset', 'forest', 'sand'] as ThemeName[]).map(theme => {
               const previewKey = theme === 'system' ? resolvedTheme : theme
               return (
                 <button

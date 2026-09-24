@@ -43,9 +43,6 @@ class MainActivity : TauriActivity() {
    * MainActivity — igual que `handleShareIntent`, que ya funciona de forma
    * fiable — y dejamos un marcador (`{cacheDir}/shortcut.txt`) que el lado
    * Rust/JS consume una sola vez vía `take_pending_shortcut`.
-   *
-   * NO consume las URLs de `auth` (login): esas solo las maneja el flujo de
-   * Supabase; aqui solo interesan los atajos.
    */
   private fun handleShortcutIntent(intent: Intent?) {
     if (intent == null || intent.action != Intent.ACTION_VIEW) return

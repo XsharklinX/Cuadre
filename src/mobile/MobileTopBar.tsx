@@ -3,7 +3,6 @@ import { getCurrencyMeta } from '@/data/currencies'
 import { useFinance } from '@/store/finance'
 import { useSettings } from '@/store/settings'
 import { useT } from '@/i18n'
-import { MobileSyncBadge } from './MobileSyncBadge'
 import { MobileMonthStrip } from './MobileMonthStrip'
 import type { MobileRoute } from './MobileBottomNav'
 import type { ViewId } from '@/types'
@@ -42,6 +41,8 @@ export function MobileTopBar({
   const { currency } = useFinance()
   const meta = getCurrencyMeta(currency)
   const lang = useSettings(s => s.language)
+  const privacyMode = useSettings(s => s.privacyMode)
+  const togglePrivacyMode = useSettings(s => s.togglePrivacyMode)
   const locale = lang === 'es' ? 'es-DO' : 'en-US'
   const t = useT()
 
@@ -96,7 +97,17 @@ export function MobileTopBar({
         <div className="mobile-topbar-side mobile-topbar-right">
           {!compactHeader && (
             <>
-              <MobileSyncBadge />
+              {/* MODO PRIVADO a un toque. En Ajustes tambien esta, pero quien
+                  necesita tapar la pantalla lo necesita AHORA, no dentro de
+                  cuatro toques: alguien acaba de sentarse al lado. */}
+              <button
+                className={`mobile-icon-btn${privacyMode ? ' on' : ''}`}
+                aria-label={t(privacyMode ? 'privacyModeOn' : 'privacyModeOff')}
+                aria-pressed={privacyMode}
+                onClick={togglePrivacyMode}
+              >
+                <Icon name={privacyMode ? 'eyeOff' : 'eye'} size={17} />
+              </button>
               <button className="mobile-currency-btn" aria-label={t('currency')} onClick={onCurrency}>
                 <span className="mobile-currency-flag">{meta.flag}</span>
                 <span className="mobile-currency-code">{currency}</span>

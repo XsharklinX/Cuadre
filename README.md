@@ -86,7 +86,7 @@ Toma una foto de un recibo y la app extrae el monto con OCR — reconocimiento e
 
 ### Tus datos, respaldados de varias formas
 
-Backup manual en JSON, backup automático semanal a una carpeta dedicada en tu teléfono, snapshots de recuperación locales, y respaldo en la nube opcional vía Supabase si activas sincronización.
+Backup manual en JSON (con cifrado por contraseña opcional), backup automático semanal a una carpeta dedicada en tu teléfono, y snapshots de recuperación locales. Todo vive en tu dispositivo: no hay servidor al que subir nada.
 
 ### Seguridad sin fricción
 
@@ -121,7 +121,6 @@ Las funciones que dependen del hardware del teléfono (OCR nativo, notificacione
 | Bundler | Vite 6 |
 | Estado | Zustand 5 |
 | App nativa | Tauri 2 (Rust) — Android y Windows |
-| Backend cloud | Supabase (auth, sync en tiempo real, storage) |
 | Gráficas | Recharts |
 | Exportación | jsPDF, ExcelJS, html2canvas |
 | OCR | ML Kit (Android) / Tesseract.js (web) |
@@ -132,10 +131,10 @@ Las funciones que dependen del hardware del teléfono (OCR nativo, notificacione
 ```text
 src/
   mobile/          Toda la UI mobile-first (30+ pantallas y sheets)
-  store/           Zustand — finanzas, ajustes, auth, deudas
+  store/           Zustand — finanzas, ajustes, deudas
   data/            Cálculos, import/export, backup, inteligencia financiera
   hooks/           Automatizaciones (recurrencias, backups, notificaciones)
-  lib/             Integraciones (Supabase, OCR, biometría, notificaciones)
+  lib/             Integraciones (OCR, biometría, notificaciones, cifrado de backups)
   i18n/            Diccionarios ES/EN
   styles/          CSS modular por sección
 
@@ -155,7 +154,6 @@ Necesitas Node.js 20+, npm y, si vas a compilar la app nativa, Rust estable con 
 
 ```bash
 npm install
-cp .env.example .env.local   # configura Supabase solo si vas a probar cloud sync
 npm run dev                  # servidor web en localhost:3000
 npm run tauri:dev            # versión desktop nativa
 ```
@@ -189,9 +187,8 @@ Genera `release/windows/$harky-setup.exe` (instalador) y `$harky-portable.exe`. 
 
 ## Seguridad y privacidad
 
-- **Local-first de verdad**: la app funciona completa sin conexión. La nube es un extra, no un requisito.
+- **Local y punto**: no hay cuentas, no hay servidor y no hay sincronización. Tus datos financieros nunca salen del dispositivo, así que no hay nada que filtrar ni nadie a quien pedírselos.
 - El PIN y el patrón se cifran con el Keystore de Android (o el keyring del sistema en desktop) — nunca se guardan en texto plano.
-- La sincronización cloud usa Row Level Security en Supabase: cada usuario solo puede leer y escribir sus propios datos.
 - No hay telemetría de terceros. Cualquier diagnóstico es local y opcional.
 
 ## Estado del proyecto

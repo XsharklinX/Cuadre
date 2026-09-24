@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
+import { AccountPickerRow } from '@/components/ui/AccountPickerRow'
 import { Icon } from '@/components/ui/Icon'
 import { BrandLogo } from '@/components/ui/BrandLogo'
 import { toast } from '@/components/ui/Toast'
-import { accountCurrency, currentMonthKey, dateLocale, fmt, localToday } from '@/data/helpers'
+import { currentMonthKey, dateLocale, fmt, localToday } from '@/data/helpers'
 import { detectSubscriptions, subscriptionInsightKey as insightKey, type SubscriptionInsight } from '@/data/financeIntelligence'
 import { deleteWithUndo } from '@/lib/undoDelete'
 import { CURRENCIES } from '@/data/seed'
@@ -320,6 +321,10 @@ export function MobileSubscriptions() {
           onDismiss={item => {
             dismissSuggestion(insightKey(item))
             toast(t('subscriptionIgnoredToast').replace('{name}', titleCase(item.merchant)), { icon: 'check', type: 'ok' })
+          }}
+          onDismissAll={() => {
+            detected.forEach(item => dismissSuggestion(insightKey(item)))
+            toast(t('allSuggestionsDismissed'), { icon: 'check', type: 'ok' })
           }} />
       )}
 
@@ -395,7 +400,20 @@ export function MobileSubscriptions() {
   )
 }
 
-function DetectedSection({ items, categories, accounts, currency, t, onConvert, onDismiss }: {
+/**
+ * Cuántas sugerencias se enseñan de golpe.
+ *
+ * Antes salían TODAS. Con ocho cargos recurrentes detectados, la pantalla se
+ * convertía en un muro de «¿esto es una suscripción?» por encima de las
+ * suscripciones de verdad — que es lo que el usuario venía a ver. Un muro de
+ * preguntas se aprende a ignorar entero, así que la novena sugerencia, la
+ * buena, tampoco se lee.
+ *
+ * De tres en tres: se responden, aparecen las siguientes.
+ */
+const MAX_SUGGESTIONS_AT_ONCE = 3
+
+function DetectedSection({ items, categories, accounts, currency, t, onConvert, onDismiss, onDismissAll }: {
   items: SubscriptionInsight[]
   categories: Category[]
   accounts: Account[]
@@ -403,13 +421,19 @@ function DetectedSection({ items, categories, accounts, currency, t, onConvert, 
   t: ReturnType<typeof useT>
   onConvert: (insight: SubscriptionInsight) => void
   onDismiss: (insight: SubscriptionInsight) => void
+  onDismissAll: () => void
 }) {
+  const shown = items.slice(0, MAX_SUGGESTIONS_AT_ONCE)
+  const hidden = items.length - shown.length
   return (
     <div className="msub-section">
       <div className="msub-section-header">
         <span>{t('detectedAutomaticallyLabel')}</span>
+        {/* Salida limpia para quien no quiere ninguna. Sin esto, la unica forma
+            de quitarlas era descartarlas de una en una. */}
+        <button className="msub-dismiss-all" onClick={onDismissAll}>{t('dismissAllLabel')}</button>
       </div>
-      {items.map(item => {
+      {shown.map(item => {
         const cat = categories.find(c => c.id === item.categoryId)
         const acct = accounts.find(a => a.id === item.accountId)
         return (
@@ -436,6 +460,10 @@ function DetectedSection({ items, categories, accounts, currency, t, onConvert, 
           </div>
         )
       })}
+      {/* Decir cuantas quedan evita que parezca que la app dejo de detectar. */}
+      {hidden > 0 && (
+        <p className="msub-more-hint">{t('moreSuggestionsHint').replace('{n}', String(hidden))}</p>
+      )}
     </div>
   )
 }
@@ -891,6 +919,7 @@ function RecurringTxForm({
           title={t('name')}
           value={note}
           placeholder={t('notePlaceholder')}
+          suggestFor={{ categoryId }}
           onDone={v => { setNote(v); setSub(null) }}
           onClose={() => setSub(null)}
         />
@@ -906,18 +935,12 @@ function RecurringTxForm({
             </header>
             <div className="mobile-picker-list">
               {accounts.map(a => (
-                <button
+                <AccountPickerRow
                   key={a.id}
-                  className={`mobile-picker-row${a.id === accountId ? ' active' : ''}`}
-                  onClick={() => { setAccountId(a.id); setSub(null) }}
-                >
-                  <span style={{ color: a.color }}>
-                    <Icon name={ACCT_ICONS[a.type]} size={22} />
-                  </span>
-                  <b>{a.name}</b>
-                  <small>{fmt(a.balance, accountCurrency(a, currency))}</small>
-                  {a.id === accountId && <Icon name="check" size={16} style={{ color: 'var(--accent, #ffdd3d)', marginLeft: 4 }} />}
-                </button>
+                  account={a}
+                  selected={a.id === accountId}
+                  onSelect={() => { setAccountId(a.id); setSub(null) }}
+                />
               ))}
             </div>
           </section>

@@ -535,27 +535,7 @@
     outline: none;
   }
   .mobile-quick-note-input input::placeholder { color: #444; }
-  .mobile-note-chips {
-    display: flex;
-    gap: 6px;
-    overflow-x: auto;
-    padding: 4px 16px 6px;
-    scrollbar-width: none;
-  }
-  .mobile-note-chips::-webkit-scrollbar { display: none; }
-  .mobile-note-chip {
-    background: var(--m-surface);
-    border: 1px solid var(--m-border);
-    border-radius: 999px;
-    color: var(--m-text);
-    flex-shrink: 0;
-    font-size: 12px;
-    font-weight: 700;
-    height: 30px;
-    padding: 0 12px;
-    white-space: nowrap;
-  }
-  .mobile-note-chip:active { background: color-mix(in oklab, var(--m-primary) 12%, var(--m-surface)); }
+
   .mobile-quick-date-btn {
     align-items: center;
     background: var(--m-surface);
@@ -671,8 +651,23 @@
   }
   .mobile-picker-row:active { background: var(--m-surface-2); }
   .mobile-picker-row.active { border-color: color-mix(in oklab, var(--m-primary) 25%, transparent); background: color-mix(in oklab, var(--m-primary) 4%, transparent); }
-  .mobile-picker-row b { flex: 1; font-size: 15px; font-weight: 800; }
+  .mobile-picker-row b { font-size: 15px; font-weight: 800; }
   .mobile-picker-row small { color: var(--m-muted); font-size: 13px; font-weight: 750; }
+
+  /* Nombre y ultimos 4, apilados: con tres tarjetas del mismo banco el nombre
+     solo no alcanza para distinguirlas. `flex: 1` pasa de la <b> a este
+     bloque, que es el que ahora manda en el ancho. */
+  .mpick-id { display: grid; flex: 1; gap: 1px; min-width: 0; }
+  .mpick-id b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mpick-last4 {
+    color: var(--m-muted);
+    font-size: 11.5px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    letter-spacing: .02em;
+  }
+  /* El saldo no encoge ni se parte: es el otro dato con el que se elige. */
+  .mpick-amount { flex-shrink: 0; white-space: nowrap; }
 
   .mobile-create-receipt-preview {
     align-items: center; display: flex; flex-direction: column; gap: 6px;

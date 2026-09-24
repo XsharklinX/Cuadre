@@ -1,6 +1,5 @@
 import { listRecoverySnapshots } from './recovery'
 import { accountMovementsTotal, accountSecondaryMovementsTotal } from './helpers'
-import { isSessionStoredInPlaintext } from '@/lib/secureAuthStorage'
 import type { FinanceState } from '@/store/finance'
 
 export interface DataHealthStatus {
@@ -11,25 +10,18 @@ export interface DataHealthStatus {
   recoveryPoints: number
   lastRecoveryAt?: string
   lastRecoveryReason?: string
-  lastCloudBackupAt?: string
-  lastSyncAt?: string
   riskLevel: 'ok' | 'warning'
   warnings: string[]
   driftedAccounts: number
   driftedSecondary: number
   driftedGoals: number
-  sessionStoredInPlaintext: boolean
 }
 
-export function getDataHealthStatus(state: FinanceState, userId?: string): DataHealthStatus {
+export function getDataHealthStatus(state: FinanceState): DataHealthStatus {
   const snapshots = listRecoverySnapshots()
   const warnings: string[] = []
   const latest = snapshots[0]
-  const lastCloudBackupAt = userId ? localStorage.getItem(`sharky-cloud-backup-last-v1:${userId}`) ?? undefined : undefined
-  const lastSyncAt = userId ? readCloudSyncAt(userId) : undefined
-
   if (!snapshots.length) warnings.push('No hay puntos de recuperacion locales.')
-  if (state.transactions.length > 0 && !lastCloudBackupAt) warnings.push('No hay backup cloud reciente registrado.')
   if (state.accounts.length === 0) warnings.push('No hay cuentas configuradas.')
   if (state.categories.length === 0) warnings.push('No hay categorias configuradas.')
 
@@ -63,12 +55,6 @@ export function getDataHealthStatus(state: FinanceState, userId?: string): DataH
   }, 0)
   if (driftedGoals > 0) warnings.push(`${driftedGoals} meta(s) con ahorro descuadrado.`)
 
-  // Respaldo silencioso: el Keystore de Android falló y la sesión quedó sin
-  // cifrar en el sandbox privado de la app — antes esto no se mostraba en
-  // ningún lado.
-  const sessionStoredInPlaintext = isSessionStoredInPlaintext()
-  if (sessionStoredInPlaintext) warnings.push('La sesión se guardó sin cifrar (el Keystore del dispositivo no está disponible).')
-
   return {
     accounts: state.accounts.length,
     transactions: state.transactions.length,
@@ -77,22 +63,10 @@ export function getDataHealthStatus(state: FinanceState, userId?: string): DataH
     recoveryPoints: snapshots.length,
     lastRecoveryAt: latest?.createdAt,
     lastRecoveryReason: latest?.reason,
-    lastCloudBackupAt,
-    lastSyncAt,
     riskLevel: warnings.length ? 'warning' : 'ok',
     warnings,
     driftedAccounts,
     driftedSecondary,
     driftedGoals,
-    sessionStoredInPlaintext,
-  }
-}
-
-function readCloudSyncAt(userId: string): string | undefined {
-  try {
-    const value = JSON.parse(localStorage.getItem(`sharky-cloud-sync-v1:${userId}`) ?? '{}') as { lastSyncAt?: string }
-    return value.lastSyncAt
-  } catch {
-    return undefined
   }
 }

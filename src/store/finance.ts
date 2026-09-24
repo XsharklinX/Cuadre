@@ -13,6 +13,16 @@ import { useSettings } from '@/store/settings'
 import type { Account, Category, Transaction, Goal, GoalContribution, CurrencyCode, OverdraftPolicy } from '@/types'
 
 type FinanceData = Pick<FinanceState, 'accounts' | 'transactions' | 'categories' | 'goals' | 'goalContributions' | 'currency'>
+/**
+ * Tope de la descripción larga de un movimiento.
+ *
+ * Generoso —caben varios párrafos— pero acotado: el libro entero vive en
+ * `localStorage`, que tiene un límite duro por origen. Un solo campo sin tope
+ * puede llenarlo y dejar la app sin poder guardar NADA más, que es una forma
+ * silenciosa de perderle los datos a alguien.
+ */
+export const MAX_DESCRIPTION = 2000
+
 const ICONS = new Set([
   'home','cart','food','car','bolt','play','heart','bag','book','wallet','laptop','trend',
   'music','coffee','phone','gym','building','bus','gamepad','gift','scissors','baby','paw',
@@ -45,6 +55,17 @@ const CAT_MIGRATE: Record<string, { es: string; oldEn: string[] }> = {
 const text = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0
 const amount = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value)
 const date = (value: unknown): value is string => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
+
+/**
+ * La categoría con la que se rellena un movimiento que no trae ninguna.
+ *
+ * La primera del tipo que toque. No es adivinar la intención del usuario —es
+ * dejar el movimiento VIVO y visible para que él la corrija en dos toques.
+ * La alternativa era descartarlo, y descartarlo significa borrarle dinero.
+ */
+function fallbackCategoryId(categories: Category[], type: 'income' | 'expense'): string | undefined {
+  return categories.find(c => c.type === type)?.id
+}
 
 export function sanitizeFinanceData(value: unknown): FinanceData {
   const data = (value && typeof value === 'object' ? value : {}) as Partial<FinanceData>
@@ -139,8 +160,41 @@ export function sanitizeFinanceData(value: unknown): FinanceData {
   const transactions = (Array.isArray(data.transactions) ? data.transactions : []).filter(tx => {
     if (!text(tx.id) || !['income', 'expense', 'transfer'].includes(tx.type) || !amount(tx.amount) || tx.amount <= 0 || !date(tx.date) || !text(tx.note)) return false
     if (tx.type === 'transfer') return !!tx.fromAccount && !!tx.toAccount && accountIds.has(tx.fromAccount) && accountIds.has(tx.toAccount) && tx.fromAccount !== tx.toAccount
-    return !!tx.accountId && !!tx.categoryId && accountIds.has(tx.accountId) && categoryIds.has(tx.categoryId)
+    // Solo se exige la CUENTA. Sin cuenta, un movimiento no se puede aplicar a
+    // ningún saldo y no hay nada que salvar; sin categoría sí — se le pone una
+    // más abajo. Ver el comentario del rescate de categoría.
+    return !!tx.accountId && accountIds.has(tx.accountId)
   }).map(tx => {
+    /*
+     * CATEGORÍA AUSENTE: se le asigna una, NO se tira el movimiento.
+     *
+     * Antes este filtro exigía `categoryId` válido y descartaba lo que no lo
+     * tuviera. Eso BORRABA DINERO DEL USUARIO en silencio: el ajuste que crea
+     * "Conciliar" nace sin categoría, así que al recargar la app desaparecía y
+     * el saldo volvía a descuadrar. El usuario lo veía como "recalculo y se
+     * borra lo que puse".
+     *
+     * Perder un movimiento es el peor resultado posible en una app de dinero.
+     * Una categoría equivocada se corrige en dos toques; un gasto borrado no
+     * se recupera.
+     */
+    /*
+     * DESCRIPCIÓN: se limpia, no se descarta el movimiento.
+     *
+     * Es un campo libre y opcional. Si viene con basura (no es texto, o es un
+     * muro de 50.000 caracteres de un backup manipulado) se quita LA
+     * DESCRIPCIÓN, nunca el movimiento: el dinero del usuario no se tira por
+     * un campo decorativo.
+     */
+    if (tx.description !== undefined) {
+      const clean = typeof tx.description === 'string' ? tx.description.trim().slice(0, MAX_DESCRIPTION) : ''
+      tx = { ...tx, description: clean || undefined }
+    }
+
+    if (tx.type !== 'transfer' && (!tx.categoryId || !categoryIds.has(tx.categoryId))) {
+      const fallback = fallbackCategoryId(categories, tx.type === 'income' ? 'income' : 'expense')
+      if (fallback) tx = { ...tx, categoryId: fallback }
+    }
     // toAmount: solo válido en transferencias, como número positivo.
     if (tx.toAmount !== undefined && (tx.type !== 'transfer' || !amount(tx.toAmount) || tx.toAmount <= 0)) {
       tx = { ...tx, toAmount: undefined }
@@ -510,6 +564,16 @@ export interface FinanceState {
 
   // Categorías
   addCategory:    (c: Omit<Category, 'id'>) => void
+  /**
+   * Devuelve el id de una categoría fija de la app, creándola si no existe.
+   *
+   * La usan los pagos de deuda: un pago tiene que caer en ALGUNA categoría
+   * para poder verse en los movimientos, en el presupuesto y en los informes.
+   * Obligar al usuario a elegirla cada vez sería fricción sobre una respuesta
+   * que siempre es la misma, y meterla en la semilla no serviría: quien ya
+   * tiene la app instalada nunca la recibiría.
+   */
+  ensureCategory: (seed: Category) => string
   updateCategory: (id: string, fields: Partial<Category>) => void
   deleteCategory: (id: string) => void
   transferEnvelopeFunds: (fromCategoryId: string, toCategoryId: string, amount: number) => void
@@ -651,6 +715,17 @@ export const useFinance = create<FinanceState>()(
               if (fields.balance !== undefined && fields.openingBalance === undefined) {
                 next.openingBalance = fields.balance - accountMovementsTotal(id, s.transactions, s.goalContributions)
               }
+              // EL SEGUNDO LIBRO, con la MISMA regla.
+              //
+              // Sin esto, editar la deuda en dólares dejaba `secondaryBalance`
+              // en -39.80 y `secondaryOpeningBalance` donde estaba (0). En el
+              // siguiente "Recalcular", la invariante `apertura + movimientos`
+              // devolvía 0 y la deuda en dólares DESAPARECÍA — sin aviso y sin
+              // rastro en el libro.
+              if (fields.secondaryBalance !== undefined && fields.secondaryOpeningBalance === undefined) {
+                next.secondaryOpeningBalance =
+                  fields.secondaryBalance - accountSecondaryMovementsTotal(id, s.transactions)
+              }
               return next
             }),
           }
@@ -712,9 +787,16 @@ export const useFinance = create<FinanceState>()(
         if (!account) return 0
         const diff = Math.round((balance - account.balance) * 100) / 100
         if (Math.abs(diff) < 0.005) return 0
+        // CON CATEGORÍA. El ajuste nacía sin ella y el saneador lo borraba al
+        // recargar: el usuario conciliaba, veía el saldo cuadrar, cerraba la
+        // app y al volver el descuadre estaba otra vez ahí. El saneador ya no
+        // borra (rellena), pero el ajuste debe nacer bien de todos modos: un
+        // movimiento sin categoría no se puede filtrar ni presupuestar.
+        const type = diff > 0 ? 'income' : 'expense'
         const tx = normalizeTransaction({
-          id: newId(), type: diff > 0 ? 'income' : 'expense', amount: Math.abs(diff),
+          id: newId(), type, amount: Math.abs(diff),
           accountId: id, date: localToday(), note: tt('reconciliationAdjustmentNote'),
+          categoryId: fallbackCategoryId(s.categories, type),
         } as Transaction)
         set({
           transactions: sortTxns([tx, ...s.transactions]),
@@ -785,6 +867,13 @@ export const useFinance = create<FinanceState>()(
         if (!text(c.name) || !/\p{L}/u.test(c.name)) throw new Error('Escribe un nombre válido para la categoría.')
         return { categories: [...s.categories, { id: newId('cat_'), ...c, name: c.name.trim() }] }
       }),
+
+      ensureCategory: (seed) => {
+        const existing = get().categories.find(c => c.id === seed.id)
+        if (existing) return existing.id
+        set(s => ({ categories: [...s.categories, seed] }))
+        return seed.id
+      },
 
       updateCategory: (id, fields) => set(s => {
         if (fields.name !== undefined && (!text(fields.name) || !/\p{L}/u.test(fields.name))) throw new Error('Escribe un nombre válido para la categoría.')

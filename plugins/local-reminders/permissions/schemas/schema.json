@@ -295,6 +295,18 @@
       "type": "string",
       "oneOf": [
         {
+          "description": "Enables the battery_status command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-battery-status",
+          "markdownDescription": "Enables the battery_status command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the battery_status command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-battery-status",
+          "markdownDescription": "Denies the battery_status command without any pre-configured scope."
+        },
+        {
           "description": "Enables the cancel_reminders command without any pre-configured scope.",
           "type": "string",
           "const": "allow-cancel-reminders",
@@ -365,6 +377,18 @@
           "type": "string",
           "const": "deny-get-backup-status",
           "markdownDescription": "Denies the get_backup_status command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the open_battery_settings command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-open-battery-settings",
+          "markdownDescription": "Enables the open_battery_settings command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the open_battery_settings command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-open-battery-settings",
+          "markdownDescription": "Denies the open_battery_settings command without any pre-configured scope."
         },
         {
           "description": "Enables the open_file command without any pre-configured scope.",
@@ -607,10 +631,10 @@
           "markdownDescription": "Denies the sync_snapshot command without any pre-configured scope."
         },
         {
-          "description": "Permite sincronizar el snapshot de datos, programar/cancelar recordatorios locales (WorkManager) y gestionar el backup semanal automatico (elegir carpeta SAF, programar, probar y consultar estado).\n#### This default permission set includes:\n\n- `allow-sync-snapshot`\n- `allow-schedule-reminders`\n- `allow-cancel-reminders`\n- `allow-sync-backup-snapshot`\n- `allow-pick-backup-folder`\n- `allow-schedule-weekly-backup`\n- `allow-cancel-weekly-backup`\n- `allow-run-backup-now`\n- `allow-get-backup-status`\n- `allow-set-system-bars`\n- `allow-set-quick-add-notification`\n- `allow-share-text`\n- `allow-open-file`\n- `allow-pick-image`",
+          "description": "Permite sincronizar el snapshot de datos, programar/cancelar recordatorios locales (WorkManager) y gestionar el backup semanal automatico (elegir carpeta SAF, programar, probar y consultar estado).\n#### This default permission set includes:\n\n- `allow-sync-snapshot`\n- `allow-schedule-reminders`\n- `allow-cancel-reminders`\n- `allow-sync-backup-snapshot`\n- `allow-pick-backup-folder`\n- `allow-schedule-weekly-backup`\n- `allow-cancel-weekly-backup`\n- `allow-run-backup-now`\n- `allow-battery-status`\n- `allow-open-battery-settings`\n- `allow-get-backup-status`\n- `allow-set-system-bars`\n- `allow-set-quick-add-notification`\n- `allow-share-text`\n- `allow-open-file`\n- `allow-pick-image`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Permite sincronizar el snapshot de datos, programar/cancelar recordatorios locales (WorkManager) y gestionar el backup semanal automatico (elegir carpeta SAF, programar, probar y consultar estado).\n#### This default permission set includes:\n\n- `allow-sync-snapshot`\n- `allow-schedule-reminders`\n- `allow-cancel-reminders`\n- `allow-sync-backup-snapshot`\n- `allow-pick-backup-folder`\n- `allow-schedule-weekly-backup`\n- `allow-cancel-weekly-backup`\n- `allow-run-backup-now`\n- `allow-get-backup-status`\n- `allow-set-system-bars`\n- `allow-set-quick-add-notification`\n- `allow-share-text`\n- `allow-open-file`\n- `allow-pick-image`"
+          "markdownDescription": "Permite sincronizar el snapshot de datos, programar/cancelar recordatorios locales (WorkManager) y gestionar el backup semanal automatico (elegir carpeta SAF, programar, probar y consultar estado).\n#### This default permission set includes:\n\n- `allow-sync-snapshot`\n- `allow-schedule-reminders`\n- `allow-cancel-reminders`\n- `allow-sync-backup-snapshot`\n- `allow-pick-backup-folder`\n- `allow-schedule-weekly-backup`\n- `allow-cancel-weekly-backup`\n- `allow-run-backup-now`\n- `allow-battery-status`\n- `allow-open-battery-settings`\n- `allow-get-backup-status`\n- `allow-set-system-bars`\n- `allow-set-quick-add-notification`\n- `allow-share-text`\n- `allow-open-file`\n- `allow-pick-image`"
         }
       ]
     }

@@ -1,7 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { useFinance } from '@/store/finance'
-import { useAuth } from '@/store/auth'
-import { flushPendingFeedback } from '@/data/feedback'
 import { useSettings } from '@/store/settings'
 import { useT } from '@/i18n'
 import { currentMonthKey, monthKeys } from '@/data/helpers'
@@ -25,8 +23,6 @@ import { useAutoBackup } from '@/hooks/useAutoBackup'
 import { useScheduledBackup } from '@/hooks/useScheduledBackup'
 import { useWeeklyAutoBackup } from '@/hooks/useWeeklyAutoBackup'
 import { useUpdateCheck } from '@/hooks/useUpdateCheck'
-import { useCloudWorkspace } from '@/hooks/useCloudWorkspace'
-import { useAutoCloudSync } from '@/hooks/useAutoCloudSync'
 import { useLiveExchangeRates } from '@/hooks/useLiveExchangeRates'
 import { useAppLockHydration } from '@/hooks/useAppLockHydration'
 import { MobileBiometricGate } from '@/mobile/MobileBiometricGate'
@@ -35,7 +31,10 @@ import { MobilePatternGate } from '@/mobile/MobilePatternGate'
 import { MobileShell } from '@/mobile/MobileShell'
 import { MobileRatingPrompt } from '@/mobile/MobileRatingPrompt'
 import { useRatingPrompt } from '@/hooks/useRatingPrompt'
+import { useStartupPrompts } from '@/hooks/useStartupPrompts'
 import { useWhatsNew } from '@/hooks/useWhatsNew'
+import { MobileBatteryGuide } from '@/mobile/MobileBatteryGuide'
+import { MobileCardRescue } from '@/mobile/MobileCardRescue'
 import { MobileWhatsNew } from '@/mobile/MobileWhatsNew'
 import { useExitConfirm } from '@/mobile/useExitConfirm'
 import { useMobileBackDismiss } from '@/mobile/useMobileBackDismiss'
@@ -71,11 +70,6 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settingsInitialSheet, setSettingsInitialSheet] = useState<Sheet | null>(null)
 
-  const initializeAuth = useAuth(state => state.initialize)
-  useEffect(() => { initializeAuth() }, [initializeAuth])
-
-  // Reintentar comentarios que quedaron encolados sin conexión
-  useEffect(() => { void flushPendingFeedback() }, [])
 
   // Primer arranque: adoptar el idioma del dispositivo si el usuario aún no
   // pasó por el onboarding (después de eso, respetamos su elección manual).
@@ -118,14 +112,29 @@ export default function App() {
   // WorkManager: ahí sigue corriendo al abrir la app.
   useScheduledBackup()
   useWeeklyAutoBackup()
-  const availableUpdate = useUpdateCheck()
-  useCloudWorkspace()
-  useAutoCloudSync()
   useLiveExchangeRates()
   // Valoracion: se evalua una vez por sesion, con retraso, y solo si el usuario
   // ya lleva tiempo usando la app de verdad (ver `data/ratingPrompt.ts`).
   const whatsNew = useWhatsNew()
-  const rating = useRatingPrompt(whatsNew.open)
+  /* Los avisos de arranque van ANTES que la valoracion: pedir una estrella
+     encima de "tu tarjeta esta mal capturada" es pedirla en el peor momento
+     posible. */
+  const startup = useStartupPrompts(whatsNew.open)
+  const rating = useRatingPrompt(whatsNew.open || !!startup.rescue || startup.battery)
+  /*
+   * La actualizacion va la ULTIMA de la cola de arranque.
+   *
+   * No porque importe menos —importa mas que ninguna—, sino porque es la unica
+   * que puede tomar la pantalla completa. Lanzarla encima de "tu tarjeta esta
+   * mal capturada" seria enterrar un aviso sobre el dinero de alguien debajo
+   * de una descarga.
+   */
+  const updateOffer = useUpdateCheck(
+    whatsNew.open || !!startup.rescue || startup.battery || rating.open,
+  )
+  // Cerrado en ESTA sesion. Que vuelva a ofrecerse en la siguiente lo decide
+  // el aplazamiento persistido, no esta bandera.
+  const [updateDismissed, setUpdateDismissed] = useState(false)
 
   const overlayOpen = !!txForm || settingsOpen
   useMobileBackDismiss(overlayOpen, () => {
@@ -247,6 +256,12 @@ export default function App() {
         />
         <ToastHost />
         {whatsNew.open && <MobileWhatsNew onClose={whatsNew.close} highlightLatest />}
+        {!whatsNew.open && startup.rescue && (
+          <MobileCardRescue candidate={startup.rescue} onClose={startup.dismissRescue} />
+        )}
+        {!whatsNew.open && !startup.rescue && startup.battery && (
+          <MobileBatteryGuide onClose={startup.dismissBattery} />
+        )}
         {rating.open && (
           <MobileRatingPrompt
             onRated={rating.rated}
@@ -255,8 +270,10 @@ export default function App() {
           />
         )}
         <Suspense fallback={null}>
-          {availableUpdate && !s.dismissedAlerts.includes(`update-${availableUpdate.version}`) && (
-            <MobileUpdateDialog update={availableUpdate} onDismiss={() => s.dismissAlert(`update-${availableUpdate.version}`)} />
+          {/* Cuándo y cómo se ofrece lo decide `data/updatePrompt.ts`; aquí
+              solo se pinta lo que ya se decidió mostrar. */}
+          {updateOffer && !updateDismissed && (
+            <MobileUpdateDialog offer={updateOffer} onDismiss={() => setUpdateDismissed(true)} />
           )}
           {txForm && <TransactionForm value={txForm} mkey={mkey} onClose={() => setTxForm(null)} onDelete={handleDeleteTx} />}
           {settingsOpen && (

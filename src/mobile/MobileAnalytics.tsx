@@ -10,7 +10,7 @@ import { exportElementPng } from '@/data/imageExport'
 import { exportCsv, exportExcel, exportMonthlyPdf } from '@/data/professionalExport'
 import { advanceRecurrenceDate } from '@/hooks/useRecurring'
 import { playConfirmSound } from '@/lib/sound'
-import { accountSavingsRate, amountForCategory, byCategory, categoryParts, currentMonthKey, dateLocale, monthLabel, monthlySeries, netWorthBreakdown, netWorthSeries, rollingNetWorthSeries, savingsBalance, shortMonth, totalBalanceInBase, totals, transactionsForTotals, txForMonth, type NetWorthPoint } from '@/data/helpers'
+import { accountSavingsRate, amountForCategory, byCategory, categoryParts, currentMonthKey, dateLocale, monthLabel, monthlySeries, netWorthBreakdown, rollingNetWorthSeries, savingsBalance, shortMonth, totalBalanceInBase, totals, transactionsForTotals, txForMonth, type NetWorthPoint } from '@/data/helpers'
 import { projectNetWorth } from '@/data/netWorthProjection'
 import { useAnalyticsSections, type AnalyticsSectionId } from '@/store/analyticsSections'
 import { useDismissals } from '@/store/dismissals'
@@ -22,6 +22,7 @@ import { useMobileBackDismiss } from './useMobileBackDismiss'
 import { useDialogA11y } from './useDialogA11y'
 import { SheetPortal } from './SheetPortal'
 import type { CurrencyCode, IconName, Transaction } from '@/types'
+import { useDebt } from '@/store/debt'
 
 export type AnalyticsPeriod = 'week' | 'month' | 'year'
 
@@ -283,7 +284,6 @@ export function MobileAnalytics({ mkey, onBudgets, onImport, onEditTx, initialPe
   const othersAmount = othersRows.reduce((sum, r) => sum + r.amount, 0)
   const totalExpense = Math.max(1, summary.expense)
   const monthly = monthlySeries(visTx, year)
-  const netWorth = netWorthSeries(accounts, transactions, goalContributions, year, dateLocale(lang), currency)
 
   const barData = useMemo(() => {
     if (period === 'year') {
@@ -433,8 +433,13 @@ export function MobileAnalytics({ mkey, onBudgets, onImport, onEditTx, initialPe
   // (previousAvg > 0) — si no, cualquier gasto nuevo dispararia el insight cada mes.
   const topTrend = intelligence.trends.find(item => item.previousAvg > 0 && item.delta > Math.max(300, item.previousAvg * 0.3))
   const upcomingSubscription = intelligence.subscriptions.find(item => !item.alreadyRecurring) ?? intelligence.subscriptions[0]
-  const netWorthHistory = netWorth.filter(point => point.key <= mkey)
-  const netWorthPoint = netWorth.find(point => point.key === mkey) ?? netWorthHistory[netWorthHistory.length - 1] ?? netWorth[0]
+  /*
+   * La tarjeta de patrimonio mezclaba dos momentos: el NUMERO era el del mes
+   * seleccionado y el desglose de debajo el de HOY. Eran dos periodos
+   * distintos en la misma tarjeta, y eso es la mitad de por que la cifra no se
+   * entendia. Ahora las dos lineas hablan del presente; la evolucion mes a mes
+   * la cuenta la grafica, que es su sitio.
+   */
   const compareNetDeltaPct = showCompare
     ? comparePrev.net !== 0
       ? Math.round(((summary.net - comparePrev.net) / Math.abs(comparePrev.net)) * 100)
@@ -446,7 +451,17 @@ export function MobileAnalytics({ mkey, onBudgets, onImport, onEditTx, initialPe
     [accounts, transactions, goalContributions, mkey, lang, currency],
   )
   const netWorthProjected = useMemo(() => projectNetWorth(netWorthRolling, 6), [netWorthRolling])
-  const netWorthSplit = useMemo(() => netWorthBreakdown(accounts, currency), [accounts, currency])
+  /*
+   * El patrimonio incluye las deudas registradas a mano (prestamos, lo que le
+   * debes a alguien) y lo que TE deben. Sin ellas la cifra decia "patrimonio"
+   * y era "saldo de mis cuentas", que no es lo mismo.
+   */
+  const manualDebts = useDebt(st => st.debts)
+  const netWorthSplit = useMemo(
+    () => netWorthBreakdown(accounts, currency, manualDebts),
+    [accounts, currency, manualDebts],
+  )
+  const netWorthNow = netWorthSplit.assets - netWorthSplit.liabilities
 
   const hiddenInsights = useDismissals(s => s.hiddenInsights)
   const hiddenInsightTypes = useDismissals(s => s.hiddenInsightTypes)
@@ -896,15 +911,16 @@ export function MobileAnalytics({ mkey, onBudgets, onImport, onEditTx, initialPe
 
           <article className="man-quick-card">
             <span className="man-chip-label">{t('netWorthLabel')}</span>
-            <strong className={`man-quick-value ${currentNetWorth >= 0 ? 'income' : 'expense'}`}>
-              {fmtVal(netWorthPoint?.value ?? currentNetWorth, currency)}
+            <strong className={`man-quick-value ${netWorthNow >= 0 ? 'income' : 'expense'}`}>
+              {fmtVal(netWorthNow, currency)}
             </strong>
+            {/* SIEMPRE el desglose, aunque no haya deudas. Un numero solo no
+                se puede comprobar: con "Tienes X · Debes Y" el usuario ve de
+                donde sale y detecta el dato que falta. */}
             <span className="man-quick-subtle">
-              {netWorthSplit.liabilities > 0
-                ? t('netWorthBreakdownLabel')
-                    .replace('{assets}', fmtVal(netWorthSplit.assets, currency))
-                    .replace('{liabilities}', fmtVal(netWorthSplit.liabilities, currency))
-                : t('patrimonyScope')}
+              {t('netWorthBreakdownLabel')
+                .replace('{assets}', fmtVal(netWorthSplit.assets, currency))
+                .replace('{liabilities}', fmtVal(netWorthSplit.liabilities, currency))}
             </span>
           </article>
         </div>

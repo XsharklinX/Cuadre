@@ -8,14 +8,14 @@
     <item android:id="@android:id/background">
         <shape>
             <corners android:radius="999dp" />
-            <solid android:color="#1B2130" />
+            <solid android:color="@color/widget_track" />
         </shape>
     </item>
     <item android:id="@android:id/progress">
         <clip>
             <shape>
                 <corners android:radius="999dp" />
-                <solid android:color="#FFD84D" />
+                <solid android:color="@color/widget_warn" />
             </shape>
         </clip>
     </item>

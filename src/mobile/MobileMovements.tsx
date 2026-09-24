@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react'
 import { AnimatedMoney } from '@/components/ui/AnimatedMoney'
 import { Icon } from '@/components/ui/Icon'
-import { accountBalanceInBase, availableBalanceInBase, convertTxAmountsToBase, fmt, localToday, totals, transactionsForTotals, txForMonth, visibleAccounts } from '@/data/helpers'
+import { accountBalanceInBase, accountCurrency, availableBalanceInBase, convertTxAmountsToBase, fmt, localToday, totals, transactionsForTotals, txForMonth, visibleAccounts } from '@/data/helpers'
+import { creditUsed } from '@/data/creditCard'
 import { weeklyDigest } from '@/data/weeklyDigest'
 import { proactiveInsights } from '@/data/proactiveInsights'
 import { translateCategoryName, useT } from '@/i18n'
+import { useMoneyDecimals } from '@/hooks/useFmt'
 import { useFinance } from '@/store/finance'
 import { useSettings } from '@/store/settings'
 import type { Transaction } from '@/types'
@@ -30,6 +32,7 @@ export function MobileMovements({
   const { compactNumbers, appPin, appPattern, dismissedAlerts, dismissAlert, language,
     hiddenShowInMovements, hiddenCountInBalance, hiddenCountInSummary } = useSettings()
   const t = useT()
+  const moneyDecimals = useMoneyDecimals()
   const lang = (language ?? 'es') as 'en' | 'es'
 
   // Resumen semanal proactivo: los últimos 7 días destilados. Se descarta por
@@ -123,15 +126,50 @@ export function MobileMovements({
                 <span>{t('creditCardsGroupLabel')}</span>
                 <small>{t('creditNotInTotal')}</small>
               </div>
-              {creditAccounts.map(account => (
-                <div key={account.id} className="mhome-balance-row">
-                  <span className="mobile-balance-dot" style={{ background: account.color }} />
-                  <span className="mhome-balance-acct-name">{account.name}</span>
-                  <strong className={account.balance < 0 ? 'expense' : 'muted-amt'}>
-                    {account.balance < 0 ? t('owedAmount').replace('{amount}', fmtMoney(Math.abs(account.balance))) : fmtMoney(0)}
-                  </strong>
-                </div>
-              ))}
+              {/*
+                LA TARJETA ENTERA, NO LA MITAD.
+                Antes esta fila solo enseñaba la deuda en pesos. Una tarjeta
+                dominicana arrastra DOS deudas que el banco liquida por
+                separado —pesos y dólares—, así que quien debía US$ 39.80 veía
+                un resumen que se callaba esa parte.
+                Y decía solo lo que DEBES. Nadie mira su tarjeta en esos
+                términos: la app del banco dice «Disponible», y esa es la cifra
+                con la que se decide si se puede comprar algo. Ahora van las
+                dos, y cada divisa en su línea.
+              */}
+              {creditAccounts.map(account => {
+                const cardCur = accountCurrency(account, currency)
+                const owed = creditUsed(account.balance)
+                const avail = account.limit != null ? Math.max(0, account.limit - owed) : null
+                const secCur = account.secondaryCurrency
+                const secOwed = secCur ? creditUsed(account.secondaryBalance ?? 0) : 0
+                return (
+                  <div key={account.id} className="mhome-balance-card">
+                    <div className="mhome-balance-row">
+                      <span className="mobile-balance-dot" style={{ background: account.color }} />
+                      <span className="mhome-balance-acct-name">{account.name}</span>
+                      <strong className={owed > 0 ? 'expense' : 'muted-amt'}>
+                        {fmt(owed, cardCur)}
+                      </strong>
+                    </div>
+                    {/* La línea en divisa extranjera solo aparece si la tarjeta
+                        la tiene: una tarjeta sin dólares no debe enseñar
+                        "US$ 0.00" y hacer dudar al usuario. */}
+                    {secCur && (
+                      <div className="mhome-balance-row sub">
+                        <span className="mhome-balance-acct-name">{secCur}</span>
+                        <strong className={secOwed > 0 ? 'expense' : 'muted-amt'}>
+                          {fmt(secOwed, secCur)}
+                        </strong>
+                      </div>
+                    )}
+                    <div className="mhome-balance-avail">
+                      <span>{t('cardAvailableLabel')}</span>
+                      <b>{avail !== null ? fmt(avail, cardCur) : t('cardNoLimitShort')}</b>
+                    </div>
+                  </div>
+                )
+              })}
             </>
           )}
           {/* Cuentas ocultas ("no incluidas"): su saldo se ve aquí al tocar el
@@ -178,9 +216,11 @@ export function MobileMovements({
           <div className="mweek-body">
             <div className="mweek-main">
               <small>{t('weeklySpentLabel')}</small>
-              {/* Sin centavos: es la cifra mas grande de la tarjeta y con
-                  decimales se partia en dos lineas. */}
-              <strong>{fmt(digest.expense, currency, { decimals: 0 })}</strong>
+              {/* Los centavos dependen de la preferencia del usuario, no de
+                  esta pantalla. Estaban forzados a cero aqui, asi que "Tu
+                  semana" mostraba RD$ 1,900 mientras el resto de la app
+                  mostraba RD$ 1,900.00. */}
+              <strong>{fmt(digest.expense, currency, { decimals: moneyDecimals })}</strong>
               {digest.expenseDeltaPct !== null && (
                 <span className={`mweek-delta ${digest.expenseDeltaPct > 0 ? 'up' : 'down'}`}>
                   <Icon name="arrowUp" size={11} style={{ transform: digest.expenseDeltaPct > 0 ? 'none' : 'rotate(180deg)' }} />

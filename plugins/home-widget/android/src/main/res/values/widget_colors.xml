@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  COLOR DE LOS WIDGETS — tema claro, por defecto.
+
+  Antes no existia este archivo: cada color estaba escrito a mano en
+  hexadecimal dentro de cada layout y cada drawable. El resultado era un
+  widget SIEMPRE oscuro, que ignoraba el tema del sistema y el fondo de
+  pantalla del usuario — un rectangulo negro pegado en una pantalla clara.
+  Eso es lo que hace que un widget se vea viejo, mas que su tipografia.
+
+  A partir de aqui hay cuatro variantes del mismo juego de nombres:
+    values/            → claro
+    values-night/      → oscuro
+    values-v31/        → Material You (Android 12+), toma el color del fondo
+    values-night-v31/  → Material You oscuro
+
+  Android elige sola. Los layouts solo nombran `@color/widget_*`.
+-->
+<resources>
+    <color name="widget_surface">#FFFFFF</color>
+    <color name="widget_stroke">#1A000000</color>
+    <color name="widget_text">#141A24</color>
+    <color name="widget_text_dim">#5C6478</color>
+    <color name="widget_accent">#2563EB</color>
+    <color name="widget_on_accent">#FFFFFF</color>
+    <color name="widget_income">#0D9268</color>
+    <color name="widget_expense">#D13350</color>
+    <color name="widget_warn">#B45309</color>
+    <color name="widget_track">#12000000</color>
+
+    <!-- El boton "+" conserva su degradado propio: es el unico widget que el
+         usuario reconoce por su aspecto, y homogeneizarlo con el resto seria
+         quitarle justo lo que funciona. -->
+    <color name="widget_fab_top">#5B8DEF</color>
+    <color name="widget_fab_mid">#17A38E</color>
+    <color name="widget_fab_bottom">#2F63E6</color>
+    <color name="widget_fab_edge">#33FFFFFF</color>
+    <color name="widget_fab_ink">#FFFFFF</color>
+</resources>

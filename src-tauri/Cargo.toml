@@ -1,6 +1,6 @@
 [package]
 name        = "sharky"
-version     = "1.9.5"
+version     = "1.9.7"
 description = "Cuadre - Gestion de gastos"
 edition     = "2021"
 
@@ -25,6 +25,7 @@ tauri-plugin-bank-notifications = { path = "../plugins/bank-notifications" }
 tauri-plugin-keystore = { path = "../plugins/keystore" }
 tauri-plugin-home-widget = { path = "../plugins/home-widget" }
 tauri-plugin-play-billing = { path = "../plugins/play-billing" }
+tauri-plugin-in-app-update = { path = "../plugins/in-app-update" }
 serde                    = { version = "1", features = ["derive"] }
 serde_json               = "1"
 keyring                  = { version = "3", features = ["windows-native"] }

@@ -40,54 +40,41 @@ Use the Privacy Policy URL in **Play Console → App content → Privacy policy*
 
 ## 4. Data Safety form
 
+> **Cambio desde 1.9.6:** se elimino toda la infraestructura cloud (Supabase,
+> login con Google, sync entre dispositivos). La app es 100% local. Esto
+> simplifica el formulario radicalmente — **hay que volver a rellenarlo**,
+> porque el que esta enviado declara datos que ya no se recogen.
+
 ### Does your app collect or share any of the required user data types?
 
-**Yes.**
+**No.**
 
-### Data types collected
+La app no envia nada fuera del dispositivo. No hay cuentas, no hay servidor y
+no hay copia de los datos financieros en ningun sitio salvo el telefono del
+usuario. El formulario de comentarios abre la app de correo del propio usuario
+con el texto escrito: el envio lo hace el, desde su cuenta, con su cliente de
+correo — la app no transmite nada.
 
-| Category | Type | Collected? | Shared? | Required/Optional | Purpose |
-|---|---|---|---|---|---|
-| Personal info | Name | Optional | No | Optional | Account management, App functionality |
-| Personal info | Email address | Optional | No | Optional | Account management, App functionality |
-| Personal info | User IDs | Optional | No | Optional | Account management, App functionality |
-| Financial info | User-entered transactions, accounts, budgets, goals | Optional | No | Optional | App functionality (cloud sync) |
-| App activity | Comments/feedback text sent by the user | Optional | No | Optional | App functionality (support) |
-| App info and performance | Crash logs / diagnostics | Optional, **off by default** | No | Optional | Analytics (app functionality) |
-
-Notes for the form:
-- All of the above is collected **only if the user opts in** to Google
-  sign-in / cloud sync. Local-only usage (default) sends nothing off-device.
-- "Shared" = No: Google (auth provider) and Supabase (cloud database) act as
-  service providers / processors strictly to operate the app, which Play
-  Console treats as **not** "sharing with third parties" as long as you
-  declare them as service providers in your privacy policy (already done,
-  section 4).
-- Crash/error telemetry (`errorTelemetryEnabled` in Settings) defaults to
-  **off** and is local-only unless explicitly enabled by the user — confirm
-  current implementation before declaring "collected" if this changes.
+Si Play Console insiste en una justificacion, la frase es: *"Data is entered
+and stored exclusively in the app's private on-device storage. The app has no
+backend, no accounts and no network transmission of user data."*
 
 ### Security practices
 
-- Data is encrypted in transit: **Yes** (HTTPS/TLS, Supabase + Google APIs).
+- Data is encrypted in transit: **N/A** — no user data is transmitted.
 - Users can request data deletion: **Yes**
-  - In-app: Settings → Data → "Eliminar todos los datos" (wipes local **and**
-    cloud-synced data for signed-in users).
-  - Full account deletion: via email to `contactosharklin@gmail.com`
-    (documented in Privacy Policy section 6/10).
+  - In-app: Settings → Data → "Eliminar todos los datos".
+  - Desinstalar la app borra su almacenamiento privado por completo.
 - Committed to Play Families Policy / target audience: app is **not**
   directed at children (target age 18+, or "Everyone" with no child-directed
   content — pick based on your content rating answers).
 
-## 5. Account deletion (Play Console → App content → Data safety →
-   "Account deletion" link, required if app supports account creation)
+## 5. Account deletion
 
-Provide:
-- In-app path: Settings → Data → "Eliminar todos los datos" (deletes synced
-  data) + Settings → Account → Sign out.
-- Web/contact path: `contactosharklin@gmail.com` for full account removal
-  (auth user deletion), since self-service auth-account deletion isn't
-  exposed in the Supabase client SDK without a backend function.
+**Ya no aplica.** La app no permite crear cuentas, asi que Play Console no
+exige el enlace de eliminacion de cuenta. `docs/delete-account.html` se
+mantiene publicada de todos modos: explica como borrar los datos locales y no
+estorba tenerla.
 
 ## 6. After the release goes live on Play Store
 
@@ -103,10 +90,6 @@ isn't the newer one yet.
 
 - [ ] Enable GitHub Pages for `XsharklinX/Sharky-Coin` (`/docs` folder) and
       verify `privacy.html` / `terms.html` load publicly.
-- [ ] Custom Google OAuth Client (Client ID/Secret) configured in
-      Supabase → Authentication → Providers → Google, with consent screen
-      branded as "$harky" (fixes the "...supabase.co" branding on the
-      Google login screen).
 - [ ] Content rating questionnaire (Play Console → App content).
 - [ ] Store listing assets: icon, feature graphic, phone screenshots
       (min. 2), short & full description.

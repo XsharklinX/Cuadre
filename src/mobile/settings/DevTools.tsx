@@ -15,6 +15,9 @@ import { useDev } from '@/store/dev'
 import { useFinance } from '@/store/finance'
 import { useRating } from '@/store/rating'
 import { useT } from '@/i18n'
+import { checkForUpdate } from '@/lib/inAppUpdate'
+import { MobileUpdateDialog } from '@/mobile/MobileUpdateDialog'
+import type { UpdateOffer } from '@/hooks/useUpdateCheck'
 
 /**
  * Las ocho herramientas del panel de desarrollador.
@@ -306,6 +309,63 @@ export function DevRating() {
         <div><span>ya valoro</span><b>{String(rating.rated)}</b></div>
         <div><span>pospuesto</span><b>{rating.timesAsked}</b></div>
       </div>
+    </>
+  )
+}
+
+// ── Actualización dentro de la app ──────────────────────────
+
+/**
+ * PROBAR EL AVISO DE ACTUALIZAR SIN TENER UNA ACTUALIZACIÓN.
+ *
+ * Google Play In-App Updates solo responde en una copia instalada DESDE PLAY.
+ * En una compilación de desarrollo la API falla siempre, así que sin esto el
+ * diálogo sería literalmente imposible de ver antes de publicarlo — se probaría
+ * en producción, con usuarios reales, que es donde no se prueba nada.
+ *
+ * Esto NO simula la descarga (eso lo hace Google): pinta el diálogo en cada uno
+ * de sus estados para poder revisar el texto, el encuadre y los botones.
+ */
+export function DevUpdate() {
+  const t = useT()
+  const [preview, setPreview] = useState<UpdateOffer | null>(null)
+
+  const show = (mode: 'flexible' | 'install' | 'immediate') => setPreview({
+    status: {
+      available: true,
+      versionCode: 1_009_999,
+      stalenessDays: mode === 'immediate' ? 30 : 1,
+      flexibleAllowed: true,
+      immediateAllowed: true,
+      downloaded: mode === 'install',
+    },
+    decision: { show: true, mode },
+  })
+
+  /** Lo que Play contesta de verdad en ESTE dispositivo. */
+  const askPlay = async () => {
+    const status = await checkForUpdate()
+    toast(
+      status.available
+        ? `Hay ${status.versionCode} (${status.stalenessDays ?? 0} días)`
+        : status.reason ?? 'Play dice que no hay nada nuevo',
+      { icon: status.available ? 'download' : 'info' },
+    )
+  }
+
+  return (
+    <>
+      <p className="mset-group-label">{t('devUpdateTitle')}</p>
+      <div className="mset-card mset-dev-chips">
+        <small>{t('devUpdateDesc')}</small>
+        <div>
+          <button onClick={() => show('flexible')}>ofrecer</button>
+          <button onClick={() => show('install')}>descargada</button>
+          <button onClick={() => show('immediate')}>obligada</button>
+          <button onClick={() => void askPlay()}>preguntar a Play</button>
+        </div>
+      </div>
+      {preview && <MobileUpdateDialog offer={preview} onDismiss={() => setPreview(null)} />}
     </>
   )
 }

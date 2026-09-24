@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Icon } from '@/components/ui/Icon'
+import { NoteSuggestionList } from '@/components/ui/NoteSuggestionList'
 import { useT } from '@/i18n'
 import { useMobileBackDismiss } from './useMobileBackDismiss'
 import { useDialogA11y } from './useDialogA11y'
@@ -10,6 +11,7 @@ export function MobileTextSheet({
   value,
   placeholder,
   maxLength,
+  suggestFor,
   onDone,
   onClose,
 }: {
@@ -17,6 +19,14 @@ export function MobileTextSheet({
   value: string
   placeholder?: string
   maxLength?: number
+  /**
+   * Enciende las sugerencias de concepto. Se pasa la categoria activa para
+   * que lo escrito en ella vaya primero; `{}` las activa sin preferencia.
+   *
+   * Solo donde el texto es un CONCEPTO de movimiento. En el nombre de una
+   * cuenta o de una meta no pinta nada ofrecer "Supermercado Nacional".
+   */
+  suggestFor?: { categoryId?: string }
   onDone: (value: string) => void
   onClose: () => void
 }) {
@@ -38,6 +48,13 @@ export function MobileTextSheet({
     <SheetPortal>
     <div ref={dialogRef} className="mtxt-overlay" role="dialog" aria-modal="true" aria-label={title} onClick={onClose}>
       <div className="mtxt-bar" onClick={e => e.stopPropagation()}>
+        {suggestFor && (
+          <NoteSuggestionList
+            query={text}
+            categoryId={suggestFor.categoryId}
+            onPick={value => { onDone(value); onClose() }}
+          />
+        )}
         <span className="mtxt-label">{title}</span>
         <div className="mtxt-row">
           <input

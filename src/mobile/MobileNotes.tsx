@@ -3,7 +3,8 @@ import { Icon } from '@/components/ui/Icon'
 import { toast } from '@/components/ui/Toast'
 import { useDialogs } from '@/components/ui/DialogProvider'
 import { localToday, transactionsForTotals, txForMonth } from '@/data/helpers'
-import { itemLineTotal, itemPriceLabel, noteProgress, noteShareText, noteTotals, orderedItems, type Note, type NoteItem, type NoteType } from '@/data/notes'
+import { budgetLeft, budgetState, itemLineTotal, itemPriceLabel, noteProgress, noteShareText, noteTotals, orderedItems, type Note, type NoteItem, type NoteType } from '@/data/notes'
+import { buildPriceMemory, suggestPrice } from '@/data/notePrices'
 import { useNotes } from '@/store/notes'
 import { deleteWithUndo } from '@/lib/undoDelete'
 import { useFinance } from '@/store/finance'
@@ -252,7 +253,8 @@ function NoteCard({ note, money, onOpen, onLongPress }: {
 
   return (
     <button
-      className={`mnote-card${note.pinned ? ' pinned' : ''}`}
+      className={`mnote-card${note.pinned ? ' pinned' : ''}${pct >= 100 && totals.totalCount > 0 ? ' done' : ''}`}
+      style={{ '--note': note.color } as React.CSSProperties}
       {...pressHandlers}
       onClick={() => { if (press.current.fired) return; onOpen() }}
     >
@@ -357,10 +359,13 @@ function NoteDetail({ note, money, spent, onClose }: {
   const finance = useFinance()
   const { confirm } = useDialogs()
   const { updateNote, deleteNote, restoreNote, duplicateNote, addItem, updateItem, toggleItem, removeItem } = useNotes.getState()
+  // TODAS las listas, incluidas las archivadas: el historial de precios del
+  // usuario esta ahi, y archivar una compra vieja no borra lo que costo.
+  const allNotes = useNotes(st => st.notes)
   const [newText, setNewText] = useState('')
   const addItemRef = useRef<HTMLInputElement>(null)
   const [editingItem, setEditingItem] = useState<NoteItem | null>(null)
-  const [picker, setPicker] = useState<'category' | 'account' | 'goal' | null>(null)
+  const [picker, setPicker] = useState<'category' | 'account' | 'goal' | 'budget' | null>(null)
   const [confirmDel, setConfirmDel] = useState(false)
 
   // El back-dismiss del detalle lo gobierna MobileNotes (padre estable). Aquí
@@ -401,10 +406,27 @@ function NoteDetail({ note, money, spent, onClose }: {
   const overBudget = remainingBudget != null && totals.remaining > remainingBudget
   const overBy = overBudget ? totals.remaining - remainingBudget : 0
 
+  /*
+   * MEMORIA DE PRECIOS. Al añadir un ítem que ya compraste antes, entra con el
+   * precio que pagaste la última vez.
+   *
+   * Sin esto la lista solo estima si tecleas cada precio de memoria, y nadie
+   * los teclea: el total estimado quedaba en cero y la pregunta que de verdad
+   * importa —«¿me alcanza?»— se quedaba sin responder.
+   *
+   * Un precio con más de dos meses NO se rellena solo: ahí es más honesto no
+   * decir nada que dar por bueno un precio de otra temporada.
+   */
+  const priceMemory = useMemo(() => buildPriceMemory(allNotes), [allNotes])
+
   const addNewItem = () => {
     const text = newText.trim()
     if (!text) return
-    addItem(note.id, { text })
+    const remembered = suggestPrice(priceMemory, text)
+    addItem(note.id, {
+      text,
+      ...(remembered && !remembered.stale ? { price: remembered.price } : {}),
+    })
     setNewText('')
     // Mantener el foco en el campo para escribir el siguiente ítem sin tener
     // que volver a tocarlo — clave para armar una lista rápido.
@@ -511,6 +533,41 @@ function NoteDetail({ note, money, spent, onClose }: {
                     <div className="mnote-totrow"><span>{t('remainingLabel')} ({totals.totalCount - totals.boughtCount})</span><b style={{ color: 'var(--m-muted)' }}>{money(totals.remaining)}</b></div>
                     <div className="mnote-totrow big"><span>{t('estimatedTotalLabel')}</span><b>{money(totals.total)}</b></div>
                   </div>
+                )}
+
+                {/*
+                  «VOY AL SÚPER CON RD$ 3.000».
+                  Así es como la gente compra de verdad, y la lista no tenía
+                  dónde anotarlo: calculaba un total estimado sin nada contra
+                  qué compararlo. Con el tope, el total deja de ser un dato y
+                  pasa a ser una respuesta — te alcanza o no te alcanza.
+                */}
+                {hasMoney && (
+                  <button
+                    className={`mnote-budget ${budgetState(note)}`}
+                    onClick={() => setPicker('budget')}
+                  >
+                    <Icon name={note.budget ? 'target' : 'plus'} size={15} />
+                    {note.budget ? (
+                      <>
+                        <span>{t('noteBudgetLabel')}</span>
+                        <b>{money(note.budget)}</b>
+                        {(() => {
+                          const left = budgetLeft(note)
+                          if (left === null) return null
+                          return (
+                            <em>
+                              {left >= 0
+                                ? t('noteBudgetLeft').replace('{amount}', money(left))
+                                : t('noteBudgetOver').replace('{amount}', money(-left))}
+                            </em>
+                          )
+                        })()}
+                      </>
+                    ) : (
+                      <span>{t('noteBudgetSet')}</span>
+                    )}
+                  </button>
                 )}
 
                 {overBudget && (
@@ -628,7 +685,19 @@ function NoteDetail({ note, money, spent, onClose }: {
         />
       )}
 
-      {picker && (
+      {/* El tope se teclea con el mismo teclado numerico que el resto de la
+          app, no con un selector de opciones. */}
+      {picker === 'budget' && (
+        <MobileAmountSheet
+          title={t('noteBudgetLabel')}
+          value={note.budget ?? 0}
+          currency={finance.currency}
+          onDone={value => { updateNote(note.id, { budget: value > 0 ? value : undefined }); setPicker(null) }}
+          onClose={() => setPicker(null)}
+        />
+      )}
+
+      {picker && picker !== 'budget' && (
         <PickerSheet
           title={picker === 'category' ? t('categoryLabel') : picker === 'account' ? t('accountLabel') : t('goalLabel')}
           options={picker === 'category'

@@ -990,6 +990,19 @@
     text-align: right;
   }
 
+  /* Fila de solo lectura: la deuda de una tarjeta que ya tiene libro. Se ve
+     igual que las demas pero con candado en vez de flecha — la diferencia
+     esta en a donde lleva, no en si se puede leer. */
+  .mpr-form-row-locked { cursor: default; }
+  .mpr-form-row-locked .mpr-form-row-val { color: var(--m-muted); }
+  .mpr-form-hint {
+    color: var(--m-muted);
+    font-size: 11.5px;
+    line-height: 1.45;
+    margin: 0;
+    padding: 9px 14px 11px;
+  }
+
   /* Overdraft inline row */
   .mpr-overdraft-row {
     align-items: center;
@@ -1289,19 +1302,72 @@
     position: fixed;
     z-index: 300;
   }
+  /*
+   * PEGADA ABAJO, encima del teclado — no arriba del todo.
+   *
+   * Estaba en `top: 0`: escribias en el teclado, abajo, y tenias que mirar al
+   * borde superior de la pantalla para ver lo que salia. En un telefono
+   * grande son 15cm de distancia entre el dedo y el texto.
+   *
+   * Funciona porque la Activity usa `adjustResize` (AndroidManifest): al
+   * abrirse el teclado la ventana se encoge y `bottom: 0` queda justo encima.
+   */
   .mtxt-bar {
     background: var(--m-bg, #0f0f10);
-    border-bottom: 1px solid var(--m-border);
+    border-top: 1px solid var(--m-border);
+    bottom: 0;
+    box-shadow: 0 -12px 28px rgba(0, 0, 0, .45);
     display: flex;
     flex-direction: column;
     gap: 6px;
     left: 0;
-    padding: 14px 16px 12px;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
     position: fixed;
     right: 0;
-    top: 0;
     z-index: 301;
   }
+
+  /* Sugerencias: lo que ya escribiste antes, encima del campo. */
+  /* Caja propia: en la fila rapida de "Anadir" la lista flota sobre el panel
+     de crear, no dentro de una barra con fondo como en la hoja de texto. */
+  .mnotesug {
+    background: var(--m-surface, #1b1b1b);
+    border: 1px solid var(--m-border);
+    border-radius: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    list-style: none;
+    margin: 0 0 4px;
+    /* Techo bajo a proposito: una lista de ocho filas tapa media pantalla y
+       deja de ser una ayuda para ser un obstaculo. */
+    max-height: 210px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 4px;
+  }
+  .mnotesug button {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    border-radius: 10px;
+    color: var(--m-text);
+    display: flex;
+    font-family: inherit;
+    font-size: 15px;
+    gap: 10px;
+    min-height: 44px;
+    padding: 0 10px;
+    text-align: left;
+    width: 100%;
+  }
+  .mnotesug button:active { background: var(--m-surface-2); }
+  .mnotesug button span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mnotesug-ico { color: var(--m-muted); flex-shrink: 0; }
   .mtxt-label {
     color: var(--m-muted);
     font-size: 11px;
@@ -1957,6 +2023,26 @@
   .mdebt-free-bar i { background: var(--m-income); border-radius: 999px; display: block; height: 100%; transition: width .4s cubic-bezier(.2,.8,.2,1); }
   .mdebt-free-meta { color: var(--m-muted); font-size: 11.5px; font-variant-numeric: tabular-nums; }
 
+  /* DE QUE ESTA HECHA TU DEUDA.
+     Un total no dice nada del reparto: RD$ 80.000 puede ser una deuda enorme o
+     cinco medianas, y lo que toca hacer es distinto. Cada tramo lleva el color
+     de su deuda, asi que esta barra y la lista de abajo se leen juntas sin
+     necesidad de leyenda. */
+  .mdebt-mix {
+    border-radius: 999px;
+    display: flex;
+    gap: 2px;
+    height: 7px;
+    margin-top: 13px;
+    overflow: hidden;
+  }
+  .mdebt-mix i {
+    display: block;
+    height: 100%;
+    min-width: 3px;      /* una deuda diminuta sigue siendo visible */
+    transition: width .45s cubic-bezier(.2,.8,.2,1);
+  }
+
   /* Estrategia en cristiano */
   .mdebt-plan { display: flex; gap: 8px; margin: 12px 16px 0; }
   .mdebt-plan button { background: var(--m-surface); border: 1px solid var(--m-border); border-radius: 14px; color: var(--m-text); flex: 1; padding: 11px 10px; text-align: left; }
@@ -1992,15 +2078,45 @@
 
   /* Deudas con progreso */
   .mdebt-list { display: flex; flex-direction: column; gap: 8px; margin: 0 16px; }
-  .mdebt-debt { align-items: stretch; background: var(--m-surface); border: 1px solid var(--m-border); border-radius: 14px; display: flex; overflow: hidden; }
-  .mdebt-debt.target { border-color: color-mix(in oklab, var(--m-primary) 45%, var(--m-border)); }
+  /* ESPINA DE COLOR. El punto de 11px se perdia entre el texto; una banda
+     lateral se ve de reojo al deslizar y ata la fila con su tramo de la barra
+     de composicion de arriba. */
+  .mdebt-debt {
+    align-items: stretch;
+    background:
+      linear-gradient(90deg, color-mix(in oklab, var(--debt, transparent) 9%, transparent), transparent 42%),
+      var(--m-surface);
+    border: 1px solid var(--m-border);
+    border-left: 3px solid var(--debt, var(--m-border));
+    border-radius: 14px;
+    display: flex;
+    overflow: hidden;
+  }
+  /* La deuda OBJETIVO del mes: la que recibe el pago extra. Es la unica
+     decision accionable de la pantalla, asi que se le da un halo de verdad en
+     vez de un borde algo mas claro que el resto. */
+  .mdebt-debt.target {
+    border-color: color-mix(in oklab, var(--m-primary) 45%, var(--m-border));
+    border-left-color: var(--debt, var(--m-primary));
+    box-shadow: 0 0 0 1px color-mix(in oklab, var(--m-primary) 26%, transparent),
+                0 6px 18px -10px color-mix(in oklab, var(--m-primary) 60%, transparent);
+  }
+  .mdebt-kind {
+    align-items: center;
+    border-radius: 9px;
+    display: flex;
+    flex-shrink: 0;
+    height: 26px;
+    justify-content: center;
+    width: 26px;
+  }
   .mdebt-debt-main { flex: 1; min-width: 0; padding: 13px 14px; text-align: left; }
   .mdebt-debt-top { align-items: center; display: flex; gap: 8px; }
   .mdebt-row-dot { border-radius: 50%; flex-shrink: 0; height: 11px; width: 11px; }
   .mdebt-debt-top b { color: var(--m-text); flex: 1; font-size: 14px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .mdebt-debt-rate { color: var(--m-muted); font-size: 11.5px; }
   .mdebt-debt-top strong { color: var(--m-text); font-size: 14px; font-variant-numeric: tabular-nums; font-weight: 800; }
-  .mdebt-debt-bar { background: color-mix(in oklab, var(--m-text) 9%, transparent); border-radius: 999px; height: 5px; margin: 8px 0 5px; overflow: hidden; }
+  .mdebt-debt-bar { background: color-mix(in oklab, var(--m-text) 9%, transparent); border-radius: 999px; height: 6px; margin: 9px 0 6px; overflow: hidden; }
   .mdebt-debt-bar i { border-radius: 999px; display: block; height: 100%; transition: width .3s; }
   .mdebt-debt-sub { color: var(--m-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
   .mdebt-debt-pay { align-items: center; background: color-mix(in oklab, var(--m-income) 12%, transparent); border-left: 1px solid var(--m-border); color: var(--m-income); display: flex; flex-direction: column; font-size: 11px; font-weight: 800; gap: 3px; justify-content: center; padding: 0 14px; }
@@ -2030,6 +2146,110 @@
   .mdebt-sheet-actions { border-top: 1px solid var(--m-border); display: flex; gap: 10px; padding: 16px 20px; }
   .mdebt-btn-cancel { background: var(--m-surface); border: 1px solid var(--m-border); border-radius: 12px; color: var(--m-text); flex: 1; font-size: 15px; font-weight: 600; padding: 14px; }
   .mdebt-btn-save { border-radius: 12px; color: #000; flex: 2; font-size: 15px; font-weight: 700; padding: 14px; }
+
+  /* ── Deuda: calendario, tipo, contraparte, historial (1.9.6) ────────── */
+
+  /* Vencimiento. Solo grita cuando toca: lo que vence en tres semanas no
+     puede verse igual que lo que vence manana, o deja de distinguirse. */
+  .mdebt-debt-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .mdebt-due { align-items: center; border-radius: 999px; display: inline-flex; font-size: 10.5px; font-weight: 750; gap: 4px; padding: 3px 8px; }
+  .mdebt-due.ok { background: color-mix(in oklab, var(--m-income) 14%, transparent); color: var(--m-income); }
+  .mdebt-due.due-soon { background: color-mix(in oklab, #f59e0b 16%, transparent); color: #f59e0b; }
+  .mdebt-due.due-today,
+  .mdebt-due.overdue { background: color-mix(in oklab, var(--m-expense) 16%, transparent); color: var(--m-expense); }
+  .mdebt-meta-chip { background: var(--m-bg); border: 1px solid var(--m-border); border-radius: 999px; color: var(--m-muted); font-size: 10.5px; font-weight: 650; padding: 3px 8px; }
+
+  /* ── LO QUE DEBES vs LO QUE TE DEBEN ────────────────────────────────
+     No son dos variantes del mismo objeto: uno resta de tu patrimonio y el
+     otro suma. Verlos con el mismo aspecto obligaba a leer la seccion en la
+     que estaban para saber de cual se trataba. Ahora el color lo dice antes
+     que el texto: rojo sale de tu bolsillo, verde vuelve a el. */
+  .mdebt-debt.lent {
+    background:
+      linear-gradient(90deg, color-mix(in oklab, var(--m-income) 11%, transparent), transparent 46%),
+      var(--m-surface);
+    border-left-color: var(--m-income);
+  }
+  .mdebt-debt.lent .mdebt-debt-top strong { color: var(--m-income); }
+  .mdebt-debt.lent .mdebt-kind { background: color-mix(in oklab, var(--m-income) 16%, transparent); color: var(--m-income); }
+  .mdebt-debt.lent .mdebt-debt-pay {
+    background: color-mix(in oklab, var(--m-income) 16%, transparent);
+    color: var(--m-income);
+  }
+  /* Una deuda tuya: el monto en rojo. Es lo que se va. */
+  .mdebt-debt.owed .mdebt-debt-top strong { color: var(--m-expense); }
+  .mdebt-debt.owed .mdebt-debt-pay { background: color-mix(in oklab, var(--m-expense) 12%, transparent); color: var(--m-expense); }
+  .mdebt-debt.owed .mdebt-debt-pay:active { background: color-mix(in oklab, var(--m-expense) 22%, transparent); }
+
+  /* Etiqueta de direccion: dos palabras que quitan toda la ambiguedad. */
+  .mdebt-dir {
+    border-radius: 999px;
+    font-size: 9.5px;
+    font-weight: 900;
+    letter-spacing: .06em;
+    padding: 2px 7px;
+    text-transform: uppercase;
+  }
+  .mdebt-dir.owed { background: color-mix(in oklab, var(--m-expense) 16%, transparent); color: var(--m-expense); }
+  .mdebt-dir.lent { background: color-mix(in oklab, var(--m-income) 16%, transparent); color: var(--m-income); }
+
+  .mdebt-lent-total { color: var(--m-income); font-size: 13px; font-weight: 800; margin-left: auto; }
+
+  /* Segmentado de dos (la debo / me la deben) y chips de tipo. */
+  .mdebt-seg { background: var(--m-bg); border: 1px solid var(--m-border); border-radius: 12px; display: flex; gap: 4px; padding: 4px; }
+  .mdebt-seg button { border-radius: 9px; color: var(--m-muted); flex: 1; font-size: 13px; font-weight: 700; padding: 10px 8px; }
+  .mdebt-seg button.on { background: var(--m-surface); color: var(--m-text); box-shadow: 0 1px 3px rgb(0 0 0 / .18); }
+  .mdebt-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+  .mdebt-chips button { background: var(--m-bg); border: 1px solid var(--m-border); border-radius: 999px; color: var(--m-muted); font-size: 12.5px; font-weight: 650; padding: 8px 13px; }
+  .mdebt-chips button.on { background: color-mix(in oklab, var(--m-text) 10%, transparent); border-color: var(--m-text); color: var(--m-text); }
+
+  /* De que cuenta sale el pago. Sin esto no se puede registrar: un pago sin
+     origen es justo el descuadre que este rediseno venia a eliminar. */
+  .mdebt-src-list { display: flex; flex-direction: column; gap: 8px; }
+  .mdebt-src { align-items: center; background: var(--m-bg); border: 1px solid var(--m-border); border-radius: 12px; display: flex; gap: 10px; min-height: 52px; padding: 0 14px; width: 100%; }
+  .mdebt-src-dot { border-radius: 50%; flex-shrink: 0; height: 9px; width: 9px; }
+  .mdebt-src-name { color: var(--m-text); flex: 1; font-size: 14px; font-weight: 700; text-align: left; }
+  .mdebt-src-bal { color: var(--m-muted); font-size: 12.5px; font-variant-numeric: tabular-nums; font-weight: 650; }
+
+  .mdebt-hint { color: var(--m-muted); font-size: 11.5px; line-height: 1.45; margin: 0; }
+  .mdebt-suggest { align-items: center; background: color-mix(in oklab, var(--m-income) 10%, transparent); border: 1px solid color-mix(in oklab, var(--m-income) 30%, transparent); border-radius: 12px; color: var(--m-text); display: flex; flex-wrap: wrap; font-size: 12.5px; gap: 6px; padding: 11px 13px; text-align: left; }
+  .mdebt-suggest b { color: var(--m-income); font-size: 12px; font-weight: 800; margin-left: auto; }
+
+  /* Historial: lo pagado, comprobable. Antes solo habia un porcentaje. */
+  .mdebt-history { background: var(--m-bg); border: 1px solid var(--m-border); border-radius: 12px; overflow: hidden; }
+  .mdebt-history-row { align-items: center; border-bottom: 1px solid var(--m-border); display: flex; justify-content: space-between; padding: 10px 14px; }
+  .mdebt-history-row:last-child { border-bottom: 0; }
+  .mdebt-history-row span { color: var(--m-muted); font-size: 12px; font-weight: 600; }
+  .mdebt-history-row b { color: var(--m-text); font-size: 13.5px; font-variant-numeric: tabular-nums; font-weight: 750; }
+
+  /* ── Descripcion larga de un movimiento (1.9.7) ─────────────────────── */
+
+  /* Hoja de escritura: un textarea de verdad, no un input estirado. */
+  .mdesc-sheet { background: var(--m-surface); border-radius: 24px 24px 0 0; overflow: hidden; }
+  .mdesc-sheet header { align-items: center; border-bottom: 1px solid var(--m-border); display: flex; justify-content: space-between; padding: 18px 20px; }
+  .mdesc-sheet header span { color: var(--m-text); font-size: 16px; font-weight: 700; }
+  .mdesc-sheet header button { color: var(--m-muted); }
+  .mdesc-body { padding: 16px 20px 8px; position: relative; }
+  .mdesc-input {
+    background: var(--m-bg);
+    border: 1px solid var(--m-border);
+    border-radius: 14px;
+    color: var(--m-text);
+    font-family: inherit;
+    font-size: 15px;
+    line-height: 1.5;
+    padding: 14px;
+    resize: none;
+    width: 100%;
+  }
+  .mdesc-count { color: var(--m-muted); font-size: 11px; font-variant-numeric: tabular-nums; position: absolute; right: 30px; bottom: 16px; }
+  .mdesc-actions { border-top: 1px solid var(--m-border); display: flex; gap: 10px; padding: 14px 20px; }
+  .mdesc-cancel { background: var(--m-surface); border: 1px solid var(--m-border); border-radius: 12px; color: var(--m-text); flex: 1; font-size: 15px; font-weight: 600; padding: 14px; }
+  .mdesc-save { background: var(--accent, #ffdd3d); border-radius: 12px; color: #000; flex: 2; font-size: 15px; font-weight: 700; padding: 14px; }
+
+  /* En la fila del editor, la descripcion se recorta a una linea: ahi solo
+     hace falta saber SI hay algo escrito, no leerlo entero. */
+  .txf-desc-preview { display: block; max-width: 58%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* -- MobileAccounts section headings (heredado del viejo MobileReports) -- */
   .mrep-tools-heading {
@@ -2503,3 +2723,155 @@
   font-variant-numeric: tabular-nums;
   font-weight: 850;
 }
+
+/* ── Guia de bateria ─────────────────────────────────────────
+   Hoja inferior: llega desde un aviso, no desde una navegacion, y se cierra
+   tocando fuera. Misma familia que el resto de hojas de la app. */
+.mbat-sheet {
+  background: var(--surface);
+  border-radius: 22px 22px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-height: min(92dvh, calc(100dvh - env(safe-area-inset-top) - 8px));
+  max-width: 520px;
+  padding: 16px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+  width: 100%;
+}
+.mbat-head { align-items: flex-start; display: flex; gap: 12px; }
+.mbat-head > div { display: grid; flex: 1; gap: 2px; min-width: 0; }
+.mbat-head strong { color: var(--text); font-size: 17px; font-weight: 850; }
+/* El estado se distingue por COLOR y por palabra, no solo por color. */
+.mbat-head small { font-size: 12.5px; font-weight: 750; }
+.mbat-head small.ok { color: var(--income); }
+.mbat-head small.missing { color: var(--warn); }
+.mbat-ico {
+  align-items: center;
+  background: color-mix(in oklab, var(--warn) 18%, transparent);
+  border-radius: 12px;
+  color: var(--warn);
+  display: grid;
+  flex-shrink: 0;
+  height: 40px;
+  place-items: center;
+  width: 40px;
+}
+.mbat-close {
+  background: var(--track); border: 0; border-radius: 999px; color: var(--text-dim);
+  display: grid; flex-shrink: 0; height: 32px; place-items: center; width: 32px;
+}
+
+.mbat-body {
+  display: block;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.mbat-body > * { margin-bottom: 12px; }
+.mbat-body > :last-child { margin-bottom: 0; }
+
+.mbat-why { color: var(--text-dim); font-size: 13.5px; line-height: 1.5; margin: 0; }
+.mbat-warn {
+  align-items: flex-start;
+  background: color-mix(in oklab, var(--warn) 12%, transparent);
+  border-radius: 12px;
+  color: var(--warn);
+  display: flex;
+  font-size: 12.5px;
+  font-weight: 700;
+  gap: 8px;
+  line-height: 1.4;
+  margin: 0;
+  padding: 11px 13px;
+}
+.mbat-vendor { align-items: baseline; display: flex; gap: 8px; justify-content: space-between; }
+.mbat-vendor span {
+  color: var(--text-dim); font-size: 10.5px; font-weight: 850;
+  letter-spacing: .09em; text-transform: uppercase;
+}
+.mbat-vendor b { color: var(--accent); font-size: 13px; font-weight: 850; }
+
+/* Pasos numerados: es una receta, y una receta se sigue en orden. */
+.mbat-steps { display: grid; gap: 8px; list-style: none; margin: 0; padding: 0; }
+.mbat-steps li {
+  align-items: flex-start;
+  background: var(--surface-2);
+  border-radius: 13px;
+  display: flex;
+  gap: 11px;
+  padding: 12px 13px;
+}
+.mbat-step-n {
+  align-items: center;
+  background: color-mix(in oklab, var(--accent) 20%, transparent);
+  border-radius: 999px;
+  color: var(--accent);
+  display: grid;
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 850;
+  height: 22px;
+  place-items: center;
+  width: 22px;
+}
+.mbat-steps li > span:last-child { color: var(--text); font-size: 13.5px; line-height: 1.45; }
+
+.mbat-other {
+  background: none; border: 0; color: var(--text-dim);
+  font-family: inherit; font-size: 12.5px; font-weight: 750;
+  padding: 6px 0; text-decoration: underline;
+}
+.mbat-vendors { display: flex; flex-wrap: wrap; gap: 7px; }
+.mbat-vendors button {
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px;
+  color: var(--text-dim); font-family: inherit; font-size: 12px; font-weight: 750;
+  padding: 7px 13px;
+}
+.mbat-vendors button.on { border-color: var(--accent); color: var(--accent); }
+
+.mbat-actions { display: flex; flex-shrink: 0; gap: 10px; }
+.mbat-secondary, .mbat-primary {
+  align-items: center; border: 0; border-radius: 14px;
+  display: flex; font-family: inherit; font-size: 14.5px; font-weight: 850;
+  gap: 8px; justify-content: center; min-height: 50px;
+}
+.mbat-secondary { background: transparent; border: 1.5px solid var(--border); color: var(--text-dim); flex: 0 1 auto; padding: 0 18px; }
+.mbat-primary { background: var(--accent); color: #08201c; flex: 1; }
+
+/* ── Rescate de tarjeta ──────────────────────────────────────
+   Dialogo centrado, no hoja inferior: es una PREGUNTA que hay que responder,
+   no un panel del que se sale deslizando. */
+.mrescue {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  margin: 0 18px;
+  max-width: 420px;
+  padding: 24px 20px 20px;
+  text-align: center;
+}
+.mrescue-ico {
+  align-items: center;
+  background: color-mix(in oklab, var(--warn) 18%, transparent);
+  border-radius: 16px;
+  color: var(--warn);
+  display: grid;
+  height: 52px;
+  place-items: center;
+  width: 52px;
+}
+.mrescue strong { color: var(--text); font-size: 18px; font-weight: 850; margin-top: 4px; }
+.mrescue p { color: var(--text-dim); font-size: 13.5px; line-height: 1.55; margin: 0; }
+/* Las dos salidas pesan IGUAL: un saldo a favor es legitimo y la app no debe
+   empujar hacia una respuesta que quiza sea la equivocada. */
+.mrescue-actions { display: grid; gap: 8px; margin-top: 8px; width: 100%; }
+.mrescue-primary, .mrescue-secondary {
+  border: 0; border-radius: 14px; font-family: inherit;
+  font-size: 14.5px; font-weight: 850; min-height: 50px;
+}
+.mrescue-primary { background: var(--accent); color: #08201c; }
+.mrescue-secondary { background: var(--surface-2); color: var(--text-dim); }

@@ -40,6 +40,15 @@ export interface Note {
   categoryId?: string
   /** Cuenta sugerida al registrar el gasto. */
   accountId?: string
+  /**
+   * TOPE DE GASTO de la lista. Opcional.
+   *
+   * «Voy al súper con RD$ 3.000» es la forma en que la gente compra de verdad,
+   * y la lista no tenía dónde anotarlo: calculaba un total estimado sin nada
+   * contra qué compararlo. Con el tope, el total pasa de ser un dato a ser una
+   * respuesta — te alcanza o no te alcanza.
+   */
+  budget?: number
   archived?: boolean
   /** Fijada arriba de la lista, por encima del orden por fecha. */
   pinned?: boolean
@@ -157,6 +166,33 @@ export function itemPriceLabel(item: NoteItem, formatMoney: (n: number) => strin
   if (item.price == null) return null
   const qty = item.qty && item.qty > 1 ? `×${item.qty} · ` : ''
   return `${qty}${formatMoney(itemLineTotal(item))}`
+}
+
+export type BudgetState = 'none' | 'ok' | 'close' | 'over'
+
+/** A partir de qué fracción del tope se avisa de que queda poco margen. */
+export const BUDGET_CLOSE_AT = 0.9
+
+/**
+ * Cómo va la lista contra su tope.
+ *
+ * Se mide contra el TOTAL estimado, no contra lo ya marcado: la pregunta es
+ * «¿me alcanza para todo esto?», y responderla con lo que ya echaste al carrito
+ * llegaría siempre tarde — en la caja.
+ */
+export function budgetState(note: Note): BudgetState {
+  const budget = note.budget
+  if (!budget || budget <= 0) return 'none'
+  const { total } = noteTotals(note)
+  if (total > budget) return 'over'
+  if (total >= budget * BUDGET_CLOSE_AT) return 'close'
+  return 'ok'
+}
+
+/** Lo que queda del tope. Negativo = pasado. */
+export function budgetLeft(note: Note): number | null {
+  if (!note.budget || note.budget <= 0) return null
+  return Math.round((note.budget - noteTotals(note).total) * 100) / 100
 }
 
 /** Ícono por defecto según el tipo de lista. */

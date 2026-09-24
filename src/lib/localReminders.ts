@@ -261,3 +261,35 @@ export async function syncNotificationHistory(): Promise<void> {
     // plugin no disponible o historial vacío — no-op
   }
 }
+
+// ── Guia de bateria ─────────────────────────────────────────
+
+/**
+ * ¿Esta la app exenta de la optimizacion de bateria?
+ *
+ * `null` fuera de Android: no hay nada que comprobar y la pantalla no debe
+ * ofrecerse. Un `false` seria mentir — en escritorio no existe el concepto.
+ */
+export async function isBatteryExempt(): Promise<boolean | null> {
+  if (!isTauri()) return null
+  try {
+    const { invoke } = await import('@tauri-apps/api/core')
+    const res = await invoke<{ exempt: boolean }>('plugin:local-reminders|battery_status')
+    return res.exempt
+  } catch {
+    // Build viejo sin el comando: se trata como "no se sabe".
+    return null
+  }
+}
+
+/** Abre la pantalla del sistema donde se concede la exencion. */
+export async function openBatterySettings(): Promise<boolean> {
+  if (!isTauri()) return false
+  try {
+    const { invoke } = await import('@tauri-apps/api/core')
+    const res = await invoke<{ opened: boolean }>('plugin:local-reminders|open_battery_settings')
+    return res.opened
+  } catch {
+    return false
+  }
+}

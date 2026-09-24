@@ -2,7 +2,14 @@
 export type AccountType  = 'debit' | 'savings' | 'credit' | 'cash'
 export type TxType       = 'income' | 'expense' | 'transfer'
 export type CurrencyCode = 'DOP' | 'USD' | 'EUR' | 'MXN' | 'GBP' | 'COP' | 'ARS' | 'BRL' | 'CAD'
+/**
+ * Temas. Los cuatro nuevos no son variantes de gris: cada uno cambia el TONO
+ * de toda la app, no solo su claridad. `sand` es ademas un segundo tema claro
+ * —calido, de papel— porque hasta ahora quien no soportaba el fondo oscuro
+ * tenia una sola opcion y era un blanco que deslumbra.
+ */
 export type ThemeName    = 'dark' | 'light' | 'amoled' | 'system'
+                         | 'ocean' | 'sunset' | 'forest' | 'sand'
 export type DensityName  = 'compact' | 'regular' | 'comfy'
 export type OverdraftPolicy = 'block' | 'warn' | 'allow'
 export type CardNetwork = 'visa' | 'mastercard' | 'amex' | 'discover' | 'other'
@@ -169,6 +176,19 @@ export interface Transaction {
   amount:       number
   date:         string              // YYYY-MM-DD
   note:         string
+  /**
+   * DESCRIPCIÓN LARGA, opcional.
+   *
+   * `note` es el concepto: corto, se ve en la lista, cabe en una línea. Esto
+   * es lo demás — el detalle que no cabe ahí y que a los tres meses es lo
+   * único que explica un gasto: con quién fuiste, qué incluía, por qué se
+   * pagó, el número de factura.
+   *
+   * Opcional a propósito y nunca obligatoria: quien apunta un gasto en la fila
+   * del supermercado no va a escribir un párrafo, y pedírselo es como se
+   * consigue que deje de apuntar.
+   */
+  description?: string
   categoryId?:  string              // income / expense
   accountId?:   string              // income / expense
   /**

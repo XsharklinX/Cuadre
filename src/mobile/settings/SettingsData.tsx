@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { Icon } from '@/components/ui/Icon'
 import { toast } from '@/components/ui/Toast'
 import { createBackup, parseBackup } from '@/data/backup'
-import { wipeCloudData } from '@/data/cloudSync'
 import { getDataHealthStatus } from '@/data/dataHealth'
 import { exportExcel, exportMonthlyPdf } from '@/data/professionalExport'
 import { dateLocale, monthLabel } from '@/data/helpers'
@@ -10,8 +9,6 @@ import { decryptWithPassphrase, encryptWithPassphrase, looksEncrypted } from '@/
 import { getScheduledBackupStatus, pickBackupFolder as pickSafBackupFolder, runBackupNow, type ScheduledBackupStatus } from '@/lib/scheduledBackup'
 import { useFinance } from '@/store/finance'
 import { useNotes } from '@/store/notes'
-import { useAuth } from '@/store/auth'
-import { clearCloudWorkspaceCache } from '@/hooks/useCloudWorkspace'
 import { isTauri, openBackup, pickBackupFolder, saveBackup } from '@/hooks/useTauri'
 import { useSettings } from '@/store/settings'
 import { useT } from '@/i18n'
@@ -19,9 +16,8 @@ import { SettingsRow, SettingsSheet, type SheetProps } from './shared'
 
 export function SettingsData({ mkey, activeSheet, onOpen, onClose, grouped }: SheetProps & { mkey: string; grouped?: boolean }) {
   const finance = useFinance()
-  const auth    = useAuth()
   const t       = useT()
-  const health  = getDataHealthStatus(finance, auth.user?.id)
+  const health  = getDataHealthStatus(finance)
   const lang    = useSettings(s => s.language)
   const lastWeeklyBackupAt = useSettings(s => s.lastWeeklyBackupAt)
   const lastManualBackupAt = useSettings(s => s.lastManualBackupAt)
@@ -64,7 +60,6 @@ export function SettingsData({ mkey, activeSheet, onOpen, onClose, grouped }: Sh
   const [exportingPdf,    setExportingPdf]    = useState(false)
   const [exportingExcel,  setExportingExcel]  = useState(false)
   const [pendingReset,    setPendingReset]    = useState(false)
-  const [resetting,       setResetting]       = useState(false)
   const [encryptExport,   setEncryptExport]   = useState(false)
   const [exportPassword,  setExportPassword]  = useState('')
   const [exporting,       setExporting]       = useState(false)
@@ -232,20 +227,9 @@ export function SettingsData({ mkey, activeSheet, onOpen, onClose, grouped }: Sh
     }
   }
 
-  const confirmReset = async () => {
-    const user = auth.user
-    if (user?.mode === 'cloud' && user.id) {
-      setResetting(true)
-      try {
-        await wipeCloudData(user.id)
-        clearCloudWorkspaceCache(user.id)
-      } catch (error) {
-        toast(error instanceof Error ? error.message : t('couldNotDeleteCloudData'), { icon: 'alert' })
-        setResetting(false)
-        return
-      }
-      setResetting(false)
-    }
+  // Ya no hay copia en ningun servidor que borrar: los datos viven solo aqui,
+  // asi que borrarlos aqui los borra del todo.
+  const confirmReset = () => {
     finance.startEmpty()
     useNotes.getState().importNotes([])
     toast(t('allDataDeleted'), { icon: 'trash' })
@@ -551,7 +535,6 @@ export function SettingsData({ mkey, activeSheet, onOpen, onClose, grouped }: Sh
           <div className="mset-sheet-body">
             <p className="mset-reset-warning">
               {t('deleteDataWarningPrefix')}<strong>{t('deleteDataWarningBoldText')}</strong>
-              {auth.user?.mode === 'cloud' ? <>{t('deleteDataWarningCloudSuffix')}<strong>{t('deleteDataWarningCloudBoldText')}</strong></> : null}
               {t('deleteDataWarningSuffix')}
             </p>
             {!pendingReset ? (
@@ -560,10 +543,10 @@ export function SettingsData({ mkey, activeSheet, onOpen, onClose, grouped }: Sh
               </button>
             ) : (
               <>
-                <button className="mset-sheet-danger" disabled={resetting} onClick={() => void confirmReset()}>
-                  <Icon name="trash" size={18} /> {resetting ? t('deletingEllipsis') : t('yesDeleteAll')}
+                <button className="mset-sheet-danger" onClick={confirmReset}>
+                  <Icon name="trash" size={18} /> {t('yesDeleteAll')}
                 </button>
-                <button className="mset-sheet-cancel" disabled={resetting} onClick={() => setPendingReset(false)}>
+                <button className="mset-sheet-cancel" onClick={() => setPendingReset(false)}>
                   {t('cancel')}
                 </button>
               </>

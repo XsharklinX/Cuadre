@@ -226,17 +226,68 @@ export function creditCardsOwedInBase(accounts: Account[], base: CurrencyCode): 
 export interface NetWorthBreakdown { assets: number; liabilities: number }
 
 /**
+ * Lo mínimo que hace falta de una deuda registrada a mano para contarla en el
+ * patrimonio. Se declara aquí, y no se importa `Debt` de `store/debt`, para no
+ * atar el módulo de cálculos a un store de Zustand.
+ */
+export interface ManualDebt {
+  balance: number
+  currency?: CurrencyCode
+  direction?: 'owed' | 'lent'
+}
+
+/**
  * Desglosa el patrimonio en activos (saldos positivos) y pasivos (saldos
  * negativos — típicamente deuda de tarjeta de crédito), en vez de un solo
  * número combinado. Se separa por el SIGNO real de cada cuenta, no por su
  * `type`: una tarjeta de crédito sobrepagada (saldo positivo) cuenta como
  * activo, igual que en cualquier estado de patrimonio real.
  */
-export function netWorthBreakdown(accounts: Account[], base: CurrencyCode): NetWorthBreakdown {
-  return visibleAccounts(accounts).reduce((acc, account) => {
+export function netWorthBreakdown(
+  accounts: Account[],
+  base: CurrencyCode,
+  debts: ManualDebt[] = [],
+): NetWorthBreakdown {
+  const fromAccounts = visibleAccounts(accounts).reduce((acc, account) => {
     const value = accountBalanceInBase(account, base)
     return value >= 0 ? { ...acc, assets: acc.assets + value } : { ...acc, liabilities: acc.liabilities - value }
   }, { assets: 0, liabilities: 0 })
+
+  /*
+   * LAS DEUDAS REGISTRADAS A MANO TAMBIÉN SON PATRIMONIO.
+   *
+   * Hasta ahora esto solo miraba las cuentas: registrabas un préstamo de
+   * vehículo de RD$ 200.000 en la pantalla de Deudas y tu patrimonio neto no
+   * se movía ni un peso. La cifra decía «patrimonio» y era «saldo de mis
+   * cuentas» — que es justo la diferencia entre las dos palabras.
+   *
+   * Y desde que se puede apuntar lo que TE DEBEN, eso es un activo: te lo van
+   * a devolver, cuenta a tu favor.
+   *
+   * Las tarjetas de crédito NO se suman aquí: su deuda ya viaja en el saldo de
+   * su cuenta. Las que salen en la pantalla de Deudas son derivadas de esas
+   * mismas cuentas, no registros aparte, así que contarlas otra vez duplicaría
+   * la deuda del usuario.
+   */
+  return debts.reduce((acc, debt) => {
+    const amount = debt.currency && debt.currency !== base
+      ? convertCurrency(debt.balance, debt.currency, base)
+      : debt.balance
+    if (amount <= 0) return acc
+    return (debt.direction ?? 'owed') === 'owed'
+      ? { ...acc, liabilities: acc.liabilities + amount }
+      : { ...acc, assets: acc.assets + amount }
+  }, fromAccounts)
+}
+
+/** Patrimonio neto: activos menos pasivos. */
+export function netWorthValue(
+  accounts: Account[],
+  base: CurrencyCode,
+  debts: ManualDebt[] = [],
+): number {
+  const { assets, liabilities } = netWorthBreakdown(accounts, base, debts)
+  return assets - liabilities
 }
 
 /**

@@ -19,7 +19,6 @@ import { SettingsBankNotifications } from './settings/SettingsBankNotifications'
 import { SettingsDev } from './settings/SettingsDev'
 import { SettingsLegal } from './settings/SettingsLegal'
 import { SettingsVip } from './settings/SettingsVip'
-import { SettingsSyncConflicts } from './settings/SettingsSyncConflicts'
 
 // ── Estructura tipo "hub" (Opción A) ────────────────────────────────────────
 // La pantalla principal es corta: buscador + perfil + una fila por categoría.
@@ -296,12 +295,7 @@ export function MobileSettings({
             {section === 'finance' && <SettingsAppearance {...sheetProps} only="finance" />}
             {section === 'appearance' && <SettingsAppearance {...sheetProps} only="appearance" />}
             {section === 'categories' && <SettingsCategories {...sheetProps} />}
-            {section === 'data' && (
-              <>
-                <SettingsData mkey={mkey} {...sheetProps} grouped />
-                <SettingsSyncConflicts {...sheetProps} />
-              </>
-            )}
+            {section === 'data' && <SettingsData mkey={mkey} {...sheetProps} grouped />}
             {section === 'security' && <SettingsSecurity {...sheetProps} grouped />}
             {section === 'bank' && <SettingsBankNotifications {...sheetProps} grouped />}
             {section === 'about' && <SettingsLegal {...sheetProps} />}
