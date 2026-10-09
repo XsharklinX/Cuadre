@@ -1,6 +1,7 @@
 package com.sharky.miapp
 
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.graphics.Color
 import android.net.Uri
 import android.os.Build
@@ -20,6 +21,27 @@ class MainActivity : TauriActivity() {
       navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
     )
     super.onCreate(savedInstanceState)
+
+    /*
+     * SOLO VERTICAL — y a proposito aqui, no en el manifiesto.
+     *
+     * La app es de una mano y una columna: en horizontal las hojas se comen la
+     * pantalla y los teclados tapan los campos.
+     *
+     * En 1.9.9 esto se declaro con `android:screenOrientation="portrait"` en el
+     * manifiesto y Play, que calcula la compatibilidad leyendo ese archivo,
+     * saco del catalogo 27 aparatos que solo funcionan en horizontal: 17 de
+     * coche, 3 TVs y 7 tablets. Telefonos no se perdio ninguno, pero quien ya
+     * la tuviera instalada en uno de esos se quedaba sin actualizaciones.
+     *
+     * Pedirlo en ejecucion hace lo mismo donde importa y Play no lo ve, asi
+     * que no filtra a nadie.
+     *
+     * Sigue en pie que Android 16 ignora la peticion en pantallas grandes
+     * (tablets, plegables abiertos): ahi rotara, por diseño del sistema.
+     */
+    requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
       window.isNavigationBarContrastEnforced = false
     }

@@ -1,5 +1,6 @@
 import { APP_NAME } from '@/data/release'
 import { isTauri } from '@/hooks/useTauri'
+import { tt } from '@/i18n'
 
 export interface BiometricStatus {
   available: boolean
@@ -32,7 +33,7 @@ export async function authenticateBiometric(reason = 'Verificar tu identidad'): 
   await authenticate(reason, {
     title: APP_NAME,
     subtitle: reason,
-    cancelTitle: 'Cancelar',
-    fallbackTitle: 'Usar PIN o patrón',
+    cancelTitle: tt('cancel'),
+    fallbackTitle: tt('usePinOrPattern'),
   })
 }

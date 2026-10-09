@@ -1,4 +1,6 @@
 /** Encuadre elegido por el usuario en el editor, en coordenadas del visor. */
+import { tt } from '@/i18n'
+
 export interface AvatarCrop {
   /** Zoom aplicado sobre el tamaño "cubre el visor" (1 = justo cubierto). */
   zoom: number
@@ -29,11 +31,11 @@ export function avatarMaxOffset(width: number, height: number, crop: Omit<Avatar
 
 async function canvasToDataUrl(canvas: HTMLCanvasElement): Promise<string> {
   const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.85))
-  if (!blob) throw new Error('No se pudo procesar la imagen')
+  if (!blob) throw new Error(tt('couldNotProcessImage'))
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => resolve(reader.result as string)
-    reader.onerror = () => reject(new Error('No se pudo leer la imagen'))
+    reader.onerror = () => reject(new Error(tt('couldNotReadImage')))
     reader.readAsDataURL(blob)
   })
 }
@@ -62,7 +64,7 @@ export async function cropAvatarPhoto(
   canvas.width = size
   canvas.height = size
   const ctx = canvas.getContext('2d')
-  if (!ctx) throw new Error('No se pudo procesar la imagen')
+  if (!ctx) throw new Error(tt('couldNotProcessImage'))
   ctx.drawImage(source, sx, sy, side, side, 0, 0, size, size)
 
   return canvasToDataUrl(canvas)

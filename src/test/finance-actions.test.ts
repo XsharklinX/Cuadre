@@ -39,6 +39,49 @@ function seed() {
   })
 }
 
+describe('la descripcion de una transferencia', () => {
+  beforeEach(() => {
+    useFinance.setState({
+      accounts: [
+        { ...ACC },
+        { id: 'acc_2', name: 'Banco', short: 'Bk', type: 'debit', color: '#fff', balance: 0, openingBalance: 0, last4: null },
+      ],
+      transactions: [],
+      categories: CATS.map(c => ({ ...c })),
+      goals: [],
+      goalContributions: [],
+      currency: 'DOP',
+    })
+  })
+
+  /*
+   * SE PERDIA EN SILENCIO. El boton de descripcion estaba disponible tambien
+   * en transferencias, el usuario la escribia... y `transfer` no recibia el
+   * campo. El movimiento se guardaba sin ella y sin avisar de nada, asi que al
+   * abrirlo despues no habia descripcion y parecia que la pantalla estaba
+   * rota. Un dato que el usuario se tomo la molestia de escribir no puede
+   * desaparecer sin decir nada.
+   */
+  it('se guarda', () => {
+    useFinance.getState().transfer({
+      fromAccount: 'acc_1', toAccount: 'acc_2', amount: 500,
+      date: '2026-09-24', note: 'Paso a banco',
+      description: 'Para el alquiler del mes que viene',
+    })
+    const [t] = useFinance.getState().transactions
+    expect(t.type).toBe('transfer')
+    expect(t.description).toBe('Para el alquiler del mes que viene')
+  })
+
+  it('sin descripcion, el campo no se inventa', () => {
+    useFinance.getState().transfer({
+      fromAccount: 'acc_1', toAccount: 'acc_2', amount: 500,
+      date: '2026-09-24', note: 'Paso a banco',
+    })
+    expect(useFinance.getState().transactions[0].description).toBeUndefined()
+  })
+})
+
 describe('sobres: mover presupuesto entre categorias', () => {
   beforeEach(seed)
 

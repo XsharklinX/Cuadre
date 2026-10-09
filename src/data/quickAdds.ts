@@ -92,3 +92,46 @@ export function deriveQuickAdds(transactions: Transaction[], limit = 8): QuickAd
     .sort((a, b) => b.uses - a.uses)
     .slice(0, limit)
 }
+
+
+/**
+ * EL ÚLTIMO MOVIMIENTO, PARA REPETIRLO DE UN TOQUE.
+ *
+ * `deriveQuickAdds` pide tres repeticiones antes de ofrecer nada, y con razón:
+ * dos veces seguidas puede ser casualidad y no un hábito. Pero eso deja sin
+ * atajos justo el arranque — las dos primeras veces que anotas el café son
+ * manuales enteras, que es cuando el usuario decide si la app le compensa.
+ *
+ * Esto no adivina ningún hábito: ofrece repetir lo que acabas de hacer, que es
+ * una afirmación que no puede estar equivocada.
+ *
+ * AQUÍ SÍ VIAJA EL MONTO, al revés que en los rápidos derivados. Allí se deja
+ * vacío porque un importe promediado es un importe inventado; aquí es
+ * exactamente el de la última vez, y repetirlo tal cual es justo lo que
+ * promete el botón.
+ */
+export function lastMovementQuickAdd(
+  transactions: Transaction[],
+  type: 'expense' | 'income',
+): QuickAdd | null {
+  let ultimo: Transaction | null = null
+  for (const tx of transactions) {
+    // Las transferencias necesitan dos cuentas y no caben en un atajo.
+    if (tx.type !== type) continue
+    if (!tx.note?.trim()) continue
+    if (!ultimo || tx.date > ultimo.date) ultimo = tx
+  }
+  if (!ultimo) return null
+
+  return {
+    // La misma identidad que usan los rápidos derivados, para poder
+    // reconocer si este movimiento YA esta en la lista y no duplicarlo.
+    key: `${ultimo.type}|${normalizeNote(ultimo.note)}|${ultimo.categoryId ?? ''}|${ultimo.accountId ?? ''}`,
+    note: ultimo.note.trim(),
+    type,
+    categoryId: ultimo.categoryId,
+    accountId: ultimo.accountId,
+    amount: ultimo.amount,
+    uses: 1,
+  }
+}

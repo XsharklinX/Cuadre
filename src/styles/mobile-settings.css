@@ -60,6 +60,7 @@
     border-color: color-mix(in oklab, var(--accent) 55%, var(--border));
   }
   .mset-search svg { flex-shrink: 0; }
+  .mset-search-icon { color: var(--text-dim); }
   .mset-search input {
     background: transparent;
     border: 0;
@@ -91,6 +92,8 @@
     font-weight: 700;
     padding: 2px 8px 0;
   }
+  /* Los resultados cuelgan del buscador, no del bloque anterior. */
+  .mset-search-results { margin-top: 4px; }
   .mset-search-empty {
     color: var(--text-dim);
     font-size: 13.5px;
@@ -103,6 +106,11 @@
     font-weight: 600;
   }
   .mset-section { display: grid; gap: 9px; }
+  /* `-label` y `-title` son el mismo encabezado con dos nombres. `-label`
+     nunca tuvo estilo, asi que en Notificaciones y en Seguridad el titulo de
+     seccion salia como texto suelto, sin el espaciado ni las mayusculas que
+     lo separan de las filas de abajo. */
+  .mset-section-label,
   .mset-section-title {
     color: var(--text-dim);
     font-size: 11px;
@@ -1963,6 +1971,75 @@
   }
   .mhealth-restore span { color: var(--accent); font-weight: 800; }
 
+  /* ── HISTORIAL Y COPIAS ──────────────────────────────────────────
+     Un registro, no una funcion mas: pesa menos que los descuadres de
+     arriba, que son lo que el usuario vino a mirar. */
+  /* ── IMPUESTO COBRADO DE MAS ──────────────────────────────────────
+     Avisa de dinero inventado, no de un descuadre, asi que pesa mas que
+     cualquier otra fila de la pantalla y se pinta en rojo de alerta. */
+  .mhealth-repair {
+    background: color-mix(in oklab, var(--expense) 11%, transparent);
+    border: 1px solid color-mix(in oklab, var(--expense) 34%, transparent);
+    border-radius: 14px;
+    display: grid;
+    gap: 7px;
+    padding: 13px 15px;
+  }
+  .mhealth-repair-head { align-items: center; color: var(--expense); display: flex; gap: 8px; }
+  .mhealth-repair-head strong { font-size: 14.5px; font-weight: 850; }
+  .mhealth-repair-head svg { flex-shrink: 0; }
+  .mhealth-repair p { color: var(--text); font-size: 12.5px; line-height: 17px; margin: 0; }
+  .mhealth-repair button {
+    align-items: center;
+    background: var(--expense);
+    border: 0;
+    border-radius: 11px;
+    color: #fff;
+    display: flex;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 850;
+    gap: 6px;
+    justify-content: center;
+    min-height: 40px;
+  }
+  .mhealth-log { display: grid; gap: 4px; }
+  .mhealth-log-head {
+    align-items: baseline; display: flex; gap: 10px; justify-content: space-between;
+    padding: 2px 2px 4px;
+  }
+  .mhealth-log-head strong { color: var(--text); font-size: 13.5px; font-weight: 800; }
+  .mhealth-log-clear {
+    background: transparent; border: 0; color: var(--text-dim); font-family: inherit;
+    font-size: 12px; font-weight: 700; padding: 4px;
+  }
+  .mhealth-log-empty { color: var(--text-dim); font-size: 12.5px; line-height: 17px; margin: 0 2px 2px; }
+  .mhealth-log-row {
+    align-items: center; background: var(--surface-2); border-radius: 12px;
+    display: flex; gap: 10px; padding: 9px 12px;
+  }
+  /* Lo deshecho no se esconde: se apaga y se queda, para que el registro
+     pueda contar tambien que se deshizo. */
+  .mhealth-log-row.undone { opacity: 0.55; }
+  .mhealth-log-id { display: grid; flex: 1; gap: 1px; min-width: 0; }
+  .mhealth-log-id strong {
+    color: var(--text); font-size: 13.5px; font-weight: 750;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .mhealth-log-id small { color: var(--text-dim); font-size: 11px; }
+  .mhealth-log-delta {
+    font-size: 12.5px; font-variant-numeric: tabular-nums; font-weight: 800; white-space: nowrap;
+  }
+  .mhealth-log-delta.up   { color: var(--income); }
+  .mhealth-log-delta.down { color: var(--expense); }
+  .mhealth-log-done { color: var(--text-dim); font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+  .mhealth-log-undo {
+    background: transparent; border: 0; border-radius: 9px;
+    box-shadow: inset 0 0 0 1px var(--border); color: var(--accent);
+    flex-shrink: 0; font-family: inherit; font-size: 12px; font-weight: 800;
+    min-height: 32px; padding: 0 11px;
+  }
+
   .mhealth-formula {
     align-items: flex-start; color: var(--text-dim); display: flex; font-size: 12.5px;
     gap: 7px; line-height: 17px; margin: 0;
@@ -1988,19 +2065,38 @@
   /* NOVEDADES: una tarjeta centrada, no una hoja a pantalla completa.
      Salia al 100% de ancho, 88vh de alto y con las catorce versiones dentro:
      ocupaba toda la pantalla para decir lo que trae UNA actualizacion. */
+  /*
+   * La hoja es su propio contenedor con scroll, asi que cuando el changelog no
+   * cabe el contenido llega hasta el borde y la esquina redondeada lo SIEGA en
+   * diagonal: arriba no se nota porque ahi empieza el titulo, pero abajo se ve
+   * un corte brusco.
+   *
+   * Dos cosas lo suavizan. El radio sube, para que la forma se lea ovalada. Y
+   * una mascara difumina los ultimos pixeles: el texto se desvanece en vez de
+   * cortarse, que es lo que dice "sigue habiendo mas abajo".
+   *
+   * La mascara no se desplaza con el scroll —se pinta contra la caja, no
+   * contra el contenido—, asi que se queda siempre pegada al borde. Por eso el
+   * relleno inferior es mayor que la propia mascara: al llegar al final lo que
+   * se difumina es hueco, no la ultima linea.
+   */
   .mnews-sheet {
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 22px;
+    border-radius: 26px;
     display: grid;
     gap: 13px;
     margin: 0 18px;
+    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 22px), transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 22px), transparent 100%);
     max-height: 76vh;
     max-width: 400px;
     overflow-y: auto;
-    padding: 16px 18px 18px;
+    padding: 16px 18px 30px;
+    scrollbar-width: none;
     width: 100%;
   }
+  .mnews-sheet::-webkit-scrollbar { display: none; }
   .mnews-header { align-items: center; display: flex; gap: 12px; justify-content: space-between; }
   .mnews-header > span { color: var(--text); font-size: 16px; font-weight: 850; }
   .mnews-header > button {

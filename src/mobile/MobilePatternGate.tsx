@@ -1,10 +1,12 @@
 import { APP_NAME } from '@/data/release'
 import { useState } from 'react'
 import { Icon } from '@/components/ui/Icon'
+import { useT } from '@/i18n'
 import { playDoneSound, playWarningHaptic } from '@/lib/sound'
 import { PatternPad } from './PatternPad'
 
 export function MobilePatternGate({ pattern, onUnlocked }: { pattern: string; onUnlocked: () => void }) {
+  const t = useT()
   const [error, setError] = useState('')
   const [shake, setShake] = useState(false)
   const [success, setSuccess] = useState(false)
@@ -20,7 +22,7 @@ export function MobilePatternGate({ pattern, onUnlocked }: { pattern: string; on
       return
     }
     playWarningHaptic()
-    setError('Patrón incorrecto')
+    setError(t('wrongPattern'))
     setShake(true)
     setTimeout(() => setShake(false), 380)
   }
@@ -32,7 +34,7 @@ export function MobilePatternGate({ pattern, onUnlocked }: { pattern: string; on
           <Icon name="grid" size={48} />
         </div>
         <h2>{APP_NAME}</h2>
-        <p>{error || 'Dibuja tu patrón para continuar'}</p>
+        <p>{error || t('patternPrompt')}</p>
 
         <PatternPad onComplete={handleComplete} shake={shake} success={success} />
       </div>

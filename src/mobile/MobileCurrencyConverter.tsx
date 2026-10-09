@@ -10,6 +10,7 @@ import { useT } from '@/i18n'
 import { useMobileBackDismiss } from './useMobileBackDismiss'
 import { useDialogA11y } from './useDialogA11y'
 import { SheetPortal } from './SheetPortal'
+import { MobileFxStats } from './MobileFxStats'
 import type { CurrencyCode } from '@/types'
 
 const NUMPAD_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', 'back'] as const
@@ -42,6 +43,7 @@ export function MobileCurrencyConverter({ onClose }: { onClose: () => void }) {
   const [amountText, setAmountText] = useState('1')
   const [from, setFrom] = useState<CurrencyCode>('USD')
   const [to, setTo] = useState<CurrencyCode>(appCurrency === 'USD' ? 'DOP' : appCurrency)
+  const [stats, setStats] = useState<CurrencyCode | null>(null)
   const [picker, setPicker] = useState<'from' | 'to' | null>(null)
   // Bump para re-renderizar cuando llegan tasas frescas (mutan CURRENCIES in place)
   const [, setRatesVersion] = useState(0)
@@ -163,6 +165,18 @@ export function MobileCurrencyConverter({ onClose }: { onClose: () => void }) {
               <div className="mconv-rate-line">
                 <Icon name="trend" size={13} />
                 1 {from} = {fmt(unitRate, to)}
+                {/* El acceso va justo en la linea de la tasa: es el numero que
+                    el usuario quiere ver moverse, y es donde ya esta mirando.
+                    Se abre sobre la moneda de DESTINO, que es la que se lee
+                    como precio ("el dolar esta a X"). */}
+                <button
+                  className="mconv-stats-btn"
+                  onClick={() => setStats(to)}
+                  aria-label={t('fxStatsLabel')}
+                >
+                  <Icon name="chart" size={13} />
+                  {t('fxStatsLabel')}
+                </button>
               </div>
 
               <p className="mcur-note mconv-fetched-note">
@@ -187,6 +201,7 @@ export function MobileCurrencyConverter({ onClose }: { onClose: () => void }) {
           </>
         )}
       </section>
+      {stats && <MobileFxStats code={stats} onClose={() => setStats(null)} />}
     </div>
     </SheetPortal>
   )

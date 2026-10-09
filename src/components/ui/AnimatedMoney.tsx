@@ -11,9 +11,39 @@ interface Props {
   className?: string
   /** Divisa a mostrar; por defecto la divisa base de la app. */
   currency?: CurrencyCode
+  /**
+   * Encoge la letra cuando la cifra es larga, para que quepa entera.
+   *
+   * Solo donde el hueco es fijo y estrecho — las tres columnas del resumen —
+   * no en una ficha donde la cifra manda y tiene sitio de sobra.
+   */
+  fit?: boolean
 }
 
-export function AnimatedMoney({ value, compact, decimals, style, className, currency: currencyOverride }: Props) {
+/**
+ * CUÁNTO HAY QUE ENCOGER LA LETRA PARA QUE QUEPA.
+ *
+ * Una app de dinero no puede recortar una cifra de dinero. «RD$ 1,166,62…» no
+ * se puede leer y, peor, se puede leer MAL: parecen cien mil menos de los que
+ * son. Antes esto se intentó bajando la letra de 15px a 13.5px, que aguantó
+ * hasta que aparecieron los millones.
+ *
+ * Se calcula por LONGITUD DEL TEXTO, no midiendo la caja: el número ya está
+ * formateado aquí, así que sale de una resta en vez de un ciclo de medir y
+ * repintar. Y al ser un factor relativo (`em`) se compone con el tamaño que
+ * ponga el CSS y con la escala de letra de accesibilidad de la app, en vez de
+ * pelearse con ellos.
+ */
+export function fitScale(text: string): number {
+  const n = text.length
+  if (n <= 13) return 1
+  if (n <= 15) return 0.92
+  if (n <= 17) return 0.84
+  if (n <= 19) return 0.76
+  return 0.7
+}
+
+export function AnimatedMoney({ value, compact, decimals, style, className, currency: currencyOverride, fit }: Props) {
   const baseCurrency = useFinance(s => s.currency)
   const currency = currencyOverride ?? baseCurrency
   const [disp, setDisp] = useState(0)
@@ -39,7 +69,14 @@ export function AnimatedMoney({ value, compact, decimals, style, className, curr
   // `fmtCompact`, que es un alias de `fmt` y por tanto SEGUIA mostrandolos.
   const text = fmt(disp, currency, { decimals: compact ? 0 : decimals })
   return (
-    <span style={{ fontVariantNumeric: 'tabular-nums', ...style }} className={className}>
+    <span
+      style={{
+        fontVariantNumeric: 'tabular-nums',
+        ...(fit ? { fontSize: `${fitScale(text)}em` } : {}),
+        ...style,
+      }}
+      className={className}
+    >
       {text}
     </span>
   )

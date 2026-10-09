@@ -529,6 +529,114 @@
     justify-content: center;
     padding: 10px 2px 0;
   }
+  /* El acceso a la grafica, en la propia linea de la tasa: discreto, porque
+     es un extra, pero pegado al numero que se quiere ver moverse. */
+  .mconv-stats-btn {
+    align-items: center;
+    background: color-mix(in oklab, var(--accent) 14%, transparent);
+    border: 0;
+    border-radius: 999px;
+    color: var(--accent);
+    display: flex;
+    font-family: inherit;
+    font-size: 11.5px;
+    font-weight: 800;
+    gap: 4px;
+    margin-left: 4px;
+    padding: 4px 9px;
+  }
+
+  /* ── ESTADISTICAS DE UNA MONEDA (MobileFxStats) ───────────────── */
+  .mfx-overlay { align-items: center; justify-content: center; }
+  .mfx-sheet {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    display: grid;
+    gap: 12px;
+    margin: 0 18px;
+    max-height: 80vh;
+    max-width: 400px;
+    overflow-y: auto;
+    padding: 16px;
+    width: 100%;
+  }
+  .mfx-header { align-items: flex-start; display: flex; justify-content: space-between; }
+  .mfx-header b { color: var(--text); display: block; font-size: 16px; font-weight: 850; }
+  .mfx-header small { color: var(--text-dim); font-size: 11.5px; }
+  .mfx-header button {
+    background: transparent; border: 0; color: var(--text-dim); padding: 2px;
+  }
+
+  .mfx-figure { display: grid; gap: 3px; }
+  .mfx-figure strong {
+    color: var(--text); font-size: 30px; font-variant-numeric: tabular-nums;
+    font-weight: 850; letter-spacing: -.02em; line-height: 1.1;
+  }
+  .mfx-delta {
+    align-items: center; display: flex; font-size: 13px;
+    font-variant-numeric: tabular-nums; font-weight: 800; gap: 4px;
+  }
+  .mfx-delta em { color: var(--text-dim); font-style: normal; font-weight: 650; margin-left: 2px; }
+  .mfx-delta.up   { color: var(--income); }
+  .mfx-delta.down { color: var(--expense); }
+  .mfx-delta.flat { color: var(--text-dim); }
+
+  .mfx-chart { display: block; height: 92px; width: 100%; }
+  .mfx-line { fill: none; stroke-linecap: round; stroke-linejoin: round; stroke-width: 2; }
+  .mfx-area { stroke: none; }
+  .mfx-chart.up   .mfx-line { stroke: var(--income); }
+  .mfx-chart.down .mfx-line { stroke: var(--expense); }
+  .mfx-chart.flat .mfx-line { stroke: var(--text-dim); }
+  .mfx-chart.up   .mfx-area { fill: color-mix(in oklab, var(--income) 16%, transparent); }
+  .mfx-chart.down .mfx-area { fill: color-mix(in oklab, var(--expense) 16%, transparent); }
+  .mfx-chart.flat .mfx-area { fill: color-mix(in oklab, var(--text) 8%, transparent); }
+
+  .mfx-scale {
+    color: var(--text-dim); display: flex; font-size: 10.5px;
+    font-variant-numeric: tabular-nums; justify-content: space-between;
+  }
+
+  .mfx-stats { display: grid; gap: 8px; grid-template-columns: repeat(3, 1fr); margin: 0; }
+  .mfx-stats > div {
+    background: color-mix(in oklab, var(--text) 5%, transparent);
+    border-radius: 12px; display: grid; gap: 2px; padding: 8px 10px;
+  }
+  .mfx-stats dt { color: var(--text-dim); font-size: 10.5px; font-weight: 750; }
+  .mfx-stats dd {
+    color: var(--text); font-size: 13px; font-variant-numeric: tabular-nums;
+    font-weight: 800; margin: 0;
+  }
+  .mfx-stats dd.up   { color: var(--income); }
+  .mfx-stats dd.down { color: var(--expense); }
+
+  /* Sin historial todavia. Se explica, no se dibuja una linea inventada. */
+  .mfx-empty {
+    align-items: center; color: var(--text-dim); display: grid;
+    gap: 6px; justify-items: center; padding: 22px 10px; text-align: center;
+  }
+  .mfx-empty strong { color: var(--text); font-size: 15px; font-weight: 800; }
+  .mfx-empty p { font-size: 12.5px; line-height: 17px; margin: 0; }
+  .mfx-today {
+    background: color-mix(in oklab, var(--text) 7%, transparent);
+    border-radius: 999px; color: var(--text); font-size: 12px;
+    font-variant-numeric: tabular-nums; font-weight: 800; padding: 5px 12px;
+  }
+
+  .mfx-ranges { display: flex; gap: 6px; }
+  .mfx-ranges button {
+    background: color-mix(in oklab, var(--text) 6%, transparent);
+    border: 0; border-radius: 10px; color: var(--text-dim);
+    flex: 1; font-family: inherit; font-size: 12.5px; font-weight: 800;
+    min-height: 34px;
+  }
+  .mfx-ranges button.on { background: color-mix(in oklab, var(--accent) 18%, transparent); color: var(--accent); }
+
+  .mfx-note {
+    align-items: flex-start; color: var(--text-dim); display: flex;
+    font-size: 11.5px; gap: 6px; line-height: 16px; margin: 0;
+  }
+  .mfx-note svg { flex-shrink: 0; margin-top: 2px; }
   .mconv-picker-back {
     align-items: center;
     background: transparent;
@@ -1385,7 +1493,18 @@
     flex: 1;
     height: 0;
     min-height: 0;
+    /*
+     * EN HORIZONTAL NO SE MUEVE NADA.
+     *
+     * `overflow-y: auto` deja el otro eje en `auto` por defecto, asi que
+     * cualquier desborde lateral —el carrusel de tarjetas se sale del margen
+     * a proposito para que la siguiente asome— volvia la pantalla arrastrable
+     * de lado: al deslizar las tarjetas, la pagina entera se movia unos
+     * pixeles. Lo que se desliza son las tarjetas; el fondo se queda quieto.
+     */
+    overflow-x: hidden;
     overflow-y: auto;
+    overscroll-behavior-x: none;
     overscroll-behavior-y: contain;
     scroll-behavior: auto;
     scroll-padding-bottom: calc(112px + env(safe-area-inset-bottom));
@@ -1651,8 +1770,18 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  /*
+   * EL BALANCE TOTAL SE QUEDO FUERA DE LA BAJADA A 13.5px.
+   *
+   * Cuando se encogio la letra de la franja para que cupieran las cifras con
+   * centavos, esta regla siguio imponiendo 15px a la tercera columna. Por eso
+   * en la misma pantalla «Ingresos» salia entero y «Balance total» se cortaba
+   * con un numero de longitud parecida: no era el numero, era la letra.
+   *
+   * Las tres columnas miden lo mismo, asi que las tres cifras se miden igual.
+   */
   .mobile-summary-strip-movements .mini-stat-button strong {
-    font-size: 15px;
+    font-size: 13.5px;
   }
   .mobile-list-card {
     background: var(--m-surface);
@@ -1811,15 +1940,39 @@
   .mobile-tx-swipe.has-dup.open .mobile-tx-row {
     transform: translateX(-240px);
   }
+  /*
+   * LAS ACCIONES NO EXISTEN HASTA QUE SE DESLIZA.
+   *
+   * Estaban siempre ahi, solo TAPADAS por la fila. Bastaba pulsar sin soltar
+   * para destaparlas: el feedback de pulsacion de la app pone `opacity: .86`
+   * —la fila se vuelve translucida y se transparentan los botones— y
+   * `scale(.985)` —la fila se encoge y deja al aire una franja a la derecha,
+   * justo donde estan—. Por eso ademas se pulsaban sin querer: eran botones
+   * vivos debajo del dedo.
+   *
+   * Ocultas de verdad e inertes mientras la fila esta cerrada. No hay nada que
+   * transparentar ni nada que tocar.
+   */
   .mobile-row-actions {
     bottom: 0;
     display: grid;
     grid-template-columns: repeat(2, 80px);
+    pointer-events: none;
     position: absolute;
     right: 0;
     top: 0;
+    /* Al CERRAR se quedan visibles hasta que la fila acaba de taparlas; si se
+       ocultaran al instante desaparecerian de golpe a media animacion. */
+    transition: visibility 0s linear var(--m-duration);
+    visibility: hidden;
     width: 160px;
     z-index: 1;
+  }
+  .mobile-tx-swipe.open .mobile-row-actions {
+    pointer-events: auto;
+    /* Al ABRIR, en cambio, tienen que estar ya ahi cuando la fila se aparta. */
+    transition-delay: 0s;
+    visibility: visible;
   }
   .mobile-tx-swipe.has-dup .mobile-row-actions {
     grid-template-columns: repeat(3, 80px);
@@ -2581,17 +2734,6 @@
     text-align: left;
     width: calc(100% - 28px);
   }
-  .mnc-health-ico {
-    align-items: center;
-    background: color-mix(in oklab, #ff5470 22%, transparent);
-    border-radius: 10px;
-    color: #ff5470;
-    display: grid;
-    flex-shrink: 0;
-    height: 32px;
-    place-items: center;
-    width: 32px;
-  }
   .mnc-health-text { display: grid; flex: 1 1 150px; gap: 3px; min-width: 0; }
   .mnc-health-text strong { color: var(--m-text); font-size: 13.5px; font-weight: 800; line-height: 1.3; }
   .mnc-health-text small { color: var(--m-muted); font-size: 12px; line-height: 1.45; }
@@ -2749,15 +2891,6 @@
     display: flex;
     gap: 10px;
     min-width: 0;
-  }
-  .mnc-card-icon {
-    align-items: center;
-    border-radius: 11px;
-    display: flex;
-    flex-shrink: 0;
-    height: 34px;
-    justify-content: center;
-    width: 34px;
   }
   .mnc-card-title {
     display: flex;
@@ -3031,17 +3164,6 @@
     gap: 8px;
     padding: 56px 24px 64px;
     text-align: center;
-  }
-  .mnc-empty-icon {
-    align-items: center;
-    background: color-mix(in oklab, var(--m-text) 7%, transparent);
-    border-radius: 999px;
-    color: var(--m-muted);
-    display: flex;
-    height: 68px;
-    justify-content: center;
-    margin-bottom: 6px;
-    width: 68px;
   }
   .mnc-empty b { color: var(--m-text); font-size: 16px; font-weight: 850; }
   .mnc-empty small {
@@ -3554,6 +3676,10 @@
     display: flex;
     height: 78px;
     justify-content: center;
+    /* Venia de una regla anterior con el mismo nombre, que se fusionaba con
+       esta sin que se notara. Al retirarla habia que traerse esto o el icono
+       se pegaria al texto. */
+    margin-bottom: 6px;
     width: 78px;
   }
   .mnc-empty b { color: var(--m-text); font-size: 16.5px; font-weight: 850; }

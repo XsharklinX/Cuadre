@@ -41,7 +41,7 @@ function definedClasses(): Set<string> {
  * Prefijos de pantalla que este test vigila. Se limita a los propios de la
  * app para no perseguir utilidades globales ni clases de librerías.
  */
-const WATCHED = /^(sacc|macc|man|mnc|mnews|mhealth|mbank|mrate|mnum|mob-onboard|txf)-/
+const WATCHED = /^(sacc|macc|man|mnc|mnews|mhealth|mbank|mrate|mnum|mob-onboard|txf|mfx|mconv|mcur|mset|mobile)-/
 
 describe('toda clase de pantalla propia tiene CSS', () => {
   it('ninguna clase usada en el código queda sin definir', () => {
@@ -58,6 +58,14 @@ describe('toda clase de pantalla propia tiene CSS', () => {
           .split(/\s+/)
           .filter(Boolean)
         for (const cls of raw) {
+          /*
+           * Un nombre que acaba en «-» no es una clase: es lo que queda de
+           * `mobile-tool-pane-${transicion}` al quitar la interpolacion. La
+           * clase real se compone en tiempo de ejecucion y sus variantes se
+           * declaran enteras en el CSS, asi que acusarla es acusar de lo que
+           * no es.
+           */
+          if (cls.endsWith('-')) continue
           if (!WATCHED.test(cls) || defined.has(cls)) continue
           const where = file.slice(SRC.length + 1).split(sep).join('/')
           missing.set(cls, [...(missing.get(cls) ?? []), where])

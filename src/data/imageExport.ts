@@ -1,3 +1,4 @@
+import { tt } from '@/i18n'
 import { APP_NAME } from '@/data/release'
 import { localToday } from '@/data/helpers'
 import { saveFile } from '@/hooks/useTauri'
@@ -161,7 +162,7 @@ export async function exportElementPng(element: HTMLElement, name: string): Prom
     let blob = await renderBlob(2)
     if (!blob) blob = await renderBlob(1.5)
     if (!blob) blob = await renderBlob(1)
-    if (!blob) throw new Error('No se pudo generar la imagen')
+    if (!blob) throw new Error(tt('couldNotGenerateImage'))
     const filename = `${name}-${localToday()}.png`
     await saveFile(blob, filename, `Imagen de ${APP_NAME}`, ['png'])
   } finally {

@@ -217,6 +217,16 @@ export interface FeeContext {
    */
   ownTransfer?: boolean
   /**
+   * Si el dinero ENTRA o SALE.
+   *
+   * Decide si hay algo que cobrar, antes que cualquier otra regla. Todos los
+   * cargos de aqui son sobre dinero que sale: la Ley 288-04 grava DEBITOS
+   * electronicos, el recargo por divisa lo cobra el banco al pagar fuera, y un
+   * avance de efectivo es por definicion una salida. En un ingreso no hay
+   * ninguno de los tres.
+   */
+  direction?: 'out' | 'in'
+  /**
    * El usuario apagó el cálculo del 0.15%. Por defecto está encendido, pero
    * no todos los bancos lo retienen igual ni en todas las operaciones, así que
    * tiene que poder quitarse sin pelear con la app.
@@ -233,6 +243,21 @@ export interface FeeContext {
  */
 export function computeFees(base: number, ctx: FeeContext): FeeLine[] {
   if (base <= 0 || !ctx.profile) return []
+
+  /*
+   * UN INGRESO NO PAGA NADA.
+   *
+   * Todos los cargos de este archivo son sobre dinero que SALE. La Ley 288-04
+   * grava debitos electronicos; cobrarsela a un ingreso es inventar un
+   * impuesto que no existe.
+   *
+   * Y el efecto era peor que el error contable: el formulario guarda
+   * `monto + cargos`, asi que en un ingreso el impuesto se SUMABA al dinero
+   * recibido. Registrabas RD$ 10,000 de sueldo y el libro anotaba RD$ 10,015,
+   * con quince pesos que nunca existieron. Por eso descuadraba todo.
+   */
+  if (ctx.direction === 'in') return []
+
   const lines: FeeLine[] = []
 
   const add = (kind: FeeKind) => {

@@ -1,6 +1,6 @@
 {
   "name": "cuadre",
-  "version": "1.9.8",
+  "version": "1.9.11",
   "private": true,
   "type": "module",
   "scripts": {
@@ -25,7 +25,8 @@
     "android:logcat": "powershell -ExecutionPolicy Bypass -Command \"& \\\"$env:LOCALAPPDATA\\Android\\Sdk\\platform-tools\\adb.exe\\\" logcat -c; & \\\"$env:LOCALAPPDATA\\Android\\Sdk\\platform-tools\\adb.exe\\\" logcat AndroidRuntime:E chromium:E RustStdoutStderr:D Tauri:D *:S\"",
     "tauri:icon": "tauri icon public/icon.svg",
     "verify": "npm run lint && npm run typecheck && npm run test && npm run test:e2e",
-    "release:live": "node scripts/mark-released.mjs"
+    "release:live": "node scripts/mark-released.mjs",
+    "symbols": "node scripts/native-symbols.mjs"
   },
   "dependencies": {
     "@tanstack/react-virtual": "^3.13.26",

@@ -1,9 +1,11 @@
 import { APP_NAME } from '@/data/release'
 import { useState } from 'react'
 import { Icon } from '@/components/ui/Icon'
+import { useT } from '@/i18n'
 import { playKeySound, playBackspaceSound, playDoneSound, playWarningHaptic } from '@/lib/sound'
 
 export function MobilePinGate({ pin, onUnlocked }: { pin: string; onUnlocked: () => void }) {
+  const t = useT()
   const [value, setValue] = useState('')
   const [error, setError] = useState('')
 
@@ -38,7 +40,7 @@ export function MobilePinGate({ pin, onUnlocked }: { pin: string; onUnlocked: ()
           <Icon name="lock" size={48} />
         </div>
         <h2>{APP_NAME}</h2>
-        <p>{error || 'Ingresa tu PIN para continuar'}</p>
+        <p>{error || t('pinPrompt')}</p>
 
         <div className="mpin-dots">
           {Array.from({ length: pin.length }).map((_, i) => (

@@ -4,6 +4,7 @@
  * equivalente web (download/upload por archivo).
  */
 
+import { tt } from '@/i18n'
 import { APP_NAME } from '@/data/release'
 import { localToday } from '@/data/helpers'
 
@@ -43,7 +44,7 @@ export async function saveFile(blob: Blob, filename: string, title: string, exte
   // Tauri Android: Simular diálogo Guardar usando confirm y guardado directo
   if (isAndroid && isTauri()) {
     const { confirm, message } = await import('@tauri-apps/plugin-dialog')
-    const yes = await confirm(`¿Guardar "${filename}" en tu carpeta pública de Descargas?`, { title: 'Guardar archivo', kind: 'info' })
+    const yes = await confirm(tt('saveToDownloadsAsk', { file: filename }), { title: tt('saveFile'), kind: 'info' })
     if (!yes) return false
 
     const buffer = await blob.arrayBuffer()
@@ -53,11 +54,11 @@ export async function saveFile(blob: Blob, filename: string, title: string, exte
     // con un explorador: el aviso ofrece abrirlo ahí mismo. "Listo" es el botón
     // de cancelar del diálogo nativo, así que cerrarlo por fuera equivale a no
     // abrir nada — el archivo ya está guardado en cualquier caso.
-    const open = await confirm(`Guardado en:\n${savedPath}`, {
-      title: 'Exportación completada',
+    const open = await confirm(`${tt('savedAtPath')}\n${savedPath}`, {
+      title: tt('exportDone'),
       kind: 'info',
-      okLabel: 'Abrir',
-      cancelLabel: 'Listo',
+      okLabel: tt('openLabel'),
+      cancelLabel: tt('doneLabel'),
     })
     if (open) {
       const opened = await tauriInvoke<{ resolved: boolean }>('plugin:local-reminders|open_file', {
@@ -65,7 +66,7 @@ export async function saveFile(blob: Blob, filename: string, title: string, exte
         mimeType: blob.type || undefined,
       }).catch(() => ({ resolved: false }))
       if (!opened?.resolved) {
-        await message('No hay ninguna app instalada que pueda abrir este archivo.', { title: 'No se pudo abrir', kind: 'warning' })
+        await message(tt('noAppForFile'), { title: tt('couldNotOpenTitle'), kind: 'warning' })
       }
     }
     return true

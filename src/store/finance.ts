@@ -8,6 +8,8 @@ import { canHaveNetwork } from '@/data/cardNetwork'
 import { accountMovementsTotal, accountSecondaryMovementsTotal, localToday } from '@/data/helpers'
 import { validateEnvelopeTransfer } from '@/data/envelopes'
 import { createRecoverySnapshot } from '@/data/recovery'
+import { recordRecalc, type RecalcMove } from '@/data/recalcHistory'
+import { findInflatedIncome, repairInflatedIncome } from '@/data/incomeFeeRepair'
 import { tt } from '@/i18n'
 import { useSettings } from '@/store/settings'
 import type { Account, Category, Transaction, Goal, GoalContribution, CurrencyCode, OverdraftPolicy } from '@/types'
@@ -287,6 +289,25 @@ export function recomputeAccountBalances(
 }
 
 /**
+ * El antes y el despues de una cuenta, para el historial de recalculos.
+ *
+ * El nombre se copia tal cual estaba: la cuenta puede renombrarse o borrarse
+ * despues, y un historial que dice «se corrigio una cuenta» sin decir cual no
+ * sirve para comprobar nada.
+ */
+function toMove(before: Account, after: Account): RecalcMove {
+  return {
+    accountId: after.id,
+    name: after.name,
+    before: before.balance,
+    after: after.balance,
+    ...(before.secondaryBalance !== undefined || after.secondaryBalance !== undefined
+      ? { beforeSecondary: before.secondaryBalance ?? 0, afterSecondary: after.secondaryBalance ?? 0 }
+      : {}),
+  }
+}
+
+/**
  * Igual que `recomputeAccountBalances` pero para `Goal.saved`: evita que el
  * ahorro guardado sea una segunda fuente de verdad frente a la suma real de
  * `GoalContribution` — se reconcilia contra `openingSaved + aportes`.
@@ -420,11 +441,31 @@ function assertTransactionShape(tx: Transaction, accounts: Account[], categories
   if (tx.categoryId && categoryIds.size > 0 && !categoryIds.has(tx.categoryId)) throw new Error(tt('categoryError'))
 }
 
+/**
+ * Reconstruye el movimiento desde una LISTA BLANCA de campos.
+ *
+ * Es deliberado: lo que no se nombre aqui no se guarda, asi que un campo
+ * inventado por un import o por una version futura no entra al libro por la
+ * puerta de atras.
+ *
+ * ⚠ EL PRECIO DE ESA DECISION: aqui hay que nombrar TODO campo nuevo. Si se
+ * olvida, no falla nada — el campo simplemente se cae al guardar, en silencio.
+ * Le paso a `description`: no estaba en ninguna de las dos ramas, asi que la
+ * descripcion de un gasto nunca llegaba a guardarse, ni al crearlo ni al
+ * editarlo. El usuario la escribia, la veia en el formulario y desaparecia.
+ *
+ * `addTx`, `importTxs` y `updateTx` pasan todos por aqui.
+ */
 function normalizeTransaction(tx: Transaction): Transaction {
+  // Vacia es como no tenerla: asi no se guardan cadenas en blanco que luego
+  // pintan un recuadro de descripcion sin nada dentro.
+  const description = tx.description?.trim() || undefined
+
   if (tx.type === 'transfer') {
     const { id, type, amount, date, note, fromAccount, toAccount, toAmount, toSecondary, tags } = tx
     return {
       id, type, amount, date, note, fromAccount, toAccount,
+      ...(description ? { description } : {}),
       ...(toAmount !== undefined && Number.isFinite(toAmount) && toAmount > 0 ? { toAmount } : {}),
       ...(toSecondary ? { toSecondary: true } : {}),
       ...(tags?.length ? { tags } : {}),
@@ -443,6 +484,7 @@ function normalizeTransaction(tx: Transaction): Transaction {
     && !!originalCurrency && fxRate !== undefined && Number.isFinite(fxRate) && fxRate > 0
   return {
     id, type, amount, date, note, categoryId, accountId,
+    ...(description ? { description } : {}),
     ...(type === 'expense' && splits && splits.length >= 2 ? { splits } : {}),
     ...(recurring ? { recurring, recurringStart, recurringEnd, recurringNext, skippedDates } : {}),
     ...(recurring && serviceId ? { serviceId } : {}),
@@ -541,7 +583,7 @@ export interface FinanceState {
   importTxs: (txs: Array<Omit<Transaction, 'id'> & { id?: string }>) => void
   updateTx: (id: string, fields: Partial<Omit<Transaction, 'id'>>) => void
   deleteTx: (id: string) => void
-  transfer: (p: { fromAccount: string; toAccount: string; amount: number; date: string; note?: string; toSecondary?: boolean }) => void
+  transfer: (p: { fromAccount: string; toAccount: string; amount: number; date: string; note?: string; description?: string; toSecondary?: boolean }) => void
 
   // Cuentas
   addAccount:    (account: Omit<Account, 'id'>) => void
@@ -594,6 +636,23 @@ export interface FinanceState {
   recomputeAccount: (id: string) => boolean
   /** Igual, para UNA meta: su ahorro contra `apertura + aportes`. */
   recomputeGoal: (id: string) => boolean
+  /**
+   * Deshace el impuesto que se cobro de mas en los ingresos.
+   *
+   * Durante varias versiones los cargos bancarios se calculaban igual para un
+   * gasto que para un ingreso, y el monto guardado los INCLUYE: el 0.15% de la
+   * Ley 288-04 se sumaba al dinero recibido. Devuelve cuantos ingresos se
+   * corrigieron. Crea un punto de recuperacion antes, porque reescribe montos.
+   */
+  repairIncomeFees: () => number
+  /**
+   * Devuelve unos saldos a como estaban, para deshacer un recalculo.
+   *
+   * NO restaura una copia entera del libro: eso revertiria tambien los
+   * movimientos anotados despues. Solo se tocan los saldos que aquel
+   * recalculo cambio. Devuelve cuantas cuentas se devolvieron.
+   */
+  restoreAccountBalances: (moves: RecalcMove[]) => number
 
   // Redondea al entero más cercano todos los montos (quita centavos). Crea un
   // punto de recuperación antes, porque es destructivo. Devuelve cuántos
@@ -673,7 +732,7 @@ export const useFinance = create<FinanceState>()(
         }
       }),
 
-      transfer: ({ fromAccount, toAccount, amount, date, note, toSecondary }) => set(s => {
+      transfer: ({ fromAccount, toAccount, amount, date, note, description, toSecondary }) => set(s => {
         if (fromAccount === toAccount) throw new Error(tt('errSameAccount'))
         assertAvailableBalance(s.accounts, fromAccount, amount, s.currency)
         if (!s.accounts.some(a => a.id === toAccount)) throw new Error(tt('errDestAccountNotExist'))
@@ -681,6 +740,10 @@ export const useFinance = create<FinanceState>()(
           id: newId(), type: 'transfer',
           amount, fromAccount, toAccount,
           date, note: note ?? 'Transferencia',
+          // La descripcion se perdia aqui: el boton estaba disponible en
+          // transferencias, se escribia, y `transfer` no la recibia. Se
+          // guardaba el movimiento sin ella y sin avisar de nada.
+          ...(description ? { description } : {}),
           ...(toSecondary ? { toSecondary: true } : {}),
         }, s.accounts, s.currency)
         return {
@@ -874,7 +937,7 @@ export const useFinance = create<FinanceState>()(
 
       // ── Categorías ─────────────────────────────────────
       addCategory: (c) => set(s => {
-        if (!text(c.name) || !/\p{L}/u.test(c.name)) throw new Error('Escribe un nombre válido para la categoría.')
+        if (!text(c.name) || !/\p{L}/u.test(c.name)) throw new Error(tt('invalidCategoryName'))
         return { categories: [...s.categories, { id: newId('cat_'), ...c, name: c.name.trim() }] }
       }),
 
@@ -886,7 +949,7 @@ export const useFinance = create<FinanceState>()(
       },
 
       updateCategory: (id, fields) => set(s => {
-        if (fields.name !== undefined && (!text(fields.name) || !/\p{L}/u.test(fields.name))) throw new Error('Escribe un nombre válido para la categoría.')
+        if (fields.name !== undefined && (!text(fields.name) || !/\p{L}/u.test(fields.name))) throw new Error(tt('invalidCategoryName'))
         return { categories: s.categories.map(c => c.id === id ? { ...c, ...fields, ...(fields.name ? { name: fields.name.trim() } : {}) } : c) }
       }),
 
@@ -989,6 +1052,9 @@ export const useFinance = create<FinanceState>()(
         // Solo se reemplaza ESA cuenta: las demas se quedan como estaban,
         // descuadradas o no.
         set({ accounts: accounts.map(a => a.id === id ? after : a) })
+        // Se apunta aqui, no en la pantalla: asi cualquier sitio que recalcule
+        // deja rastro, y no solo el boton que existe hoy.
+        recordRecalc('account', [toMove(before, after)])
         return moved
       },
 
@@ -1001,6 +1067,26 @@ export const useFinance = create<FinanceState>()(
         const moved = Math.abs(after.saved - before.saved) > 0.005
         set({ goals: goals.map(g => g.id === id ? after : g) })
         return moved
+      },
+
+      restoreAccountBalances: (moves) => {
+        const { accounts } = get()
+        const porId = new Map(moves.map(m => [m.accountId, m]))
+        let devueltas = 0
+        const next = accounts.map(a => {
+          const m = porId.get(a.id)
+          if (!m) return a
+          devueltas++
+          return {
+            ...a,
+            balance: m.before,
+            ...(m.beforeSecondary !== undefined ? { secondaryBalance: m.beforeSecondary } : {}),
+          }
+        })
+        // Las cuentas borradas desde entonces simplemente no estan: se
+        // devuelve lo que se puede y se dice cuanto fue.
+        if (devueltas > 0) set({ accounts: next })
+        return devueltas
       },
 
       recomputeBalances: () => {
@@ -1017,7 +1103,25 @@ export const useFinance = create<FinanceState>()(
         const driftedGoals = recomputedGoals.reduce((n, goal, i) =>
           Math.abs(goal.saved - goals[i].saved) > 0.005 ? n + 1 : n, 0)
         set({ accounts: recomputedAccounts, goals: recomputedGoals })
+        recordRecalc('all', recomputedAccounts.map((after, i) => toMove(accounts[i], after)))
         return driftedAccounts + driftedGoals
+      },
+
+      repairIncomeFees: () => {
+        const state = get()
+        const danados = findInflatedIncome(state.transactions)
+        if (danados.length === 0) return 0
+
+        // Reversible, igual que redondear: reescribe montos del libro.
+        createRecoverySnapshot(state, 'pre-round')
+        const transactions = repairInflatedIncome(state.transactions)
+        // Los saldos se calcularon con los montos inflados, asi que hay que
+        // rehacerlos: si no, la cuenta se quedaria con el dinero inventado.
+        set({
+          transactions,
+          accounts: recomputeAccountBalances(state.accounts, transactions, state.goalContributions),
+        })
+        return danados.length
       },
 
       roundAllAmounts: () => {

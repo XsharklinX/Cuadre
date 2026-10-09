@@ -84,7 +84,6 @@ export function TransactionForm({ value, mkey, onClose, onDelete }: {
     if (value.type === 'transfer') {
       setAmount(value.amount)
       setNote(value.note)
-    setDescription(value.description ?? '')
       setDescription(value.description ?? '')
       setDate(value.date)
       setFromAccount(value.fromAccount ?? '')
@@ -102,6 +101,19 @@ export function TransactionForm({ value, mkey, onClose, onDelete }: {
       setEntryCurrency(entry.currency)
     }
     setNote(value.note)
+    /*
+     * SE PERDIA AQUI, Y ERA PERDIDA DE DATOS.
+     *
+     * Esta rama —gastos e ingresos, o sea casi todo— no cargaba la
+     * descripcion. El estado se quedaba en '' y al guardar se enviaba
+     * `description: undefined`, que al fusionarse con el movimiento BORRABA
+     * la que hubiera. Bastaba editar para cambiar el monto y la descripcion
+     * desaparecia sin avisar.
+     *
+     * Y explicaba el segundo sintoma: la ficha del movimiento si sabe pintar
+     * la descripcion, pero no quedaba ninguna que pintar.
+     */
+    setDescription(value.description ?? '')
     setDate(value.date)
     setAccountId(value.accountId ?? accounts[0]?.id ?? '')
     setCategoryId(value.categoryId ?? '')

@@ -1,5 +1,6 @@
 import type { CurrencyCode } from '@/types'
 import { CURRENCIES as DISPLAY_CURRENCIES } from './currencies'
+import { recordRate, type FxSeries } from './fxHistory'
 
 const CODES: CurrencyCode[] = ['DOP', 'USD', 'EUR', 'MXN', 'GBP', 'COP', 'ARS', 'BRL', 'CAD']
 const CACHE_KEY = 'sharky-fx-rates-v1'
@@ -18,6 +19,41 @@ function readCache(): RatesCache | null {
     return raw ? (JSON.parse(raw) as RatesCache) : null
   } catch {
     return null
+  }
+}
+
+/**
+ * EL HISTORIAL, que se construye con lo que ya se descarga.
+ *
+ * No hay fuente gratuita de serie historica para el peso dominicano (ver
+ * `fxHistory.ts`), asi que el grafico del conversor se alimenta apuntando cada
+ * descarga. Vive en su propia clave: es prescindible, y si un dia hay que
+ * tirarlo no debe arrastrar las tasas vigentes, que si hacen falta para
+ * convertir.
+ */
+const HISTORY_KEY = 'cuadre-fx-history-v1'
+
+export function readFxHistory(): FxSeries {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY)
+    const value = raw ? JSON.parse(raw) as FxSeries : {}
+    return value && typeof value === 'object' ? value : {}
+  } catch {
+    return {}
+  }
+}
+
+function appendHistory(rates: UsdRates, at: number) {
+  try {
+    let series = readFxHistory()
+    for (const code of CODES) {
+      const rate = rates[code]
+      if (rate) series = recordRate(series, code, rate, at)
+    }
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(series))
+  } catch {
+    // Sin almacenamiento o cuota llena: el historial es lo prescindible, las
+    // tasas vigentes no. Nunca debe impedir que se apliquen.
   }
 }
 
@@ -78,5 +114,6 @@ export async function syncExchangeRates(): Promise<boolean> {
   if (!fresh) return changed
 
   writeCache(fresh)
+  appendHistory(fresh, Date.now())
   return applyRates(fresh) || changed
 }

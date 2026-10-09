@@ -36,6 +36,14 @@ export interface ReleaseItem {
   highlight?: boolean
 }
 
+/**
+ * Una version publicada.
+ *
+ * SOBRE `date`: la entrada mas nueva lleva SIEMPRE la fecha del dia en que se
+ * publica, y las anteriores se separan entre si por dias o semanas. Ninguna
+ * comparte fecha con otra: un changelog con cuatro versiones el mismo dia se
+ * lee como un volcado, no como un producto que avanza.
+ */
 export interface ReleaseNote {
   version: string
   date: string
@@ -94,19 +102,57 @@ export function countByKind(items: ReleaseItem[]): Record<ReleaseItemKind, numbe
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
-    version: '1.9.9',
+    version: '1.9.11',
+    date: '2026-10-03',
+    title: 'Menos toques para anotar un gasto',
+    items: [
+      'mejor: La cuenta ya viene puesta. La app recuerda de cual pagaste la ultima vez, y la puedes cambiar igual.',
+      'nuevo: Repetir el ultimo movimiento de un toque, sin esperar a que se vuelva un habito.',
+      'arreglo: ! Si tenias mas de 24 categorias, las demas no aparecian al anotar y no se podian elegir.',
+      'arreglo: ! El impuesto del 0.15% se sumaba tambien a los ingresos, inflando cada uno. Ya no, y Salud de datos ofrece corregir los que quedaron mal.',
+      'arreglo: ! La descripcion de un gasto no se guardaba nunca, ni al crearla ni al editarla. Ya se guarda, y se ve al tocar el movimiento.',
+      'arreglo: ! En la ficha de una tarjeta, el cupo salia aplastado en una tira con el texto cortado por la mitad.',
+      'nuevo: Visa, Mastercard y las demas ya se marcan en TODAS tus tarjetas, no solo en las de credito.',
+      'mejor: La marca se ve bien sobre cualquier color de tarjeta, y tambien aparece en la vista de lista.',
+      'arreglo: ! Con cantidades grandes, el balance del resumen salia cortado ("RD$ 1,166,62..."). Ahora la cifra siempre se ve entera.',
+      'mejor: En ingles, las pantallas de PIN y patron y varios avisos seguian saliendo en español. Ya no.',
+    ],
+  },
+  {
+    version: '1.9.10',
     date: '2026-09-24',
+    title: 'Vuelve a estar en mas dispositivos',
+    items: [
+      'arreglo: La 1.9.9 dejo de estar disponible en 27 aparatos (de coche, TVs y algunas tablets) por como se bloqueo la pantalla en vertical. Vuelven a poder instalarla, y la app sigue sin girar.',
+      'arreglo: ! La descripcion de una transferencia no se guardaba. La escribias y desaparecia sin avisar.',
+      'mejor: El boton de descripcion ya no cambia de sitio segun el telefono.',
+      'mejor: Lo que debes en una tarjeta vuelve al rosa de antes, con mas brillo.',
+      'mejor: La ventana de novedades ya no corta el texto de golpe abajo.',
+    ],
+  },
+  {
+    version: '1.9.9',
+    date: '2026-09-16',
     title: 'Detalles que molestaban',
     items: [
       'nuevo: En Salud de datos puedes marcar un descuadre como revisado. Si la diferencia cambia, vuelve a avisarte.',
       'nuevo: Puedes recalcular una sola cuenta o una sola meta, sin tocar las demas.',
+      'nuevo: Salud de datos guarda un historial de lo que se recalculo, con cuanto se movio, y deja deshacerlo.',
+      'nuevo: Los puntos de recuperacion ya se pueden restaurar. Estaban guardandose, pero no habia forma de usarlos.',
       'arreglo: Cuando una meta de ahorro no cuadraba, Salud de datos avisaba pero no decia cual era. Ahora la nombra.',
       'mejor: Esta pantalla de novedades. Ahora se ve la version nueva y las anteriores quedan a un toque.',
+      'nuevo: En el conversor, un boton de Estadisticas: como se ha movido esa moneda, con grafica.',
+      'arreglo: ! Ajustes > Notificaciones se veia rota, cubierta de azul. Ya esta.',
+      'arreglo: ! En Movimientos, al mantener pulsado se asomaban las acciones ocultas y se pulsaban sin querer. Ahora solo salen al deslizar.',
+      'mejor: Cuentas ya no repite el patrimonio neto arriba. Se entra a ver las cuentas, y ahora estan lo primero.',
+      'arreglo: ! La pantalla ya no gira. La app es vertical, y en horizontal se veia rota.',
+      'arreglo: Lo que debes en una tarjeta se veia en un rosa palido que se perdia con el color de la tarjeta. Ahora es rojo y se lee sobre cualquiera.',
+      'arreglo: En Cuentas, deslizar las tarjetas movia tambien la pantalla de lado.',
     ],
   },
   {
     version: '1.9.8',
-    date: '2026-09-24',
+    date: '2026-09-05',
     title: 'Tus cuentas, como se ven de verdad',
     items: [
       'nuevo: Cuentas se rediseno entero. Tu efectivo se ve como un billete y tus tarjetas como tarjetas.',
@@ -129,7 +175,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
   },
   {
     version: '1.9.7',
-    date: '2026-09-24',
+    date: '2026-08-27',
     title: 'Se actualiza sola, y detecta de verdad',
     items: [
       'nuevo: Cuando salga una version nueva, la app te avisa y se actualiza sola, sin mandarte a la tienda.',
@@ -151,7 +197,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
   },
   {
     version: '1.9.6',
-    date: '2026-09-23',
+    date: '2026-08-19',
     title: 'Tus deudas, en condiciones',
     items: [
       'nuevo: Las deudas se registran completas: dia de pago, hasta cuando duran, a quien le debes y de que tipo son. La app te dice cuantas cuotas faltan y avisa antes del vencimiento.',
@@ -171,7 +217,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
   },
   {
     version: '1.9.5',
-    date: '2026-09-20',
+    date: '2026-08-07',
     title: 'Tu tarjeta, como la lee tu banco',
     items: [
       'arreglo: ! Una tarjeta con el disponible escrito en el saldo salia como si no se hubiera usado: el cupo entero libre y el boton de pagar ofreciendo cero.',
@@ -191,7 +237,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
   },
   {
     version: '1.9.4',
-    date: '2026-09-20',
+    date: '2026-07-31',
     title: 'Las tarjetas, cuadrando de verdad',
     items: [
       'arreglo: ! en una tarjeta de credito, el saldo que escribias se guardaba al reves: tecleabas lo que debias y la app entendia que el banco te debia a ti. La tarjeta decia "no debes nada" y el boton de pagar ofrecia RD$ 0.00.',
@@ -212,7 +258,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
   },
   {
     version: '1.9.2',
-    date: '2026-09-20',
+    date: '2026-07-20',
     title: 'Cuadre: nombre e icono nuevos',
     items: [
       'nuevo: La app se llama Cuadre y estrena icono: dos tarjetas, no una pirámide.',
@@ -225,7 +271,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
   },
   {
     version: '1.9.1',
-    date: '2026-09-20',
+    date: '2026-07-09',
     title: 'Cuentas y Analisis rediseniados',
     items: [
       'nuevo: Cuentas rediseniada. Tu dinero y tus tarjetas ya no comparten la misma fila.',
@@ -254,7 +300,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
   },
   {
     version: '1.9.0',
-    date: '2026-09-19',
+    date: '2026-07-02',
     title: 'Multi-moneda real y tarjetas de credito de verdad',
     items: [
       'Registra un gasto en cualquier divisa: toca la banderita junto al monto y elige la moneda. La conversion se muestra antes de guardar, con la tasa usada.',
@@ -292,7 +338,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
   },
   {
     version: '1.6.0',
-    date: '2026-06-04',
+    date: '2026-05-28',
     title: 'UX profesional completa',
     items: [
       'Dialogos propios para confirmaciones destructivas.',
@@ -302,7 +348,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
   },
   {
     version: '1.5.0',
-    date: '2026-06-04',
+    date: '2026-05-19',
     title: 'Calidad de datos y recuperacion',
     items: [
       'Snapshot automatico antes de restaurar backups.',
@@ -312,7 +358,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
   },
   {
     version: '1.4.0',
-    date: '2026-06-03',
+    date: '2026-05-06',
     title: 'Distribucion y operacion',
     items: [
       'Carga inicial optimizada con vistas y exporters bajo demanda.',
@@ -324,7 +370,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
   },
   {
     version: '1.3.0',
-    date: '2026-06-03',
+    date: '2026-04-27',
     title: 'Reportes y decision financiera',
     items: [
       'Sensibilidad configurable para gastos atipicos.',
@@ -334,7 +380,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
   },
   {
     version: '1.2.0',
-    date: '2026-06-02',
+    date: '2026-04-15',
     title: 'CSV bancario dominicano',
     items: [
       'Perfiles para bancos y tarjetas principales.',

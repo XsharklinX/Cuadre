@@ -1096,6 +1096,17 @@
     width: 54px;
   }
 
+  /* «+N más»: las categorias que no caben en la primera tanda. Se viste como
+     una categoria mas y no como un boton de accion, porque hace lo mismo que
+     ellas — llevarte a elegir una. */
+  .mobile-category-grid .mobile-category-more span {
+    background: color-mix(in oklab, var(--m-text) 8%, transparent);
+    border: 1px solid color-mix(in oklab, var(--m-text) 16%, transparent);
+    color: var(--m-muted);
+    height: 54px;
+    width: 54px;
+  }
+
   /* --- Mobile Welcome Hub --- */
   .mobile-welcome-hub {
     background: #090909;

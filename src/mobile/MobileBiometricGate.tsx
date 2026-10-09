@@ -1,11 +1,13 @@
 import { APP_NAME } from '@/data/release'
 import { useEffect, useState } from 'react'
 import { Icon } from '@/components/ui/Icon'
+import { useT } from '@/i18n'
 import { authenticateBiometric, checkBiometric } from '@/lib/biometric'
 
 type GateState = 'checking' | 'prompting' | 'error' | 'done'
 
 export function MobileBiometricGate({ onUnlocked, onUnavailable }: { onUnlocked: () => void; onUnavailable: () => void }) {
+  const t = useT()
   const [state, setState]   = useState<GateState>('checking')
   const [error, setError]   = useState('')
   const [icon,  setIcon]    = useState<'fingerprint' | 'faceId'>('fingerprint')
@@ -51,10 +53,10 @@ export function MobileBiometricGate({ onUnlocked, onUnavailable }: { onUnlocked:
         {state === 'error' && (
           <>
             <button className="mbio-retry" onClick={tryAuth}>
-              <Icon name="refresh" size={16} /> Reintentar
+              <Icon name="refresh" size={16} /> {t('retry')}
             </button>
             <button className="mbio-fallback" onClick={onUnavailable}>
-              Usar PIN o patrón
+              {t('usePinOrPattern')}
             </button>
           </>
         )}

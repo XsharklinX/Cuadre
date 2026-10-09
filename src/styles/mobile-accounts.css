@@ -26,76 +26,6 @@
   padding: 4px 0 24px;
 }
 
-/* ── Patrimonio ────────────────────────────────────────────
-   Una sola cifra manda. El reparto activo/deuda va debajo, en una barra
-   que se lee de un vistazo, y los dos montos se nombran en texto: el color
-   nunca es el único portador del dato. */
-.sacc-hero {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  display: grid;
-  gap: 14px;
-  padding: 18px;
-}
-.sacc-hero-label {
-  color: var(--text-dim);
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-}
-.sacc-hero-value {
-  color: var(--text);
-  display: block;
-  font-size: 32px;
-  font-variant-numeric: tabular-nums;
-  font-weight: 850;
-  letter-spacing: -.02em;
-  line-height: 1;
-  margin-top: -4px;
-}
-.sacc-hero-value.negative { color: var(--expense); }
-
-.sacc-hero-bar {
-  background: var(--expense);
-  border-radius: 999px;
-  display: flex;
-  height: 8px;
-  overflow: hidden;
-}
-.sacc-hero-bar > i {
-  background: var(--income);
-  display: block;
-  height: 100%;
-  transition: width .3s ease;
-}
-
-.sacc-hero-split { display: flex; gap: 20px; }
-.sacc-hero-stat { display: grid; gap: 2px; }
-.sacc-hero-stat small {
-  align-items: center;
-  color: var(--text-dim);
-  display: flex;
-  font-size: 11.5px;
-  font-weight: 700;
-  gap: 5px;
-}
-.sacc-hero-stat small::before {
-  border-radius: 50%;
-  content: '';
-  height: 7px;
-  width: 7px;
-}
-.sacc-hero-stat.asset small::before { background: var(--income); }
-.sacc-hero-stat.debt  small::before { background: var(--expense); }
-.sacc-hero-stat strong {
-  color: var(--text);
-  font-size: 15px;
-  font-variant-numeric: tabular-nums;
-  font-weight: 800;
-}
-
 /* ── Próximo pago ──────────────────────────────────────────
    Con dos o tres tarjetas, "¿cuánto debo y cuándo?" es LA pregunta. Antes
    esa respuesta estaba enterrada dentro de la ficha de cada tarjeta, así
@@ -386,7 +316,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sacc-hero-bar > i, .sacc-util-fill { transition-duration: 0ms; }
+  .sacc-util-fill { transition-duration: 0ms; }
 }
 
 /* Distintivo de red (Visa, Mastercard…). Geometría propia y nombre en texto,
@@ -890,6 +820,10 @@
      asoma por el borde e invita a deslizar. */
   margin-inline: -16px;
   overflow-x: auto;
+  /* Al llegar al final del carrusel, el gesto seguia «encadenandose» al
+     contenedor de detras y la pantalla entera se movia un poco de lado. Lo
+     que se desliza son las tarjetas; la pantalla se queda quieta. */
+  overscroll-behavior-x: contain;
   padding-inline: 16px;
   scroll-padding-inline: 16px;
   scroll-snap-type: x mandatory;
@@ -964,15 +898,23 @@
   text-transform: uppercase;
 }
 .sacc-plastic-mark { color: rgba(255,255,255,.8); flex: none; margin-left: auto; }
-.sacc-plastic-cur {
-  background: rgba(255,255,255,.16);
-  border-radius: 999px;
-  font-size: 9.5px;
-  font-weight: 850;
-  letter-spacing: .05em;
-  margin-left: auto;
-  padding: 2px 8px;
+/*
+ * LA MARCA SOBRE EL PLASTICO.
+ *
+ * Va a la derecha del todo, que es donde la busca el ojo en una tarjeta de
+ * verdad. En blanco y no en su color: el azul marino de Visa (#1a1f71) sobre
+ * una tarjeta oscura no se ve, y las tarjetas fisicas resuelven lo mismo
+ * igual — sobre plastico oscuro el logotipo va impreso en blanco. La sombra
+ * le da borde para que aguante tambien sobre una tarjeta clara.
+ */
+.sacc-plastic .netmark { flex: none; margin-left: auto; }
+.netmark-word.on-card {
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .45);
 }
+/* Los circulos de Mastercard si conservan su color: se leen sobre cualquier
+   fondo y son la unica marca que se reconoce por la forma. */
+.sacc-plastic .netmark svg { filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .35)); }
 
 .sacc-plastic-mid { align-items: flex-end; display: flex; gap: 10px; }
 
@@ -1010,7 +952,22 @@
   letter-spacing: -.02em;
   line-height: 1.2;
 }
-.sacc-plastic-figs b.owed { color: #ff8fa6; }
+/*
+ * LA DEUDA TIENE QUE LEERSE SOBRE CUALQUIER TARJETA.
+ *
+ * El rosa se fundia con el fondo sobre una tarjeta amarilla, y se probo a
+ * cambiarlo por un rojo saturado. Fue pasarse: el rojo se comia la tarjeta y
+ * quedaba peor. El rosa era el color correcto; lo que le faltaba era BRILLO.
+ *
+ * Asi que sube en luminosidad, no cambia de familia, y se queda la sombra
+ * oscura — que es lo que de verdad lo despega del fondo. El color aporta el
+ * tono; la sombra, el contraste. Por eso funciona sobre cualquier tarjeta sin
+ * tener que gritar.
+ */
+.sacc-plastic-figs b.owed {
+  color: #ffa2b8;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .55), 0 0 1px rgba(0, 0, 0, .85);
+}
 /* La SEGUNDA deuda, separada por un filete: una tarjeta dominicana arrastra
    su línea en pesos y su línea en dólares, y el banco las liquida aparte. */
 .sacc-plastic-figs em {
@@ -1024,13 +981,26 @@
   margin-top: 3px;
   padding-top: 3px;
 }
-.sacc-plastic-figs em.owed { color: rgba(255,143,166,.82); }
+/* La segunda deuda: el mismo rosa, un punto mas bajo para que no compita con
+   la cifra principal, pero con la misma sombra — se lee igual de bien. */
+.sacc-plastic-figs em.owed {
+  color: #ff8fa6;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .5);
+}
 
 .sacc-plastic-foot { display: grid; gap: 4px; }
 /* DOS TRAMOS: el cupo es uno solo y lo consumen las dos deudas. Con una sola
    barra al 74%, una tarjeta con deuda en dólares diría que queda más cupo
-   del que hay. */
-.sacc-util {
+   del que hay.
+
+   SE LLAMA `-plastic-`, Y ES IMPORTANTE: esta barra nacio llamandose
+   `.sacc-util`, que era YA el nombre del bloque de cupo de la FICHA de cuenta
+   —etiqueta, porcentaje y barra, un grid con su alto natural—. Como esta
+   regla va despues, ganaba, y le imponia `height: 4px; overflow: hidden` a
+   aquel bloque: en la ficha, el cupo aparecia aplastado a una tira de 4px con
+   el texto cortado por la mitad. Dos cosas distintas no pueden compartir
+   nombre solo porque ambas midan un cupo. */
+.sacc-plastic-util {
   background: rgba(255,255,255,.18);
   border-radius: 999px;
   display: flex;
@@ -1038,8 +1008,8 @@
   height: 4px;
   overflow: hidden;
 }
-.sacc-util > i { background: #ff8fa6; display: block; height: 100%; transition: width .35s ease; }
-.sacc-util > i.fx { background: #ffc46b; }
+.sacc-plastic-util > i { background: #ff8fa6; display: block; height: 100%; transition: width .35s ease; }
+.sacc-plastic-util > i.fx { background: #ffc46b; }
 .sacc-plastic-meta {
   color: rgba(255,255,255,.6);
   display: flex;
@@ -1079,14 +1049,17 @@
 .sacc-mini.savings { background: linear-gradient(140deg, var(--card), color-mix(in oklab, var(--card) 55%, #000)); }
 .sacc-cardrow-id { flex: 1; min-width: 0; }
 .sacc-cardrow-id b {
+  align-items: center;
   color: var(--text);
-  display: block;
+  display: flex;
   font-size: 13px;
   font-weight: 750;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  gap: 6px;
+  min-width: 0;
 }
+/* El nombre cede sitio antes que la marca: un banco con nombre largo no debe
+   empujarla fuera, porque la marca es lo que identifica la tarjeta de golpe. */
+.sacc-cardrow-id b > :first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sacc-cardrow-id small { color: var(--text-dim); font-size: 10px; font-weight: 650; }
 .sacc-cardrow-amt { flex: none; text-align: right; }
 .sacc-cardrow-amt b {

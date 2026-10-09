@@ -16,6 +16,9 @@ import { getScheduledBackupStatus, pickBackupFolder, runBackupNow, type Schedule
 import { SheetPortal } from './SheetPortal'
 import type { Account, Goal } from '@/types'
 import { driftKey, pendingDrifts } from '@/data/healthDismissals'
+import { clearRecalcs, listRecalcs, totalMoved, undoRecalc, type RecalcEntry } from '@/data/recalcHistory'
+import { findInflatedIncome, totalInflated } from '@/data/incomeFeeRepair'
+import { listRecoverySnapshots, readRecoverySnapshot, type RecoverySnapshot } from '@/data/recovery'
 
 /**
  * SALUD DE DATOS — la pantalla que responde "¿cuadra lo que dice la app con lo
@@ -61,6 +64,13 @@ export function MobileDataHealth({ onClose }: { onClose: () => void }) {
   const [justFixed, setJustFixed] = useState<number | null>(null)
   const [backup, setBackup] = useState<ScheduledBackupStatus | null>(null)
   const [backupBusy, setBackupBusy] = useState(false)
+  /*
+   * El historial y las copias viven en localStorage, no en el store: se leen
+   * al abrir y se releen tras cada cambio que pueda tocarlos.
+   */
+  const [recalcs, setRecalcs] = useState<RecalcEntry[]>(listRecalcs)
+  const [snapshots, setSnapshots] = useState<RecoverySnapshot[]>(listRecoverySnapshots)
+  const refreshLog = () => { setRecalcs(listRecalcs()); setSnapshots(listRecoverySnapshots()) }
 
   // El estado real del backup lo tiene Android, no el store: preguntarselo es
   // la unica forma de saber si de verdad se esta copiando algo.
@@ -122,6 +132,16 @@ export function MobileDataHealth({ onClose }: { onClose: () => void }) {
   const pruneDrifts = useSettings(st => st.pruneDrifts)
   const recomputeAccount = useFinance(st => st.recomputeAccount)
   const recomputeGoal = useFinance(st => st.recomputeGoal)
+  const restoreAccountBalances = useFinance(st => st.restoreAccountBalances)
+  const restoreBackup = useFinance(st => st.restoreBackup)
+  const repairIncomeFees = useFinance(st => st.repairIncomeFees)
+
+  /*
+   * Ingresos a los que se les sumo un impuesto que no existe. No es deriva:
+   * el saldo se calculo CON el monto inflado, asi que el libro cuadra consigo
+   * mismo y ninguna invariante lo ve. Solo se nota contra el banco.
+   */
+  const inflados = useMemo(() => findInflatedIncome(state.transactions), [state.transactions])
 
   const fingerprint = (d: Drift) => ({ accountId: d.account.id, primary: d.primary, secondary: d.secondary })
   const drifts = useMemo(
@@ -163,6 +183,7 @@ export function MobileDataHealth({ onClose }: { onClose: () => void }) {
     if (!ok) return
     const fixed = recomputeBalances()
     setJustFixed(fixed)
+    refreshLog()
     if (fixed > 0) playSuccessHaptic()
     toast(
       fixed > 0 ? t('balancesFixed').replace('{n}', String(fixed)) : t('balancesOk'),
@@ -192,6 +213,40 @@ export function MobileDataHealth({ onClose }: { onClose: () => void }) {
               </small>
             </div>
           </div>
+
+          {/*
+            IMPUESTO COBRADO DE MAS EN INGRESOS.
+            Va encima de los descuadres porque es peor: un descuadre avisa de
+            que algo no casa, esto es dinero que la app invento y que cuadra
+            perfectamente con su propio error.
+          */}
+          {inflados.length > 0 && (
+            <div className="mhealth-repair">
+              <div className="mhealth-repair-head">
+                <Icon name="alert" size={16} />
+                <strong>{t('incomeFeeTitle')}</strong>
+              </div>
+              <p>
+                {t('incomeFeeBody')
+                  .replace('{n}', String(inflados.length))
+                  .replace('{amount}', fmtVal(totalInflated(inflados), state.currency))}
+              </p>
+              <button onClick={async () => {
+                const ok = await confirm({
+                  title: t('incomeFeeFix'),
+                  description: t('incomeFeeConfirm'),
+                  confirmLabel: t('incomeFeeFix'),
+                })
+                if (!ok) return
+                const n = repairIncomeFees()
+                refreshLog()
+                playSuccessHaptic()
+                toast(t('incomeFeeDone').replace('{n}', String(n)), { icon: 'check', type: 'ok' })
+              }}>
+                <Icon name="refresh" size={14} /> {t('incomeFeeFix')}
+              </button>
+            </div>
+          )}
 
           {/* Que NO cuadra y POR CUANTO: sin el monto, el usuario no sabe que
               buscar en su estado de cuenta. */}
@@ -232,6 +287,7 @@ export function MobileDataHealth({ onClose }: { onClose: () => void }) {
                   <div className="mhealth-drift-actions">
                     <button onClick={() => {
                       const moved = recomputeAccount(account.id)
+                      refreshLog()
                       toast(
                         moved
                           ? t('accountRecalculated').replace('{name}', account.name)
@@ -366,21 +422,126 @@ export function MobileDataHealth({ onClose }: { onClose: () => void }) {
             </p>
           )}
 
+          {/*
+            HISTORIAL. Antes, «Recalcular» reescribia los saldos y ahi acababa
+            todo: el usuario veia unos numeros cambiar y no tenia con que
+            comprobar que cambio ni como volver atras. Pedir confianza no es lo
+            mismo que dar con que comprobar.
+          */}
+          <div className="mhealth-log">
+            <div className="mhealth-log-head">
+              <strong>{t('recalcHistoryTitle')}</strong>
+              {recalcs.length > 0 && (
+                <button className="mhealth-log-clear" onClick={async () => {
+                  const ok = await confirm({
+                    title: t('recalcClearLabel'),
+                    description: t('recalcClearConfirm'),
+                    confirmLabel: t('recalcClearLabel'),
+                    tone: 'danger',
+                  })
+                  if (!ok) return
+                  clearRecalcs()
+                  refreshLog()
+                }}>{t('recalcClearLabel')}</button>
+              )}
+            </div>
+
+            {recalcs.length === 0 ? (
+              <p className="mhealth-log-empty">{t('recalcHistoryEmpty')}</p>
+            ) : recalcs.map(entry => (
+              <div key={entry.id} className={`mhealth-log-row ${entry.undone ? 'undone' : ''}`}>
+                <div className="mhealth-log-id">
+                  <strong>{entryLabel(entry, t)}</strong>
+                  <small>{new Date(entry.at).toLocaleString(dateLocale(lang))}</small>
+                </div>
+                {/* Cuanto se movio, con signo: es la cifra que deja comprobar
+                    si el recalculo hizo lo que el usuario esperaba. */}
+                <span className={`mhealth-log-delta ${totalMoved(entry) > 0 ? 'up' : 'down'}`}>
+                  {totalMoved(entry) > 0 ? '+' : '−'}{fmtVal(Math.abs(totalMoved(entry)), state.currency)}
+                </span>
+                {entry.undone ? (
+                  <span className="mhealth-log-done">{t('recalcUndoneLabel')}</span>
+                ) : (
+                  <button className="mhealth-log-undo" onClick={async () => {
+                    const ok = await confirm({
+                      title: t('recalcUndoLabel'),
+                      description: t('recalcUndoConfirm'),
+                      confirmLabel: t('recalcUndoLabel'),
+                    })
+                    if (!ok) return
+                    const devueltas = restoreAccountBalances(undoRecalc(entry.id))
+                    refreshLog()
+                    toast(
+                      devueltas > 0
+                        ? t('recalcUndoneToast').replace('{n}', String(devueltas))
+                        : t('recalcNothingToUndo'),
+                      { icon: devueltas > 0 ? 'refresh' : 'info', type: devueltas > 0 ? 'ok' : undefined },
+                    )
+                  }}>{t('recalcUndoLabel')}</button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/*
+            PUNTOS DE RECUPERACION. Existian, se creaban solos y se contaban
+            aqui... y no habia forma de restaurar ninguno: una red de seguridad
+            que no se podia alcanzar. Van al final y con aviso porque esto SI
+            reemplaza el libro entero.
+          */}
+          {snapshots.length > 0 && (
+            <div className="mhealth-log">
+              <div className="mhealth-log-head">
+                <strong>{t('recoveryPointsLabel')}</strong>
+              </div>
+              <p className="mhealth-log-empty">{t('recoveryPointsHint')}</p>
+              {snapshots.map(snap => (
+                <div key={snap.id} className="mhealth-log-row">
+                  <div className="mhealth-log-id">
+                    <strong>{new Date(snap.createdAt).toLocaleString(dateLocale(lang))}</strong>
+                    <small>{reasonLabel(snap.reason, t)}</small>
+                  </div>
+                  <button className="mhealth-log-undo" onClick={async () => {
+                    const ok = await confirm({
+                      title: t('recoveryRestoreLabel'),
+                      description: t('recoveryRestoreConfirm'),
+                      confirmLabel: t('recoveryRestoreLabel'),
+                      tone: 'danger',
+                    })
+                    if (!ok) return
+                    restoreBackup(readRecoverySnapshot(snap.id))
+                    refreshLog()
+                    toast(t('recoveryRestoredToast'), { icon: 'check', type: 'ok' })
+                  }}>{t('recoveryRestoreLabel')}</button>
+                </div>
+              ))}
+            </div>
+          )}
+
           <dl className="mhealth-stats">
             <div><dt>{t('accounts')}</dt><dd>{health.accounts}</dd></div>
             <div><dt>{t('movementsLabel')}</dt><dd>{health.transactions}</dd></div>
             <div><dt>{t('recoveryPointsLabel')}</dt><dd>{health.recoveryPoints}</dd></div>
           </dl>
 
-          {health.lastRecoveryAt && (
-            <p className="mhealth-meta">
-              {t('lastRecoveryPoint')}: {new Date(health.lastRecoveryAt).toLocaleString(dateLocale(lang))}
-            </p>
-          )}
         </section>
       </div>
     </SheetPortal>
   )
+}
+
+/** Como se llama un recalculo en el historial. */
+function entryLabel(entry: RecalcEntry, t: ReturnType<typeof useT>): string {
+  if (entry.scope === 'account') return entry.moves[0]?.name ?? t('recalcScopeOne')
+  return t('recalcScopeAll')
+}
+
+/** Por que se creo una copia. */
+function reasonLabel(reason: RecoverySnapshot['reason'], t: ReturnType<typeof useT>): string {
+  if (reason === 'manual') return t('recoveryReasonManual')
+  if (reason === 'pre-restore') return t('recoveryReasonPreRestore')
+  if (reason === 'pre-round') return t('recoveryReasonPreRound')
+  return t('recoveryReasonAuto')
 }
 
 /**

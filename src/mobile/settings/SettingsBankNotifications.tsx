@@ -214,13 +214,25 @@ export function SettingsBankNotifications({ activeSheet, onOpen, onClose, groupe
                 <b>{t(`reminderKind_${kind}` as Parameters<typeof t>[0])}</b>
                 <small>{t(`reminderKindDesc_${kind}` as Parameters<typeof t>[0])}</small>
               </span>
-              <input
-                type="checkbox"
-                className="mset-toggle-input"
-                checked={isReminderKindOn(settings.reminderKinds, kind)}
-                onChange={e => settings.setReminderKind(kind, e.target.checked)}
-              />
-              <span className="mset-toggle" />
+              {/*
+                El interruptor VA DENTRO de `.mset-toggle-wrap`, siempre.
+                `.mset-toggle` es `position: absolute` con `inset: 0`: sin ese
+                contenedor —que es quien pone `position: relative` y le da sus
+                52x30— se ancla al ancestro posicionado mas cercano, que aqui
+                es la pantalla de ajustes entera, y el interruptor se pinta
+                sobre toda la pantalla tapandolo todo.
+                Es un <span> y no un <label> porque la fila ya es un <label>, y
+                un label dentro de otro no es HTML valido.
+              */}
+              <span className="mset-toggle-wrap">
+                <input
+                  type="checkbox"
+                  className="mset-toggle-input"
+                  checked={isReminderKindOn(settings.reminderKinds, kind)}
+                  onChange={e => settings.setReminderKind(kind, e.target.checked)}
+                />
+                <span className="mset-toggle" />
+              </span>
             </label>
           ))}
         </div>

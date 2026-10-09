@@ -35,9 +35,32 @@ async function offscreenControls(page: Page) {
   return page.evaluate(() => {
     const tol = 2, W = window.innerWidth, bad: { el: string; cutR: number; cutL: number }[] = []
     const sel = '.mobile-app button, .mobile-app input, .mobile-app select, .mobile-app textarea, .mobile-app [role="button"], .mobile-app a[href]'
+    /*
+     * Dentro de un carrusel, estar fuera de pantalla NO es un fallo.
+     *
+     * La tira de meses y el carrusel de tarjetas se desplazan a proposito: sus
+     * elementos asoman por el borde justo para invitar a deslizar, y se llega a
+     * todos. Contarlos como inalcanzables hacia que esta prueba fallara sola
+     * con el paso del tiempo — la tira va del mes del movimiento mas antiguo al
+     * mes ACTUAL, asi que cada mes que pasa añade un chip y acaba empujando al
+     * primero fuera. En octubre de 2026 empezo a fallar por eso, sin que nadie
+     * tocara nada.
+     *
+     * Lo que esta prueba busca sigue intacto: un control empujado fuera de un
+     * contenedor que NO se desplaza, donde no hay forma de alcanzarlo.
+     */
+    const enCarrusel = (el: Element) => {
+      for (let p = el.parentElement; p; p = p.parentElement) {
+        const s = getComputedStyle(p)
+        if ((s.overflowX === 'auto' || s.overflowX === 'scroll') && p.scrollWidth > p.clientWidth + 2) return true
+      }
+      return false
+    }
+
     for (const el of Array.from(document.querySelectorAll(sel))) {
       const cs = getComputedStyle(el)
       if (cs.display === 'none' || cs.visibility === 'hidden' || cs.pointerEvents === 'none') continue
+      if (enCarrusel(el)) continue
       const r = el.getBoundingClientRect()
       if (r.width < 1 || r.height < 1) continue
       const cutR = Math.round(r.right - W), cutL = Math.round(-r.left)

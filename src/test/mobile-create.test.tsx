@@ -34,11 +34,31 @@ function seedStore() {
 describe('MobileCreateFlow', () => {
   beforeEach(seedStore)
 
-  it('starts with no account selected', () => {
-    render(<MobileCreateFlow mkey="2026-06" onSaved={vi.fn()} />)
-    const accountPill = screen.getByRole('button', { name: /^account$/i })
-    expect(accountPill).toBeTruthy()
-    expect(accountPill.className).toContain('unset')
+  /*
+   * LA CUENTA VIENE SUGERIDA, NO VACIA.
+   *
+   * Antes arrancaba en «Seleccionar…» y cada gasto costaba un toque mas para
+   * responder algo que casi nunca cambia. Ahora sale del libro, y cuando no
+   * hay en que basarse se vuelve a pedir como siempre.
+   */
+  it('preselecciona la unica cuenta que hay', () => {
+    const { container } = render(<MobileCreateFlow mkey="2026-06" onSaved={vi.fn()} />)
+    const pill = container.querySelector('.mobile-create-pad-account') as HTMLElement
+    expect(pill.className).not.toContain('unset')
+    expect(pill.textContent).toContain('Cash')
+  })
+
+  it('con varias cuentas y sin historial no adivina', () => {
+    useFinance.setState({
+      accounts: [
+        { id: 'acc_cash', name: 'Cash', short: 'Cash', type: 'cash', color: '#f59e0b', balance: 500, last4: null },
+        { id: 'acc_bank', name: 'Bank', short: 'Bank', type: 'debit', color: '#3b82f6', balance: 900, last4: null },
+      ],
+      transactions: [],
+    } as never)
+    const { container } = render(<MobileCreateFlow mkey="2026-06" onSaved={vi.fn()} />)
+    const pill = container.querySelector('.mobile-create-pad-account') as HTMLElement
+    expect(pill.className).toContain('unset')
   })
 
   it('save button is not disabled when no account is selected', () => {
@@ -60,13 +80,10 @@ describe('MobileCreateFlow', () => {
     const catBtn = container.querySelector('.mobile-cat-grid button') as HTMLElement | null
     if (catBtn) fireEvent.click(catBtn)
 
-    // Open account picker and select Cash
-    const accountPill = screen.getByRole('button', { name: /^account$/i })
-    if (accountPill) {
-      fireEvent.click(accountPill)
-      const cashOpt = screen.queryByText('Cash')
-      if (cashOpt) fireEvent.click(cashOpt)
-    }
+    // La cuenta ya viene sugerida; se localiza por su clase y no por el
+    // nombre accesible, que ahora es el de la cuenta en vez de «account».
+    const accountPill = container.querySelector('.mobile-create-pad-account') as HTMLElement | null
+    expect(accountPill).toBeTruthy()
 
     // Save button should now be enabled (if amount + category + account all set)
     const saveBtn = screen.getByRole('button', { name: /save/i })

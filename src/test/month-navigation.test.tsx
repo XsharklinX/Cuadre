@@ -8,7 +8,10 @@ vi.mock('@/components/ui/Icon', () => ({
   Icon: ({ name }: { name: string }) => <span>{name}</span>
 }))
 vi.mock('@/i18n', () => ({
-  useT: () => (key: string) => key
+  useT: () => (key: string) => key,
+  // `tt` es el traductor de fuera de React. Lo usan el store y la capa de
+  // datos, que entran por la cadena de imports aunque este test no los llame.
+  tt: (key: string) => key,
 }))
 
 describe('MobileTopBar date navigation', () => {

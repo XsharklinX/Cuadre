@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { deriveQuickAdds } from './quickAdds'
+import { deriveQuickAdds, lastMovementQuickAdd } from './quickAdds'
 import type { Transaction } from '@/types'
 
 const tx = (over: Partial<Transaction> = {}): Transaction => ({
@@ -77,5 +77,57 @@ describe('deriveQuickAdds', () => {
     const [q] = deriveQuickAdds(rows)
     expect(q.note).toBe('Café')
     expect(q.uses).toBe(3)
+  })
+})
+
+/**
+ * REPETIR LO ULTIMO, SIN ESPERAR A QUE SEA UN HABITO.
+ *
+ * `deriveQuickAdds` pide tres repeticiones, asi que las dos primeras veces que
+ * anotas algo no hay ningun atajo — justo cuando el usuario esta decidiendo si
+ * la app le compensa. Esto no adivina nada: ofrece repetir lo que acabas de
+ * hacer, que es una afirmacion que no puede estar equivocada.
+ */
+describe('lastMovementQuickAdd', () => {
+  it('ofrece el ultimo movimiento aunque solo haya pasado una vez', () => {
+    const q = lastMovementQuickAdd([tx({ note: 'Café', amount: 120 })], 'expense')!
+    expect(q.note).toBe('Café')
+    expect(q.amount).toBe(120)
+  })
+
+  it('coge el mas reciente por fecha, no el primero del array', () => {
+    const q = lastMovementQuickAdd([
+      tx({ note: 'Viejo', date: '2026-01-02' }),
+      tx({ note: 'Nuevo', date: '2026-09-30' }),
+    ], 'expense')!
+    expect(q.note).toBe('Nuevo')
+  })
+
+  it('no mezcla gastos con ingresos', () => {
+    const libro = [
+      tx({ note: 'Café', type: 'expense', date: '2026-09-30' }),
+      tx({ note: 'Sueldo', type: 'income', date: '2026-09-28' }),
+    ]
+    expect(lastMovementQuickAdd(libro, 'expense')!.note).toBe('Café')
+    expect(lastMovementQuickAdd(libro, 'income')!.note).toBe('Sueldo')
+  })
+
+  /* Sin concepto no hay nada que repetir: el atajo se identifica por su nota. */
+  it('ignora los movimientos sin concepto', () => {
+    expect(lastMovementQuickAdd([tx({ note: '  ' })], 'expense')).toBeNull()
+  })
+
+  it('con el libro vacio no devuelve nada', () => {
+    expect(lastMovementQuickAdd([], 'expense')).toBeNull()
+  })
+
+  /*
+   * Comparte la identidad con los rapidos derivados, para que la pantalla
+   * pueda reconocer que ya esta en la lista y no enseñarlo dos veces.
+   */
+  it('su clave coincide con la del rapido derivado del mismo movimiento', () => {
+    const libro = repeat(3, { note: 'Café' })
+    const [derivado] = deriveQuickAdds(libro)
+    expect(lastMovementQuickAdd(libro, 'expense')!.key).toBe(derivado.key)
   })
 })

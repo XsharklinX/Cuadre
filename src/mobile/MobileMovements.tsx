@@ -87,13 +87,13 @@ export function MobileMovements({
         <article className="mini-stat">
           <small>{t('incomes')}</small>
           <strong className="income">
-            <AnimatedMoney value={summary.income} compact={compactNumbers} />
+            <AnimatedMoney value={summary.income} compact={compactNumbers} fit />
           </strong>
         </article>
         <article className="mini-stat">
           <small>{t('expenses')}</small>
           <strong className="expense">
-            <AnimatedMoney value={summary.expense} compact={compactNumbers} />
+            <AnimatedMoney value={summary.expense} compact={compactNumbers} fit />
           </strong>
         </article>
         <button
@@ -105,7 +105,7 @@ export function MobileMovements({
           <small>{t('totalBalance')}</small>
           <strong className={balancePositive ? 'income' : 'expense'}>
             {!balancePositive && '-'}
-            <AnimatedMoney value={Math.abs(totalBalance)} compact={compactNumbers} />
+            <AnimatedMoney value={Math.abs(totalBalance)} compact={compactNumbers} fit />
           </strong>
         </button>
       </section>

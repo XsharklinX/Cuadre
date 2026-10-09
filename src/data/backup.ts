@@ -40,11 +40,11 @@ export function createBackup(state: FinanceState): FinanceBackup {
   }
 }
 
-const nonEmptyText = z.string().refine(value => value.trim().length > 0, 'No puede estar vacío.')
+const nonEmptyText = z.string().refine(value => value.trim().length > 0, tt('backupFieldEmpty'))
 
 const dateSchema = z.string().refine(
   value => /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00`)),
-  'Fecha inválida.',
+  tt('backupBadDate'),
 )
 
 const iconSchema = nonEmptyText.transform(value => value as IconName)
@@ -191,7 +191,7 @@ const BackupDataSchema = z.object({
         && accountIds.has(tx.fromAccount) && accountIds.has(tx.toAccount)
     : !!tx.accountId && !!tx.categoryId && accountIds.has(tx.accountId) && categoryIds.has(tx.categoryId))
   if (!transactionsValid) {
-    ctx.addIssue({ code: 'custom', message: 'El backup contiene transacciones inválidas o referencias inexistentes.' })
+    ctx.addIssue({ code: 'custom', message: tt('backupBadTransactions') })
   }
 
   const splitsValid = data.transactions.every(tx => {
@@ -200,13 +200,13 @@ const BackupDataSchema = z.object({
     return Math.abs(sum - tx.amount) < 0.01 && tx.splits.every(split => categoryIds.has(split.categoryId))
   })
   if (!splitsValid) {
-    ctx.addIssue({ code: 'custom', message: 'El backup contiene divisiones de transacción cuya suma no coincide con el monto o con categorías inexistentes.' })
+    ctx.addIssue({ code: 'custom', message: tt('backupBadSplits') })
   }
 
   const contributionsValid = data.goalContributions.every(contribution =>
     goalIds.has(contribution.goalId) && accountIds.has(contribution.fromAccountId))
   if (!contributionsValid) {
-    ctx.addIssue({ code: 'custom', message: 'El backup contiene aportes a metas inválidos o referencias inexistentes.' })
+    ctx.addIssue({ code: 'custom', message: tt('backupBadContributions') })
   }
 })
 

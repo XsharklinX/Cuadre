@@ -9,6 +9,7 @@ import { OPERATORS, cleanAmount, evaluateExpression, lastOperatorIndex, lastSegm
 import { isDuplicateTransaction } from '@/data/bankCsv'
 import { accountCurrency, fmt, fmtCompact, localToday } from '@/data/helpers'
 import { checkOverdraft } from '@/data/overdraft'
+import { suggestAccount } from '@/data/lastAccount'
 import { ACCENT_COLORS } from '@/constants'
 import { dateLocale } from '@/data/helpers'
 import { CURRENCIES } from '@/data/seed'
@@ -23,7 +24,7 @@ import { useNotes } from '@/store/notes'
 import { noteTotals } from '@/data/notes'
 import { translateCategoryName, useT } from '@/i18n'
 import { playBackspaceSound, playDoneSound, playKeySound, playOperatorSound, playSoftHaptic } from '@/lib/sound'
-import { deriveQuickAdds, type QuickAdd } from '@/data/quickAdds'
+import { deriveQuickAdds, lastMovementQuickAdd, type QuickAdd } from '@/data/quickAdds'
 import { useQuickAdds } from '@/store/quickAdds'
 import { openNativeScanner } from '@/lib/mlkitOcr'
 import { recognizeReceipt, type ReceiptOcrResult } from '@/lib/receiptOcr'
@@ -128,7 +129,21 @@ export function MobileCreateFlow({
   const [mode, setMode] = useState<MobileTxMode>(initialMode ?? 'expense')
   const [amountText, setAmountText] = useState('')
   const [categoryId, setCategoryId] = useState<string | null>(null)
-  const [accountId, setAccountId] = useState<string | null>(null)   // no default account
+  /*
+   * La cuenta arranca SUGERIDA, no vacia.
+   *
+   * Antes empezaba en null y el selector decia «Seleccionar…», asi que cada
+   * gasto costaba un toque mas para responder algo que casi nunca cambia: casi
+   * todo el mundo paga con la misma tarjeta o el mismo efectivo. La sugerencia
+   * sale del libro (ver `data/lastAccount.ts`), sigue siendo editable, y si no
+   * hay en que basarse vuelve a pedirla como antes.
+   *
+   * Se calcula en el inicializador para que ya este puesta en el primer
+   * pintado: ponerla despues con un efecto haria parpadear «Seleccionar…».
+   */
+  const [accountId, setAccountId] = useState<string | null>(
+    () => suggestAccount(transactions, accounts, (initialMode ?? 'expense') === 'income' ? 'income' : 'expense'),
+  )
   const [fromAccount, setFromAccount] = useState('')
   const [toAccount, setToAccount] = useState('')
   const [note, setNote] = useState('')
@@ -171,11 +186,28 @@ export function MobileCreateFlow({
   const amount = evaluateExpression(amountText)
   const hasOperator = OPERATORS.some(op => amountText.includes(op))
   const categoryType = mode === 'income' ? 'income' : 'expense'
-  const visibleCategories = useMemo(
-    () => categories.filter(c => c.type === categoryType).slice(0, 24),
+  /*
+   * TODAS las categorias del tipo, sin recortar.
+   *
+   * Antes esto era `.slice(0, 24)` sin ningun «ver todas»: quien pasara de 24
+   * categorias perdia las siguientes — no podia seleccionarlas, y si un atajo
+   * rellenaba una de ellas tampoco salia marcada, porque `activeCategory` se
+   * buscaba solo entre las 24 visibles. No daba error: la categoria
+   * simplemente no estaba.
+   *
+   * Las primeras 24 se siguen enseñando de entrada para que la pantalla no sea
+   * un muro, pero el resto esta a un toque y la seleccion se resuelve siempre
+   * contra la lista completa.
+   */
+  const allCategories = useMemo(
+    () => categories.filter(c => c.type === categoryType),
     [categories, categoryType],
   )
-  const activeCategory = visibleCategories.find(c => c.id === categoryId) ?? null
+  const [showAllCats, setShowAllCats] = useState(false)
+  const CATS_SHOWN = 24
+  const visibleCategories = showAllCats ? allCategories : allCategories.slice(0, CATS_SHOWN)
+  const hiddenCats = allCategories.length - visibleCategories.length
+  const activeCategory = allCategories.find(c => c.id === categoryId) ?? null
   const activeAccountId = accountId && accounts.some(a => a.id === accountId) ? accountId : null
   const activeAccount = activeAccountId ? accounts.find(a => a.id === activeAccountId) : null
   const fromAccountObj = accounts.find(a => a.id === fromAccount)
@@ -218,6 +250,8 @@ export function MobileCreateFlow({
       typedCurrency,
       accountCurrency: targetCurrency,
       isCashAdvance,
+      // Un ingreso no paga cargos: aqui entra dinero, no sale.
+      direction: mode === 'income' ? 'in' : 'out',
       // De donde sale el dinero decide si aplica el 0.15% de la Ley 288-04.
       // Sin este dato, una compra en pesos con debito no generaba ningun cargo
       // mientras el banco si lo retenia.
@@ -537,7 +571,11 @@ export function MobileCreateFlow({
     try {
       let duplicate = false
       if (mode === 'transfer') {
-        transfer({ fromAccount, toAccount, amount, date, note: note.trim() || t('transfer') })
+        transfer({
+          fromAccount, toAccount, amount, date,
+          note: note.trim() || t('transfer'),
+          ...(description.trim() ? { description: description.trim() } : {}),
+        })
       } else {
         const finalNote = note.trim() || activeCategory!.name
         // El libro guarda SIEMPRE el monto en la divisa de la cuenta; si se
@@ -642,10 +680,25 @@ export function MobileCreateFlow({
 
   const allQuickAdds = useMemo(() => deriveQuickAdds(transactions), [transactions])
   const visibleQuickAdds = useMemo(
-    () => allQuickAdds
-      .filter(q => q.type === mode && !hiddenQuick.includes(q.key))
-      .sort((a, b) => Number(pinnedQuick.includes(b.key)) - Number(pinnedQuick.includes(a.key)) || b.uses - a.uses),
-    [allQuickAdds, mode, hiddenQuick, pinnedQuick],
+    () => {
+      const base = allQuickAdds
+        .filter(q => q.type === mode && !hiddenQuick.includes(q.key))
+        .sort((a, b) => Number(pinnedQuick.includes(b.key)) - Number(pinnedQuick.includes(a.key)) || b.uses - a.uses)
+
+      /*
+       * «Repetir el último» va DELANTE y solo si no esta ya en la lista.
+       *
+       * Los rápidos derivados piden tres repeticiones, asi que las dos
+       * primeras veces que anotas algo no hay ningún atajo. Este no adivina un
+       * habito: ofrece repetir lo que acabas de hacer.
+       */
+      if (mode === 'transfer') return base
+      const ultimo = lastMovementQuickAdd(transactions, mode)
+      if (!ultimo || hiddenQuick.includes(ultimo.key)) return base
+      if (base.some(q => q.key === ultimo.key)) return base
+      return [ultimo, ...base]
+    },
+    [allQuickAdds, mode, hiddenQuick, pinnedQuick, transactions],
   )
 
   // Rellena el formulario con un rápido. El monto solo si es estable: si el
@@ -857,6 +910,14 @@ export function MobileCreateFlow({
                     </button>
                   )
                 })}
+                {/* Las que no caben en la primera tanda. Sin esto se perdian:
+                    no se podian seleccionar y nada avisaba de que existian. */}
+                {hiddenCats > 0 && (
+                  <button className="mobile-category-more" onClick={() => setShowAllCats(true)}>
+                    <span><Icon name="dots" size={20} /></span>
+                    <small>{t('showMoreCats').replace('{n}', String(hiddenCats))}</small>
+                  </button>
+                )}
                 <button className="mobile-category-add" onClick={() => { setEditingCategory(null); setCategoryEditorOpen(true) }}>
                   <span><Icon name="plus" size={20} /></span>
                   <small>{t('new')}</small>

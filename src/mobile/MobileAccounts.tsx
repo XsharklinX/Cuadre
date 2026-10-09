@@ -4,7 +4,7 @@ import { toast } from '@/components/ui/Toast'
 import { AnimatedMoney } from '@/components/ui/AnimatedMoney'
 import { CatBadge } from '@/views/shared'
 import { ACCENT_COLORS } from '@/constants'
-import { accountActivity, accountBalanceInBase, accountCurrency, dateLocale, fmt, getAccount, getCategory, localToday, monthlyAccountSeries, visibleAccounts } from '@/data/helpers'
+import { accountActivity, accountBalanceInBase, accountCurrency, dateLocale, fmt, getAccount, getCategory, localToday, monthlyAccountSeries } from '@/data/helpers'
 import { CURRENCIES as CURRENCY_LIST, convertCurrency, getCurrencyMeta } from '@/data/currencies'
 import { CARD_NETWORKS, networkMeta } from '@/data/cardNetwork'
 import {
@@ -53,10 +53,6 @@ function getTypeMeta(t: ReturnType<typeof useT>): Record<AccountType, { label: s
 /** El titulo de cada grupo de tarjetas. */
 const GROUP_LABEL: Record<CardGroupId, 'credit' | 'debit' | 'savings'> = {
   credit: 'credit', debit: 'debit', savings: 'savings',
-}
-
-function accountKind(a: Account): 'asset' | 'debt' {
-  return a.balance < 0 ? 'debt' : 'asset'
 }
 
 export function MobileAccounts({ mkey, createRequest, onEditTx, onDeleteTx }: {
@@ -115,16 +111,11 @@ export function MobileAccounts({ mkey, createRequest, onEditTx, onDeleteTx }: {
     }
   }
 
-  const summary = useMemo(() => {
-    const visible     = visibleAccounts(accounts)
-    const inBase      = (a: Account) => accountBalanceInBase(a, currency)
-    const assets      = visible.filter(a => accountKind(a) === 'asset').reduce((s, a) => s + Math.max(0, inBase(a)), 0)
-    const liabilities = visible.filter(a => accountKind(a) === 'debt').reduce((s, a) => s + Math.abs(Math.min(0, inBase(a))), 0)
-    const cashCount   = visible.filter(a => TYPE_META[a.type].group === t('cash')).length
-    const bankCount   = visible.filter(a => TYPE_META[a.type].group === t('bankAccountsGroupLabel')).length
-    const creditCount = visible.filter(a => TYPE_META[a.type].group === t('creditCardsGroupLabel')).length
-    return { assets, liabilities, net: assets - liabilities, cashCount, bankCount, creditCount, visibleCount: visible.length }
-  }, [accounts, currency, TYPE_META, t])
+  /*
+   * El patrimonio neto se quito de aqui: ocupaba la primera pantalla entera
+   * para repetir una cifra que ya tiene su propio apartado, y empujaba hacia
+   * abajo las cuentas, que es a lo que se entra.
+   */
 
 
   /*
@@ -156,35 +147,8 @@ export function MobileAccounts({ mkey, createRequest, onEditTx, onDeleteTx }: {
     return withCycle[0] ?? null
   }, [creditCards])
 
-  const assetShare = summary.assets + summary.liabilities > 0
-    ? summary.assets / (summary.assets + summary.liabilities) * 100
-    : 100
-
   return (
     <div className="sacc-root">
-
-      {/* ── Patrimonio ──────────────────────────────────── */}
-      <section className="sacc-hero">
-        <div>
-          <span className="sacc-hero-label">{t('netWorthLabel')}</span>
-          <strong className={`sacc-hero-value${summary.net < 0 ? ' negative' : ''}`}>
-            {fmtVal(summary.net, currency)}
-          </strong>
-        </div>
-        <div className="sacc-hero-bar" role="img" aria-label={t('assetsLabel')}>
-          <i style={{ width: `${assetShare}%` }} />
-        </div>
-        <div className="sacc-hero-split">
-          <div className="sacc-hero-stat asset">
-            <small>{t('assetsLabel')}</small>
-            <strong>{fmtVal(summary.assets, currency)}</strong>
-          </div>
-          <div className="sacc-hero-stat debt">
-            <small>{t('liabilitiesLabel')}</small>
-            <strong>{fmtVal(summary.liabilities, currency)}</strong>
-          </div>
-        </div>
-      </section>
 
       {/* ── Próximo pago ────────────────────────────────── */}
       {nextDue && (
@@ -327,7 +291,18 @@ export function MobileAccounts({ mkey, createRequest, onEditTx, onDeleteTx }: {
                                 la tarjeta entera. */}
                             <span className={`sacc-mini ${a.type}`} aria-hidden="true" />
                             <span className="sacc-cardrow-id">
-                              <b>{bank?.name ?? a.name}</b>
+                              <b>
+                                {/* El nombre va en su propio <span> y no suelto:
+                                    es quien se recorta con puntos suspensivos
+                                    cuando no cabe, y un nodo de texto pelado no
+                                    puede ser objetivo de esa regla. */}
+                                <span>{bank?.name ?? a.name}</span>
+                                {/* La marca tambien en la lista: es lo que
+                                    identifica la tarjeta antes que el nombre
+                                    que le puso el usuario, y aqui no hay
+                                    plastico donde enseñarla. */}
+                                {a.network && <NetworkMark network={a.network} size={22} />}
+                              </b>
                               <small>
                                 {a.last4 ? `···· ${a.last4}` : TYPE_META[a.type].label}
                                 {fig.usedLocal !== null && ` · ${Math.round((fig.usedLocal + (fig.usedForeign ?? 0)) * 100)}% ${t('ofLimitShort')}`}
@@ -361,15 +336,29 @@ export function MobileAccounts({ mkey, createRequest, onEditTx, onDeleteTx }: {
                             <span className="sacc-plastic-top">
                               <span className="sacc-plastic-bank">
                                 <b>{bank?.name ?? a.name}</b>
-                                <small>{TYPE_META[a.type].label}</small>
+                                {/* La divisa baja aqui, junto al tipo. Antes
+                                    ocupaba la esquina y DESPLAZABA a la marca:
+                                    una Visa en dolares no podia enseñar que era
+                                    Visa. Aqui no compite con nada y se lee en el
+                                    sitio donde ya se dice que clase de cuenta
+                                    es. */}
+                                <small>
+                                  {TYPE_META[a.type].label}
+                                  {a.currency && a.currency !== currency ? ` · ${a.currency}` : ''}
+                                </small>
                               </span>
-                              {a.type === 'credit' && a.network
-                                ? <NetworkMark network={a.network} size={26} />
-                                : a.currency && a.currency !== currency
-                                  ? <span className="sacc-plastic-cur">{a.currency}</span>
-                                  : a.type === 'savings'
-                                    ? <Icon name="lock" size={15} className="sacc-plastic-mark" />
-                                    : <Icon name="wifi" size={15} className="sacc-plastic-mark" />}
+                              {/*
+                                LA MARCA, EN TODAS LAS QUE LA TENGAN.
+                                Estaba condicionada a `type === 'credit'`, asi
+                                que un debito Mastercard —que la app ya dejaba
+                                configurar— nunca la enseñaba. La red es de la
+                                TARJETA, no del credito.
+                              */}
+                              {a.network
+                                ? <NetworkMark network={a.network} size={26} onCard />
+                                : a.type === 'savings'
+                                  ? <Icon name="lock" size={15} className="sacc-plastic-mark" />
+                                  : <Icon name="wifi" size={15} className="sacc-plastic-mark" />}
                             </span>
 
                             <span className="sacc-plastic-mid">
@@ -401,7 +390,7 @@ export function MobileAccounts({ mkey, createRequest, onEditTx, onDeleteTx }: {
                                 <>
                                   {/* DOS TRAMOS: el cupo es uno solo y lo
                                       consumen las dos deudas. */}
-                                  <span className="sacc-util" aria-hidden="true">
+                                  <span className="sacc-plastic-util" aria-hidden="true">
                                     <i style={{ width: `${fig.usedLocal * 100}%` }} />
                                     {!!fig.usedForeign && <i className="fx" style={{ width: `${fig.usedForeign * 100}%` }} />}
                                   </span>
@@ -1000,15 +989,16 @@ function AccountEditorSheet({
                 <span className="sacc-plastic-top">
                   <span className="sacc-plastic-bank">
                     <b>{findBank(fields.bankId)?.name ?? (fields.name || t('accountNamePlaceholder'))}</b>
-                    <small>{TYPE_META[fields.type].label}</small>
+                    <small>
+                      {TYPE_META[fields.type].label}
+                      {fields.currency && fields.currency !== currency ? ` · ${fields.currency}` : ''}
+                    </small>
                   </span>
-                  {fields.type === 'credit' && fields.network
-                    ? <NetworkMark network={fields.network} size={26} />
-                    : fields.currency && fields.currency !== currency
-                      ? <span className="sacc-plastic-cur">{fields.currency}</span>
-                      : fields.type === 'savings'
-                        ? <Icon name="lock" size={15} className="sacc-plastic-mark" />
-                        : <Icon name="wifi" size={15} className="sacc-plastic-mark" />}
+                  {fields.network
+                    ? <NetworkMark network={fields.network} size={26} onCard />
+                    : fields.type === 'savings'
+                      ? <Icon name="lock" size={15} className="sacc-plastic-mark" />
+                      : <Icon name="wifi" size={15} className="sacc-plastic-mark" />}
                 </span>
 
                 <span className="sacc-plastic-mid">

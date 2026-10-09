@@ -74,6 +74,17 @@
         android:theme="@style/Theme.sharky"
         android:resizeableActivity="true"
         android:usesCleartextTraffic="${usesCleartextTraffic}">
+        <!-- SOLO VERTICAL, PERO NO DECLARADO AQUI.
+             La app se bloquea en vertical desde `MainActivity.onCreate`, no
+             con `android:screenOrientation`.
+             POR QUE: Play calcula los dispositivos compatibles LEYENDO ESTE
+             ARCHIVO. Al declarar la app vertical, en 1.9.9 se cayeron del
+             catalogo 27 aparatos que solo funcionan en horizontal —17 de
+             coche, 3 TVs y 7 tablets—, y los que ya la tuvieran instalada se
+             quedaban sin actualizaciones. Telefonos no se perdio ninguno,
+             pero era una perdida gratuita.
+             Bloquearlo en tiempo de ejecucion consigue lo mismo donde importa
+             y Play no lo ve, asi que no filtra nada. -->
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"
             android:launchMode="singleTask"

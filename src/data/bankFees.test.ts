@@ -127,6 +127,60 @@ describe('cargos de un movimiento', () => {
   })
 })
 
+describe('un ingreso no paga cargos', () => {
+  const banreservas = findBankProfile('banreservas')
+
+  /*
+   * LO QUE ESTABA PASANDO, Y POR QUE DESCUADRABA TODO.
+   *
+   * Los cargos se calculaban igual para un gasto que para un ingreso. Como el
+   * formulario guarda `monto + cargos`, el impuesto de la Ley 288-04 se SUMABA
+   * al dinero recibido: un sueldo de RD$ 10,000 entraba al libro como
+   * RD$ 10,015. Quince pesos que nunca existieron, en cada ingreso, para
+   * siempre.
+   *
+   * Y el error de fondo es conceptual: la Ley 288-04 grava DEBITOS
+   * electronicos. En un ingreso no hay debito. Igual con el recargo por divisa
+   * —lo cobra el banco al pagar fuera— y con el avance de efectivo, que es una
+   * salida por definicion.
+   */
+  it('la Ley 288-04 no se cobra sobre dinero que entra', () => {
+    const ctx = { profile: banreservas, typedCurrency: 'DOP', accountCurrency: 'DOP', payerType: 'debit' } as const
+    expect(computeFees(10_000, { ...ctx, direction: 'out' }).some(l => l.kind === 'itbis-transfer')).toBe(true)
+    expect(computeFees(10_000, { ...ctx, direction: 'in' })).toEqual([])
+  })
+
+  it('ningun cargo sobrevive a un ingreso, ni combinados', () => {
+    const lines = computeFees(1_000, {
+      profile: banreservas, typedCurrency: 'USD', accountCurrency: 'DOP',
+      isTransfer: true, isCashAdvance: true, direction: 'in',
+    })
+    expect(lines).toEqual([])
+    expect(totalFees(lines)).toBe(0)
+  })
+
+  /*
+   * Sin `direction` se sigue cobrando: es como llaman los movimientos
+   * antiguos y el comportamiento por defecto tiene que ser el de un gasto, que
+   * es la inmensa mayoria del libro.
+   */
+  it('sin indicar direccion se trata como salida', () => {
+    const lines = computeFees(1_000, {
+      profile: banreservas, typedCurrency: 'DOP', accountCurrency: 'DOP', isTransfer: true,
+    })
+    expect(lines.some(l => l.kind === 'itbis-transfer')).toBe(true)
+  })
+
+  it('un gasto sigue pagando exactamente lo mismo que antes', () => {
+    const lines = computeFees(1_000, {
+      profile: banreservas, typedCurrency: 'USD', accountCurrency: 'DOP',
+      isTransfer: true, isCashAdvance: true, direction: 'out',
+    })
+    expect(lines).toHaveLength(3)
+    expect(totalFees(lines)).toBeCloseTo(30 + 1.5 + 150, 2)
+  })
+})
+
 describe('saneado de los cargos guardados', () => {
   const account: Account = {
     id: 'c1', name: 'Visa Banreservas', short: 'V', type: 'credit',

@@ -514,9 +514,19 @@
     flex-wrap: wrap;
     gap: 7px;
   }
-  /* El campo de concepto se queda con la primera linea entera; los iconos
-     bajan juntos a la segunda cuando no caben. */
-  .mobile-create-quick-row > .mobile-quick-note-input { flex: 1 1 150px; }
+  /*
+   * EL REPARTO ES FIJO, NO DEPENDE DEL ANCHO.
+   *
+   * Con una base de 150px los iconos cabian o no segun la pantalla: en unas
+   * quedaban los tres arriba, en otras bajaba uno solo y se quedaba huerfano
+   * en una linea para el. Cambiaba de sitio de un telefono a otro, que es
+   * justo lo que se ve descuidado.
+   *
+   * Con base 100% el concepto se queda SIEMPRE la primera linea entera y los
+   * iconos van SIEMPRE juntos a la segunda. Misma forma en cualquier pantalla,
+   * y a 320px con la letra al 135% los cuatro caben de sobra.
+   */
+  .mobile-create-quick-row > .mobile-quick-note-input { flex: 1 1 100%; }
   .mobile-category-grid.field-error {
     border-radius: 16px;
     box-shadow: 0 0 0 2px #ff4d6d66;
@@ -877,6 +887,13 @@
   }
   .mobile-segment.mobile-segment-2 {
     grid-template-columns: repeat(2, 1fr);
+  }
+  /* Tres columnas es lo que ya hace la regla de arriba, pero se declara
+     igualmente: el marcado pide `-3` y tener solo la mitad del par deja la
+     intencion escrita a medias. Si alguien cambia el reparto por defecto, este
+     se queda donde debe. */
+  .mobile-segment.mobile-segment-3 {
+    grid-template-columns: repeat(3, 1fr);
   }
   .mobile-segment button {
     background: transparent;
