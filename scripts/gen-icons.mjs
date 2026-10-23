@@ -7,8 +7,22 @@ const __dir = dirname(fileURLToPath(import.meta.url))
 const root  = join(__dir, '..')
 const svgSrc = readFileSync(join(root, 'public', 'icon.svg'), 'utf8')
 
-// SVG without background rect — used for adaptive icon foreground layer
-const svgFg = svgSrc.replace(/<rect[^/]\/>/m, '')
+/*
+ * SVG sin el rect de fondo — es la capa FRONTAL del icono adaptativo.
+ *
+ * Se quita POR ID. La version anterior usaba `/<rect[^/]\/>/m`, que exige un
+ * solo caracter entre `<rect` y `/>`: nunca casaba con el rect real, asi que
+ * la capa frontal se generaba CON el fondo oscuro dentro. Android la escala al
+ * 66% de la zona segura, de modo que quedaba un cuadrado opaco encajado dentro
+ * del icono en vez de las tarjetas flotando sobre el fondo de verdad.
+ *
+ * No fallaba nada: solo salia un icono peor, y nadie relaciona eso con una
+ * expresion regular de un script de build.
+ */
+const svgFg = svgSrc.replace(/<g\s+id="bg"[\s\S]*?<\/g>/m, '')
+if (svgFg === svgSrc) {
+  throw new Error('No se pudo quitar el fondo: public/icon.svg necesita un <g id="bg"> … </g>')
+}
 
 function makeHtml(svg, bg, size) {
   return `<!DOCTYPE html><html><head><style>
@@ -18,10 +32,26 @@ function makeHtml(svg, bg, size) {
 </style></head><body>${svg}</body></html>`
 }
 
-async function renderAt(page, html, size) {
+/**
+ * Renderiza el SVG a PNG.
+ *
+ * `omitBackground` NO es opcional para la capa frontal del icono adaptativo:
+ * sin el, Playwright APLANA la transparencia contra BLANCO. El `background:
+ * transparent` del HTML no basta — hay que pedirlo tambien en la captura.
+ *
+ * Esto estuvo roto desde siempre y no se veia, porque la capa frontal todavia
+ * llevaba dentro el fondo oscuro (la expresion que debia quitarlo no casaba).
+ * Al arreglar aquello, el blanco quedo a la vista: un cuadrado palido detras
+ * del logo en el splash y tapando el fondo verde del icono adaptativo.
+ */
+async function renderAt(page, html, size, omitBackground = false) {
   await page.setViewportSize({ width: size, height: size })
   await page.setContent(html, { waitUntil: 'load' })
-  return page.screenshot({ type: 'png', clip: { x: 0, y: 0, width: size, height: size } })
+  return page.screenshot({
+    type: 'png',
+    clip: { x: 0, y: 0, width: size, height: size },
+    omitBackground,
+  })
 }
 
 // PWA / desktop sizes
@@ -78,7 +108,7 @@ for (const androidRoot of ANDROID_ROOTS) {
 
     // ic_launcher_foreground.png — no background, at foreground canvas size
     // The design is centred in the foreground layer; background is provided by ic_launcher_background.xml
-    const fgBuf = await renderAt(page, makeHtml(svgFg, 'transparent', foreground), foreground)
+    const fgBuf = await renderAt(page, makeHtml(svgFg, 'transparent', foreground), foreground, true)
     writeFileSync(join(dir, 'ic_launcher_foreground.png'), fgBuf)
 
     console.log(`✓ android/${density} (${launcher}px launcher, ${foreground}px foreground)`)

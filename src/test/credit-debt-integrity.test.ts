@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { sanitizeFinanceData, useFinance } from '@/store/finance'
+import { ADJUST_CATEGORY, sanitizeFinanceData, useFinance } from '@/store/finance'
 import type { Account, Category, Transaction } from '@/types'
 
 /**
@@ -73,7 +73,18 @@ describe('el saneador no borra movimientos del usuario', () => {
     expect(diff).toBeCloseTo(-3_000, 2)
 
     const s = useFinance.getState()
-    expect(s.transactions[0].categoryId).toBe('cat_super')
+    /*
+     * El ajuste usaba la categoria de reserva (`cat_super`, la primera de
+     * gasto). Eso arreglo el fallo original —nacia SIN categoria y el saneador
+     * lo borraba— pero causo otro: conciliar aparecia en los informes como un
+     * gasto de supermercado que nadie hizo.
+     *
+     * Ahora va a su propia categoria, marcada fuera de informes. Lo que este
+     * test vigila sigue siendo lo mismo: que el ajuste TENGA categoria y
+     * sobreviva a recargar.
+     */
+    expect(s.transactions[0].categoryId).toBe(ADJUST_CATEGORY.expense.id)
+    expect(s.categories.find(c => c.id === ADJUST_CATEGORY.expense.id)?.excludeFromReports).toBe(true)
 
     const reloaded = sanitizeFinanceData({
       accounts: s.accounts, categories: s.categories, transactions: s.transactions,

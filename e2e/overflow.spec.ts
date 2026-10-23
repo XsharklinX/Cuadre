@@ -114,7 +114,40 @@ for (const cfg of MATRIX) {
     }
 
     await check('movimientos')
-    for (const tab of ['Análisis', 'Cuentas', 'Perfil']) { if (await navTap(tab)) await check('tab:' + tab) }
+    // Perfil ya no es una pestaña: vive en la cabecera. Negocio ocupa su sitio.
+    for (const tab of ['Análisis', 'Cuentas', 'Negocio']) { if (await navTap(tab)) await check('tab:' + tab) }
+    try { await page.getByRole('button', { name: 'Perfil' }).first().click({ timeout: 2500 }); await page.waitForTimeout(400); await check('perfil') } catch { /* noop */ }
+
+    /*
+     * NEGOCIO Y SUS HOJAS.
+     *
+     * Es lo que mas riesgo tiene de toda la app en una pantalla estrecha: tres
+     * cifras en fila, nueve chips de ciclo, y cifras con tabulacion en columnas
+     * de cien pixeles. Y era lo unico que esta prueba no miraba.
+     */
+    if (await navTap('Negocio')) {
+      await check('negocio:cobros')
+      // La pestaña de ganancia, con su grafica de doce barras.
+      try { await page.locator('.mbiz-tabs button').nth(1).click({ timeout: 2000 }); await page.waitForTimeout(300); await check('negocio:ganancia') } catch { /* noop */ }
+      // La hoja de cliente: el formulario mas largo del modulo.
+      try {
+        await page.locator('.mbiz-tabs button').first().click({ timeout: 2000 }); await page.waitForTimeout(250)
+        await page.locator('.mbiz-empty button, .mbiz-section-head button').first().click({ timeout: 2500 })
+        await page.waitForTimeout(500)
+        await check('negocio:cliente')
+      } catch { /* noop */ }
+      await closeSheets()
+    }
+
+    // El bote: su cifra grande es la que mas facil se sale.
+    try {
+      await navTap('Movimientos')
+      await page.locator('.mobile-topbar-menu').click({ timeout: 2000 })
+      await page.locator('.mobile-tools-row', { hasText: /El bote|The jar/ }).first().click({ timeout: 2000 })
+      await page.waitForTimeout(400)
+      await check('bote')
+    } catch { /* noop */ }
+    await closeSheets()
 
     // Editor de cuenta (botón cerrar + fila de sobregiro)
     await navTap('Cuentas')

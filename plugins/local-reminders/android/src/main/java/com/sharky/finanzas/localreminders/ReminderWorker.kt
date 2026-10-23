@@ -218,11 +218,73 @@ class ReminderWorker(appContext: Context, params: WorkerParameters) : CoroutineW
                 val flag = fx.optString("currencyFlag")
                 val currencyCode = fx.optString("currency")
                 val rateLabel = fx.optString("rateLabel")
-                val verb = if (fx.optString("direction") == "above") "subió sobre" else "bajó de"
-                notify(CHANNEL_FX, alertId, "$flag El $currencyCode $verb tu límite", "1 $currencyCode = $rateLabel ahora mismo. Buen momento para revisar.", "fx")
+                val thresholdLabel = fx.optString("thresholdLabel")
+                val changeLabel = fx.optString("changeLabel")
+                val changeUp = fx.optBoolean("changeUp")
+
+                /*
+                 * EL TITULO ES LA CIFRA.
+                 *
+                 * Antes decia «El USD subio sobre tu limite» y el valor del
+                 * dolar iba en el cuerpo, que en una notificacion colapsada no
+                 * se ve: el aviso avisaba sin decir de que.
+                 *
+                 * Y los textos SE TOMAN DEL SNAPSHOT, que llegan ya
+                 * traducidos. Estaban escritos aqui en español, asi que un
+                 * usuario en ingles recibia su aviso en español — justo lo que
+                 * el resto de este worker evita leyendo `strings`.
+                 */
+                val title = s("fxTitle", "1 {code} = {rate}")
+                    .replace("{code}", currencyCode)
+                    .replace("{rate}", rateLabel)
+                val verb = if (fx.optString("direction") == "above") {
+                    s("fxUp", "subió sobre")
+                } else {
+                    s("fxDown", "bajó de")
+                }
+                var body = s("fxText", "{verb} tu límite de {threshold}.")
+                    .replace("{verb}", verb)
+                    .replace("{threshold}", thresholdLabel)
+                // El movimiento solo se añade si hay con que compararlo.
+                if (changeLabel.isNotEmpty()) {
+                    val dir = if (changeUp) s("fxUp", "subió") else s("fxDown", "bajó")
+                    body += " " + s("fxTextChange", "{dir} {amount} en el último mes.")
+                        .replace("{dir}", dir)
+                        .replace("{amount}", changeLabel)
+                }
+                notify(CHANNEL_FX, alertId, "$flag $title", body, "fx")
                 notified.add(alertId)
                 notifiedChanged = true
             }
+        }
+
+        /*
+         * COBROS: hoy y atrasados.
+         *
+         * Reusa el canal de pagos recurrentes a proposito: para el usuario son
+         * la misma clase de aviso ("algo de dinero pasa hoy"), y crear un canal
+         * nuevo le daria otro interruptor que configurar en los ajustes de
+         * Android sin ganar nada.
+         */
+        val charges = snapshot.optJSONArray("charges") ?: JSONArray()
+        for (i in 0 until charges.length()) {
+            val charge = charges.optJSONObject(i) ?: continue
+            val alertId = charge.optString("id")
+            if (alertId.isEmpty() || alertId in dismissed || alertId in notified) continue
+            val name = charge.optString("name")
+            val amountLabel = charge.optString("amountLabel")
+            val late = charge.optInt("daysLate")
+            val title = if (late > 0) {
+                s("chargeLateTitle", "{name} lleva {n} dias sin pagarte")
+                    .replace("{name}", name)
+                    .replace("{n}", late.toString())
+            } else {
+                s("chargeTodayTitle", "Hoy te paga {name}").replace("{name}", name)
+            }
+            val body = s("chargeText", "{amount}.").replace("{amount}", amountLabel)
+            notify(CHANNEL_RECURRING, alertId, title, body, "charge")
+            notified.add(alertId)
+            notifiedChanged = true
         }
 
         // Gasto inusual: se evalúa del lado de la app (con la sensibilidad

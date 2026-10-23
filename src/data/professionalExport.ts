@@ -17,7 +17,7 @@ export interface ReportExecutiveSummary {
 }
 
 export function createExecutiveSummary(state: FinanceState, month?: string): ReportExecutiveSummary {
-  const visTx = transactionsForTotals(state.transactions, state.accounts, state.currency)
+  const visTx = transactionsForTotals(state.transactions, state.accounts, state.currency, state.categories)
   const rows = month ? txForMonth(visTx, month) : visTx
   const summary = totals(rows)
   const topCategory = byCategory(rows, 'expense', state.categories)[0]
@@ -71,7 +71,7 @@ export async function exportExcel(state: FinanceState): Promise<void> {
     { Indicador: 'Categoria top', Valor: executive.topCategoryAmount, Nota: executive.topCategory ?? 'Sin datos' },
   ])
 
-  const visTx = transactionsForTotals(state.transactions, state.accounts, state.currency)
+  const visTx = transactionsForTotals(state.transactions, state.accounts, state.currency, state.categories)
   const years = Array.from(new Set(visTx.map(tx => Number(tx.date.slice(0, 4))))).sort()
   const annualRows = years.flatMap(year =>
     monthlySeries(visTx, year).map(m => ({
@@ -161,7 +161,7 @@ export async function exportMonthlyPdf(state: FinanceState, month: string, owner
   const { jsPDF } = await import('jspdf')
   const doc = new jsPDF()
   const locale = dateLocale(lang)
-  const rows = txForMonth(transactionsForTotals(state.transactions, state.accounts, state.currency), month)
+  const rows = txForMonth(transactionsForTotals(state.transactions, state.accounts, state.currency, state.categories), month)
   const summary = totals(rows)
   const executive = createExecutiveSummary(state, month)
   const categories = byCategory(rows, 'expense', state.categories)

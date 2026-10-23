@@ -157,6 +157,27 @@ export interface Category {
    * anterior se suma (o resta) al presupuesto disponible de este mes.
    */
   rolloverEnabled?: boolean
+  /**
+   * FUERA DE INFORMES Y PRESUPUESTOS, pero DENTRO del libro.
+   *
+   * Hay movimientos que tienen que existir para que el saldo cuadre y que no
+   * describen nada de lo que pasó con tu dinero. El caso que obliga a esto es
+   * el ajuste de cuadre: si la app cree que tienes 12,480 y el banco dice
+   * 12,100, hace falta un movimiento de −380 o la igualdad
+   * `saldo = apertura + movimientos` se rompe. Pero ese −380 no fue un gasto:
+   * no lo gastaste en nada, es la huella de algo que se anotó mal antes.
+   *
+   * Hasta ahora esos ajustes caían en una categoría normal, así que cuadrar
+   * +3,000 te subía los «ingresos» del mes y te rompía los informes y el
+   * presupuesto. De ahí que cuadrar se sintiera como hacer trampa: arreglabas
+   * el saldo y estropeabas los números.
+   *
+   * Con esta marca el movimiento sigue en el libro —el saldo depende de él—
+   * pero no entra en ingresos, gastos, informes ni presupuestos. Se cuenta
+   * aparte, que es donde significa algo: «tres cuadres este mes» es la señal
+   * de que algo se está colando.
+   */
+  excludeFromReports?: boolean
 }
 
 /** Un cargo bancario aplicado a un movimiento, con su tasa para poder auditarlo. */
@@ -233,7 +254,48 @@ export interface Transaction {
   generatedFrom?: string
   /** Solo suscripciones creadas desde el catálogo: id en SUBSCRIPTION_CATALOG, para mostrar el logo real de la marca. */
   serviceId?:   string
+  /**
+   * «ESTA SUSCRIPCIÓN LA REVENDO»: el `Service` de Negocio al que paga.
+   *
+   * ── EL PROBLEMA QUE RESUELVE ────────────────────────────────────────
+   * Quien revende Netflix lo tenía apuntado DOS veces y sin relación: como
+   * suscripción —el recibo real que le sale de la cuenta— y como servicio de
+   * su negocio —el coste que compara contra lo que cobra—. Las dos cosas son
+   * ciertas, pero la pantalla de Suscripciones sumaba ese Netflix a «lo que
+   * gastas al mes en suscripciones» cuando no lo está gastando: lo cubren sus
+   * clientes.
+   *
+   * ── NO ES `serviceId` ───────────────────────────────────────────────
+   * `serviceId` de arriba es el id de MARCA del catálogo, para pintar el logo.
+   * Esto es el id de un `Service` del módulo de Negocio. Son dos cosas sin
+   * nada que ver y por eso no comparten campo.
+   *
+   * No mueve ningún saldo ni cambia ninguna ganancia: el gasto sigue siendo el
+   * gasto y el coste del servicio sigue siendo el declarado. Lo único que hace
+   * es decir que las dos filas hablan de lo mismo.
+   */
+  resoldAs?:    string
   tags?:        string[]            // ej. ['trabajo', 'viaje']
+  /**
+   * FOTO DEL RECIBO: aquí va solo la MARCA de que existe, no la imagen.
+   *
+   * La app ya abría la cámara y leía el monto del ticket; luego tiraba la
+   * foto. Guardarla es lo que convierte ese trabajo en algo que sirve al mes
+   * siguiente, cuando hay que reclamar una garantía o recordar qué era
+   * aquello de RD$ 4,800.
+   *
+   * El campo es `true` y nada más: la imagen vive en IndexedDB bajo el id del
+   * movimiento (ver `lib/receiptStore.ts`). No puede ir aquí porque el libro
+   * entero se guarda en `localStorage`, con un tope de unos pocos megas —
+   * veinte fotos lo llenarían y la app se quedaría sin poder guardar ni un
+   * gasto. Mismo motivo por el que la descripción tiene `MAX_DESCRIPTION`.
+   *
+   * Consecuencia honesta: la foto NO viaja en las copias de seguridad, que
+   * son JSON. Quien restaure en otro teléfono recupera sus movimientos con la
+   * marca puesta y sin imagen detrás, y la app lo dice en vez de enseñar un
+   * hueco roto.
+   */
+  hasReceipt?:  boolean
   /** Origen cuando el movimiento se creó SOLO (no lo tecleó el usuario): un aviso
    *  bancario detectado. Se usa para marcarlo con un badge "automático" y para que
    *  el usuario pueda revisarlo/deshacerlo con confianza. */
@@ -395,6 +457,8 @@ export type ViewId =
   | 'debt'
   | 'cashflow'
   | 'notes'
+  | 'business'
+  | 'caprices'
 
 export interface ViewProps {
   txns:        Transaction[]

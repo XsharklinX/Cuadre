@@ -185,16 +185,6 @@
     padding: 34px 18px;
     text-align: center;
   }
-  .mobile-movements-empty-icon {
-    align-items: center;
-    background: color-mix(in oklab, var(--m-primary) 12%, transparent);
-    border-radius: 16px;
-    color: var(--m-primary);
-    display: grid;
-    height: 52px;
-    place-items: center;
-    width: 52px;
-  }
   .mobile-movements-empty strong {
     color: var(--m-text);
     font-size: 17px;

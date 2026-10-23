@@ -7,6 +7,8 @@
     <string name="shortcut_add_expense_long">Agregar gasto</string>
     <string name="shortcut_add_income_short">Ingreso</string>
     <string name="shortcut_add_income_long">Agregar ingreso</string>
+    <string name="shortcut_collect_short">Cobrar</string>
+    <string name="shortcut_collect_long">Ver quién me debe</string>
     <string name="shortcut_reports_short">Informes</string>
     <string name="shortcut_reports_long">Abrir informes</string>
 </resources>

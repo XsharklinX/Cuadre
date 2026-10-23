@@ -3,11 +3,13 @@ import { CURRENCY_CODES } from '@/constants'
 import { tt } from '@/i18n'
 import type { FinanceState } from '@/store/finance'
 import { useNotes } from '@/store/notes'
+import { useBusiness } from '@/store/business'
+import { useCaprices } from '@/store/caprices'
 import type { Note } from '@/data/notes'
 import type { Account, Category, CurrencyCode, Goal, GoalContribution, IconName, Transaction } from '@/types'
 
 export interface FinanceBackup {
-  version: 1 | 2 | 3
+  version: 1 | 2 | 3 | 4
   exportedAt: string
   data: {
     accounts: Account[]
@@ -18,13 +20,47 @@ export interface FinanceBackup {
     currency: CurrencyCode
     /** Listas / notas del usuario. Ausente en backups v1/v2. */
     notes?: Note[]
+    /*
+     * ── LO QUE FALTABA, Y POR QUE ERA GRAVE ───────────────────────────
+     *
+     * Clientes, negocios, servicios, cobros y caprichos viven en almacenes
+     * propios (ver `store/business.ts`), y la copia no los incluia. Eso no era
+     * solo «no se guardan»: era PEOR.
+     *
+     * Al restaurar, los movimientos se reemplazaban y esos almacenes se
+     * quedaban intactos, asi que los cobros apuntaban a movimientos que ya no
+     * existian y las funciones de limpieza —`pruneOrphanReceipts`,
+     * `useCaprices.prune`— borraban en silencio caprichos y fotos de recibo
+     * por considerarlos huerfanos. Restaurar una copia DESTRUIA datos.
+     *
+     * Van opcionales porque un backup v1/v2/v3 sigue siendo valido tal cual.
+     */
+    /*
+     * SIN TIPAR A PROPOSITO: a este nivel NO estan validados.
+     *
+     * Su esquema es permisivo —rechazar la copia entera por un campo de un
+     * cliente le costaria al usuario sus 400 movimientos—, asi que lo que sale
+     * de aqui puede traer cualquier cosa dentro. Declararlos como `Client[]`
+     * seria mentir sobre lo que `parseBackup` garantiza, y el proximo que lea
+     * el tipo confiaria en algo que nadie comprobo.
+     *
+     * Quien los use pasa por `sanitizeBusinessData` / `sanitizeCaprices`, que
+     * son el validador de verdad y el mismo que corre al cargar la app.
+     */
+    clients?: unknown[]
+    businesses?: unknown[]
+    services?: unknown[]
+    charges?: unknown[]
+    caprices?: unknown[]
   }
 }
 
 export function createBackup(state: FinanceState): FinanceBackup {
   const notes = useNotes.getState().notes
+  const { clients, businesses, services, charges } = useBusiness.getState()
+  const caprices = useCaprices.getState().items
   return {
-    version: 3,
+    version: 4,
     exportedAt: new Date().toISOString(),
     data: {
       accounts: state.accounts,
@@ -36,6 +72,13 @@ export function createBackup(state: FinanceState): FinanceBackup {
       // Solo se incluye si hay listas: mantiene los backups v1/v2 idénticos
       // cuando el usuario no usa la función.
       ...(notes.length > 0 ? { notes } : {}),
+      // Igual con los datos de negocio: quien no usa la funcion obtiene una
+      // copia identica a la de antes, sin claves vacias que no dicen nada.
+      ...(clients.length ? { clients } : {}),
+      ...(businesses.length ? { businesses } : {}),
+      ...(services.length ? { services } : {}),
+      ...(charges.length ? { charges } : {}),
+      ...(caprices.length ? { caprices } : {}),
     },
   }
 }
@@ -119,6 +162,7 @@ const TransactionSchema = z.object({
   recurringNext: dateSchema.optional(),
   skippedDates: z.array(dateSchema).optional(),
   serviceId: nonEmptyText.optional(),
+  resoldAs: nonEmptyText.optional(),
   generatedFrom: nonEmptyText.optional(),
   tags: z.array(nonEmptyText).optional(),
 })
@@ -167,6 +211,42 @@ const NoteSchema = z.object({
   updatedAt: z.number().finite(),
 })
 
+/*
+ * LOS ESQUEMAS DE NEGOCIO SON PERMISIVOS A PROPOSITO.
+ *
+ * El libro se valida con rigor porque un movimiento mal formado descuadra un
+ * saldo. Aqui no hay saldos: un cliente con un ciclo raro se corrige en dos
+ * toques, y rechazar la copia ENTERA por un campo de un cliente le costaria al
+ * usuario sus 400 movimientos. Lo que no cuadre lo sanea el almacen al cargar
+ * (ver `sanitize` en `store/business.ts`), que ya existe y ya esta probado.
+ */
+const ClientSchema = z.object({
+  id: nonEmptyText,
+  name: nonEmptyText,
+}).passthrough()
+
+const BusinessSchema = z.object({
+  id: nonEmptyText,
+  name: nonEmptyText,
+}).passthrough()
+
+const ServiceSchema = z.object({
+  id: nonEmptyText,
+  businessId: nonEmptyText,
+  name: nonEmptyText,
+}).passthrough()
+
+const ChargeSchema = z.object({
+  id: nonEmptyText,
+  clientId: nonEmptyText,
+  dueDate: dateSchema,
+}).passthrough()
+
+const CapriceSchema = z.object({
+  id: nonEmptyText,
+  txId: nonEmptyText,
+}).passthrough()
+
 const BackupDataSchema = z.object({
   accounts: z.array(AccountSchema),
   categories: z.array(CategorySchema),
@@ -175,6 +255,11 @@ const BackupDataSchema = z.object({
   goalContributions: z.array(GoalContributionSchema).optional().default([]),
   currency: z.enum(CURRENCY_CODES),
   notes: z.array(NoteSchema).optional(),
+  clients: z.array(ClientSchema).optional(),
+  businesses: z.array(BusinessSchema).optional(),
+  services: z.array(ServiceSchema).optional(),
+  charges: z.array(ChargeSchema).optional(),
+  caprices: z.array(CapriceSchema).optional(),
 }).superRefine((data, ctx) => {
   assertUniqueIds(data.accounts, 'cuentas', ctx)
   assertUniqueIds(data.categories, 'categorías', ctx)
@@ -219,7 +304,9 @@ const BackupDataSchema = z.object({
 // backup v1/v2 sigue siendo válido tal cual (sin notas). Igual que en v1->v2,
 // no hace falta transformar: solo aceptar las tres versiones al leer.
 const FinanceBackupSchema = z.object({
-  version: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+  // v3 -> v4: agrega clientes, negocios, servicios, cobros y caprichos, todos
+  // opcionales. Un backup v1/v2/v3 sigue siendo valido tal cual.
+  version: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
   exportedAt: z.string().optional(),
   data: BackupDataSchema,
 })

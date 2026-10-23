@@ -1,6 +1,6 @@
 {
   "name": "cuadre",
-  "version": "1.9.11",
+  "version": "2.1.0",
   "private": true,
   "type": "module",
   "scripts": {

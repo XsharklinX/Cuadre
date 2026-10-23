@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { currentTotalBalance, projectCashflow, safeToSpend, type CashflowProjection } from './cashflowProjection'
+import type { Charge, Client } from './clients'
 import type { Account, Goal, Transaction } from '@/types'
 
 const account = (over: Partial<Account> = {}): Account => ({
@@ -136,5 +137,106 @@ describe('safeToSpend', () => {
     const s = safeToSpend(noIncome, 0)
     expect(s.nextIncome).toBeNull()
     expect(s.committed).toBe(3100)          // Netflix + Renta + Gimnasio
+  })
+})
+
+/**
+ * LO QUE TE DEBEN, EN LA PROYECCIÓN.
+ *
+ * Para quien cobra a clientes, «¿me alcanza hasta fin de mes?» depende de
+ * ellos. Sin esto la pantalla decía que no llegas mientras te debían el doble
+ * de lo que te faltaba.
+ */
+describe('projectCashflow · cobros a clientes', () => {
+  const cliente = (over: Partial<Client> = {}): Client => ({
+    id: 'cli1', name: 'Juan', concept: 'Netflix', amount: 250, cycle: 'monthly',
+    dueDay: 15, accountId: 'acc_1', categoryId: 'cat_cobros',
+    active: true, createdAt: 0, ...over,
+  })
+
+  const cobro = (over: Partial<Charge> = {}): Charge => ({
+    id: 'ch1', clientId: 'cli1', dueDate: '2026-07-15', amount: 250,
+    paid: 0, txIds: [], paidAt: 0, ...over,
+  })
+
+  const proyecta = (charges: Charge[], clients: Client[] = [cliente()]) =>
+    projectCashflow([], [account()], [], '2026-07-31', '2026-07-07', undefined, { charges, clients })
+
+  it('un cobro futuro entra como evento propio, no como ingreso', () => {
+    const p = proyecta([cobro()])
+    expect(p.days).toHaveLength(1)
+    expect(p.days[0].date).toBe('2026-07-15')
+    expect(p.days[0].events[0].kind).toBe('charge')
+    expect(p.days[0].events[0].note).toBe('Juan')
+    expect(p.endBalance).toBe(1250)
+  })
+
+  it('SE DESPLAZA por el retraso medio de ESE cliente', () => {
+    // Si lleva meses pagando tarde, ponerle el dinero el día 15 es inventarse
+    // una puntualidad que no tiene, y la proyección mentiría a favor.
+    const historial = [
+      cobro({ id: 'viejo1', dueDate: '2026-05-15', amount: 250, paid: 250, paidAt: Date.parse('2026-05-25T12:00:00') }),
+      cobro({ id: 'viejo2', dueDate: '2026-06-15', amount: 250, paid: 250, paidAt: Date.parse('2026-06-25T12:00:00') }),
+      cobro({ id: 'ch1', dueDate: '2026-07-15' }),
+    ]
+    const p = proyecta(historial)
+    const evento = p.days.flatMap(d => d.events).find(e => e.sourceId === 'ch1')
+    expect(evento).toBeDefined()
+    expect(evento!.date).toBe('2026-07-25')
+  })
+
+  it('LO YA ATRASADO no se proyecta: no tiene fecha', () => {
+    // Puede llegar mañana o nunca; ponerle un día sería elegir uno al azar.
+    expect(proyecta([cobro({ dueDate: '2026-06-01' })]).days).toEqual([])
+  })
+
+  it('lo cobrado y lo perdonado no vuelven a entrar', () => {
+    expect(proyecta([cobro({ paid: 250, paidAt: 1 })]).days).toEqual([])
+    expect(proyecta([cobro({ waived: true })]).days).toEqual([])
+  })
+
+  it('un cobro a medias entra solo por lo que falta', () => {
+    const p = proyecta([cobro({ amount: 250, paid: 100 })])
+    expect(p.days[0].events[0].amount).toBe(150)
+  })
+
+  it('lo que cae más allá del horizonte se queda fuera', () => {
+    expect(proyecta([cobro({ dueDate: '2026-09-15' })]).days).toEqual([])
+  })
+
+  it('sin cobros no cambia nada de lo que ya hacía', () => {
+    const conVacio = projectCashflow([recurringExpense()], [account()], [], '2026-07-31', '2026-07-07', undefined, { charges: [], clients: [] })
+    const sinNada = projectCashflow([recurringExpense()], [account()], [], '2026-07-31', '2026-07-07')
+    expect(conVacio).toEqual(sinNada)
+  })
+})
+
+describe('safeToSpend · lo gastable no depende de que te paguen', () => {
+  it('un cobro NO es tu próximo ingreso', () => {
+    /*
+     * Es la cifra que el usuario lee antes de gastar. Si la frontera la pone
+     * un cobro, la app diría «gasta tranquilo, el jueves te pagan» — una
+     * promesa de otra persona.
+     */
+    const cliente: Client = {
+      id: 'cli1', name: 'Juan', concept: 'Tarea', amount: 3_000, cycle: 'monthly',
+      dueDay: 10, accountId: 'acc_1', categoryId: 'cat_cobros', active: true, createdAt: 0,
+    }
+    const charge: Charge = {
+      id: 'ch1', clientId: 'cli1', dueDate: '2026-07-10', amount: 3_000,
+      paid: 0, txIds: [], paidAt: 0,
+    }
+    const p = projectCashflow(
+      [recurringExpense({ recurringNext: '2026-07-20' })], [account()], [],
+      '2026-07-31', '2026-07-07', undefined, { charges: [charge], clients: [cliente] },
+    )
+    const safe = safeToSpend(p)
+
+    // El cobro se ve en la proyección…
+    expect(p.days.flatMap(d => d.events).some(e => e.kind === 'charge')).toBe(true)
+    // …pero no marca la frontera, así que el recibo del 20 sigue contando.
+    expect(safe.nextIncome).toBeNull()
+    expect(safe.committed).toBe(200)
+    expect(safe.amount).toBe(800)
   })
 })

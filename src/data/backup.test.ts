@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { createBackup, parseBackup } from './backup'
 import { useNotes } from '@/store/notes'
+import { sanitizeBusinessData, useBusiness } from '@/store/business'
+import { useCaprices } from '@/store/caprices'
 import type { FinanceState } from '@/store/finance'
 import type { Note } from '@/data/notes'
 
@@ -236,11 +238,14 @@ describe('backup JSON', () => {
     expect(() => parseBackup(JSON.stringify(createBackup(state)))).toThrow('divisiones')
   })
 
-  it('las listas viajan en el backup (v3) cuando hay alguna', () => {
+  it('las listas viajan en el backup cuando hay alguna', () => {
     useNotes.setState({ notes: [shoppingNote] })
     const state = { accounts: [cashAccount], categories: [foodCategory], goals: [], transactions: [], currency: 'DOP' } as unknown as FinanceState
     const backup = createBackup(state)
-    expect(backup.version).toBe(3)
+    // La version subio a 4 al incluir clientes, negocios y cobros. Lo que este
+    // test vigila es otra cosa y sigue igual: que las listas viajen y se
+    // puedan volver a leer.
+    expect(backup.version).toBe(4)
     expect(backup.data.notes).toEqual([shoppingNote])
     expect(parseBackup(JSON.stringify(backup)).notes).toEqual([shoppingNote])
   })
@@ -265,5 +270,97 @@ describe('backup JSON', () => {
     const badNote = { ...shoppingNote, items: [{ id: 'it1', text: 'x', done: false, price: -5 }] }
     const backup = { version: 3, data: { accounts: [], categories: [], goals: [], goalContributions: [], transactions: [], currency: 'DOP', notes: [badNote] } }
     expect(() => parseBackup(JSON.stringify(backup))).toThrow()
+  })
+})
+
+/**
+ * LO QUE FALTABA EN LA COPIA, Y POR QUE ERA PEOR QUE NO GUARDARLO.
+ *
+ * Clientes, negocios, servicios, cobros y caprichos viven en almacenes propios
+ * y la copia no los incluia. Eso no era solo «no se guardan»: al restaurar, el
+ * libro se reemplazaba y esos almacenes se quedaban, asi que sus cobros
+ * apuntaban a movimientos borrados y las limpiezas del arranque los daban por
+ * basura. Restaurar DESTRUIA datos en silencio.
+ */
+describe('la copia lleva los datos de negocio', () => {
+  afterEach(() => {
+    useBusiness.setState({ clients: [], businesses: [], services: [], charges: [] })
+    useCaprices.setState({ items: [] })
+  })
+
+  const estado = () => ({
+    accounts: [cashAccount], categories: [foodCategory], goals: [],
+    transactions: [], currency: 'DOP',
+  } as unknown as FinanceState)
+
+  it('incluye clientes, negocios, servicios, cobros y caprichos', () => {
+    const cli = useBusiness.getState().addClient({
+      name: 'Juan', concept: 'Netflix', amount: 250, cycle: 'monthly', dueDay: 5,
+      accountId: cashAccount.id, categoryId: foodCategory.id, active: true,
+    })
+    const biz = useBusiness.getState().addBusiness({
+      name: 'Streaming', color: '#35d0a2', icon: 'play',
+      incomeCategoryIds: [], expenseCategoryIds: [],
+    })
+    useBusiness.getState().addService({
+      businessId: biz, name: 'Netflix', cost: 600, costCycle: 'monthly',
+    })
+    useBusiness.getState().addCharge(cli, '2026-10-05', 250)
+    useCaprices.getState().open('tx_cap', 3_200, 'Audifonos')
+
+    const backup = createBackup(estado())
+    expect(backup.data.clients).toHaveLength(1)
+    expect(backup.data.businesses).toHaveLength(1)
+    expect(backup.data.services).toHaveLength(1)
+    expect(backup.data.charges).toHaveLength(1)
+    expect(backup.data.caprices).toHaveLength(1)
+  })
+
+  it('y se pueden volver a leer', () => {
+    useBusiness.getState().addClient({
+      name: 'Juan', concept: 'Netflix', amount: 250, cycle: 'monthly', dueDay: 5,
+      accountId: cashAccount.id, categoryId: foodCategory.id, active: true,
+    })
+    const leido = parseBackup(JSON.stringify(createBackup(estado())))
+    // `clients` llega sin tipar a proposito: a ese nivel no esta validado (ver
+    // el comentario en `FinanceBackup`). Para comprobar el contenido se pasa
+    // por el saneador de verdad, que es lo que hace la app al restaurar.
+    expect(sanitizeBusinessData({ clients: leido.clients }).clients[0].name).toBe('Juan')
+  })
+
+  it('sin datos de negocio, la copia queda IDENTICA a la de antes', () => {
+    // Quien no usa la funcion no debe encontrarse claves vacias que no dicen
+    // nada, ni un archivo distinto al que tenia.
+    const backup = createBackup(estado())
+    expect(backup.data.clients).toBeUndefined()
+    expect(backup.data.businesses).toBeUndefined()
+    expect(backup.data.charges).toBeUndefined()
+    expect(backup.data.caprices).toBeUndefined()
+  })
+
+  it('una copia v3 (sin negocio) sigue siendo valida', () => {
+    // Es lo que tiene en el teléfono quien no haya actualizado todavia.
+    const vieja = {
+      version: 3,
+      exportedAt: new Date().toISOString(),
+      data: { accounts: [cashAccount], categories: [foodCategory], goals: [], goalContributions: [], transactions: [], currency: 'DOP' },
+    }
+    expect(() => parseBackup(JSON.stringify(vieja))).not.toThrow()
+  })
+
+  it('un cliente con un campo raro NO invalida la copia entera', () => {
+    // El libro se valida con rigor porque un movimiento malo descuadra un
+    // saldo. Un cliente raro se corrige en dos toques, y tirar la copia
+    // completa por eso le costaria al usuario sus movimientos.
+    const conBasura = {
+      version: 4,
+      exportedAt: new Date().toISOString(),
+      data: {
+        accounts: [cashAccount], categories: [foodCategory], goals: [], goalContributions: [],
+        transactions: [], currency: 'DOP',
+        clients: [{ id: 'c1', name: 'Juan', cycle: 'inventado', amount: 'mucho' }],
+      },
+    }
+    expect(() => parseBackup(JSON.stringify(conBasura))).not.toThrow()
   })
 })

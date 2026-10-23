@@ -17,6 +17,7 @@ export function MobileTopBar({
   onMenu,
   onSelectMonth,
   onSettings,
+  onProfile,
   onCurrency,
   onCalendar,
   onSearch,
@@ -32,6 +33,8 @@ export function MobileTopBar({
   onMenu?:      () => void
   onSelectMonth: (key: string) => void
   onSettings:   () => void
+  /** Abre Perfil. Opcional: no todas las pantallas lo ofrecen. */
+  onProfile?:   () => void
   onCurrency:   () => void
   onCalendar?:  () => void
   onSearch:     () => void
@@ -51,6 +54,7 @@ export function MobileTopBar({
     analysis: t('analysisTab'),
     add:      t('add'),
     reports:  t('accounts'),
+    business: t('bizTitle'),
     profile:  t('profile'),
   }
 
@@ -118,6 +122,20 @@ export function MobileTopBar({
                   {notifCount > 0 && (
                     <span className="mobile-bell-badge">{notifCount > 9 ? '9+' : notifCount}</span>
                   )}
+                </button>
+              )}
+              {/* PERFIL, que antes era una pestaña de la barra.
+                  Va junto al engranaje porque es donde la gente ya busca su
+                  cuenta y sus ajustes, y porque las dos pantallas se visitan
+                  en el mismo momento. */}
+              {onProfile && (
+                <button
+                  className={`mobile-icon-btn${route === 'profile' ? ' on' : ''}`}
+                  aria-label={t('profile')}
+                  aria-pressed={route === 'profile'}
+                  onClick={onProfile}
+                >
+                  <Icon name="user" size={21} />
                 </button>
               )}
               <button className="mobile-icon-btn" aria-label={t('settings')} onClick={onSettings}>

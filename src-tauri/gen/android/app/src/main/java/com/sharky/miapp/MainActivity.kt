@@ -2,12 +2,10 @@ package com.sharky.miapp
 
 import android.content.Intent
 import android.content.pm.ActivityInfo
-import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.OpenableColumns
-import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import org.json.JSONArray
 import org.json.JSONObject
@@ -16,10 +14,24 @@ import java.io.FileOutputStream
 
 class MainActivity : TauriActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
-    enableEdgeToEdge(
-      statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
-      navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
-    )
+    /*
+     * BORDE A BORDE, SIN PARAMETROS OBSOLETOS.
+     *
+     * Antes se pasaban `SystemBarStyle.dark(Color.TRANSPARENT)` para las dos
+     * barras. Esos estilos existen para pintar un velo detras de las barras en
+     * Android viejo, y lo hacen a traves de `statusBarColor` y
+     * `navigationBarColor` — que desde API 35 el sistema IGNORA y estan
+     * marcados como obsoletos. Con targetSdk 36 no pintaban nada y solo
+     * encendian el aviso de Play Console.
+     *
+     * Sin argumentos hace lo correcto en cada version: en Android 15+ el
+     * sistema ya impone el borde a borde, y en los anteriores
+     * `enableEdgeToEdge` aplica su comportamiento por defecto.
+     *
+     * Los margenes de las barras los respeta la interfaz con
+     * `env(safe-area-inset-*)` en CSS, no este parametro.
+     */
+    enableEdgeToEdge()
     super.onCreate(savedInstanceState)
 
     /*
@@ -42,9 +54,12 @@ class MainActivity : TauriActivity() {
      */
     requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
 
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-      window.isNavigationBarContrastEnforced = false
-    }
+    /*
+     * `isNavigationBarContrastEnforced` se quito: es de la misma familia
+     * obsoleta desde API 35, y ademas era redundante — `enableEdgeToEdge()`
+     * ya decide el contraste de la barra de navegacion por su cuenta, y lo
+     * hace bien en cada version de Android.
+     */
     handleShareIntent(intent)
     handleShortcutIntent(intent)
     handleNotificationIntent(intent)

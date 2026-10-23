@@ -2,6 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { sheetRoot } from './SheetPortal'
 import { Icon } from '@/components/ui/Icon'
+import { EmptyArt } from '@/components/ui/EmptyArt'
 import { toast } from '@/components/ui/Toast'
 import { useFinance } from '@/store/finance'
 import { deleteWithUndo } from '@/lib/undoDelete'
@@ -12,6 +13,7 @@ import { playKeySound, playBackspaceSound, playDoneSound, playConfirmSound, play
 import { useT, type LangKey } from '@/i18n'
 import { advanceRecurrenceDate } from '@/hooks/useRecurring'
 import { estimatedMonthlyRate, firstMonthDayDate, nextWeekdayDate, projectArrival, rampPlan, requiredContribution } from '@/data/goalPlans'
+import { milestoneAlertId, topCrossedMilestone } from '@/data/goalMilestones'
 import { MobileDatePicker } from './MobileDatePicker'
 import { MobileAmountSheet } from './MobileAmountSheet'
 import type { CurrencyCode, Goal, GoalAutoContribute, IconName, RecurrenceFrequency, ViewProps } from '@/types'
@@ -917,6 +919,7 @@ function GoalDetailSheet({
 function ContributeSheet({ goal, currency, onClose }: { goal: Goal; currency: string; onClose: () => void }) {
   const t = useT()
   const { accounts, contribute } = useFinance()
+  const { dismissedAlerts, dismissAlert } = useSettings()
   const validAccounts = accounts.filter(a => a.type !== 'credit')
   const [amount, setAmount] = useState(0)
   const [accountId, setAccountId] = useState(validAccounts.find(a => a.type === 'savings')?.id ?? validAccounts[0]?.id ?? '')
@@ -932,8 +935,31 @@ function ContributeSheet({ goal, currency, onClose }: { goal: Goal; currency: st
     if (!beginSubmit()) return
     try {
       contribute(goal.id, amount, accountId)
-      if (goal.saved < goal.target && goal.saved + amount >= goal.target) playAchievementSound()
-      else playConfirmSound()
+      /*
+       * LOS HITOS, NO SOLO EL FINAL.
+       *
+       * Antes esto solo celebraba el 100 %: una meta de seis meses pasaba seis
+       * meses en silencio y la app solo hablaba el último día. Ahora celebra
+       * también el cuarto, la mitad y los tres cuartos, que es justo donde el
+       * ahorro se hace largo y se abandona.
+       *
+       * Se celebra UNA vez por hito y por meta: el id guardado evita que
+       * sacar dinero y volver a meterlo vuelva a festejar lo mismo.
+       */
+      const hito = topCrossedMilestone(goal.saved, goal.saved + amount, goal.target)
+      const hitoId = hito ? milestoneAlertId(goal.id, hito) : null
+      if (hito && hitoId && !dismissedAlerts.includes(hitoId)) {
+        dismissAlert(hitoId)
+        playAchievementSound()
+        toast(
+          hito === 100
+            ? t('goalDoneCheer').replace('{name}', goal.name)
+            : t('goalMilestoneCheer').replace('{pct}', String(hito)).replace('{name}', goal.name),
+          { icon: hito === 100 ? 'trophy' : 'target', type: 'ok' },
+        )
+      } else {
+        playConfirmSound()
+      }
       onClose()
     } catch (e: unknown) {
       endSubmit()
@@ -1072,7 +1098,7 @@ export function MobileGoals(_props: ViewProps) {
 
       {goals.length === 0 ? (
         <div className="mgl-empty">
-          <Icon name="target" size={48} style={{ opacity: .25 }} />
+          <EmptyArt kind="goals" />
           <p>{t('noGoals')}</p>
           <button className="mgl-empty-btn" onClick={() => setSheet({ type: 'purpose' })}>
             {t('createFirstGoal')}

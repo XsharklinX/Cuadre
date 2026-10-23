@@ -4,19 +4,70 @@ import { toast } from '@/components/ui/Toast'
 import { createBackup, parseBackup } from '@/data/backup'
 import { getDataHealthStatus } from '@/data/dataHealth'
 import { exportExcel, exportMonthlyPdf } from '@/data/professionalExport'
-import { dateLocale, monthLabel } from '@/data/helpers'
+import { dateLocale, fmt, monthLabel } from '@/data/helpers'
+import { TRASH_DAYS, daysLeft } from '@/data/trash'
 import { decryptWithPassphrase, encryptWithPassphrase, looksEncrypted } from '@/lib/backupCrypto'
 import { getScheduledBackupStatus, pickBackupFolder as pickSafBackupFolder, runBackupNow, type ScheduledBackupStatus } from '@/lib/scheduledBackup'
 import { useFinance } from '@/store/finance'
 import { useNotes } from '@/store/notes'
 import { isTauri, openBackup, pickBackupFolder, saveBackup } from '@/hooks/useTauri'
 import { useSettings } from '@/store/settings'
+import { useTrash } from '@/store/trash'
+import { useArchive } from '@/store/archive'
+import { useBusiness } from '@/store/business'
+import { describeBackup } from '@/data/restoreBusiness'
+import { restoreEverything, restoreReportLines } from '@/lib/restoreAll'
+import { SettingsReconcile } from './SettingsReconcile'
 import { useT } from '@/i18n'
 import { SettingsRow, SettingsSheet, type SheetProps } from './shared'
 
 export function SettingsData({ mkey, activeSheet, onOpen, onClose, grouped }: SheetProps & { mkey: string; grouped?: boolean }) {
   const finance = useFinance()
   const t       = useT()
+  const trashItems = useTrash(s => s.items)
+  const popFromTrash = useTrash(s => s.pop)
+  const clearTrash = useTrash(s => s.clear)
+  const pruneTrashNow = useTrash(s => s.prune)
+  const trashCount = trashItems.length
+  const archivedCount = useArchive(s => s.periods.length)
+  const [pendingRestore, setPendingRestore] = useState<{
+    data: ReturnType<typeof parseBackup>
+    resumen: ReturnType<typeof describeBackup>
+  } | null>(null)
+  /*
+   * La caducidad se barre al ABRIR, no con un temporizador.
+   *
+   * Un temporizador no corre con la app cerrada, que es justo donde pasan los
+   * treinta días. Barrer al mirar hace que lo caducado nunca llegue a verse,
+   * que es lo único que importa.
+   */
+  useEffect(() => {
+    if (activeSheet === 'trash') pruneTrashNow()
+  }, [activeSheet, pruneTrashNow])
+
+  /*
+   * RECUPERAR PUEDE FALLAR, Y HAY QUE DECIRLO.
+   *
+   * Entre el borrado y el rescate puede haber pasado de todo: que se borrara
+   * la cuenta del movimiento, que el saldo ya no dé para revertir un ingreso,
+   * que la categoría ya no exista. `addTx` lanza en esos casos, y con razón:
+   * meter un movimiento que apunta a una cuenta fantasma descuadraría el libro
+   * en silencio, que es peor que no recuperarlo.
+   *
+   * Si falla, la entrada se QUEDA en la papelera. Sacarla primero y perderla
+   * al fallar sería borrar dos veces lo mismo.
+   */
+  const restoreFromTrash = (id: string) => {
+    const entry = trashItems.find(e => e.tx.id === id)
+    if (!entry) return
+    try {
+      finance.addTx(entry.tx)
+      popFromTrash(id)
+      toast(t('trashRestored'), { icon: 'check', type: 'ok' })
+    } catch (error) {
+      toast(error instanceof Error ? error.message : t('couldNotSave'), { icon: 'alert' })
+    }
+  }
   const health  = getDataHealthStatus(finance)
   const lang    = useSettings(s => s.language)
   const lastWeeklyBackupAt = useSettings(s => s.lastWeeklyBackupAt)
@@ -150,6 +201,29 @@ export function SettingsData({ mkey, activeSheet, onOpen, onClose, grouped }: Sh
     }
   }
 
+  /*
+   * RESTAURAR SIN DESTRUIR NADA.
+   *
+   * Antes esto era `restoreBackup` + `importNotes` y se acababa ahi. Los
+   * almacenes de negocio se quedaban intactos con un libro nuevo debajo, asi
+   * que sus cobros apuntaban a movimientos borrados y las limpiezas del
+   * arranque los daban por basura: restaurar DESTRUIA datos en silencio.
+   *
+   * Ahora los datos de negocio se reconcilian contra el libro recien
+   * restaurado y, si algo cambio, se dice. Lo llaman los dos caminos —copia
+   * normal y copia cifrada— desde el mismo sitio, para que no haya dos
+   * versiones de esto que puedan divergir.
+   */
+  const applyRestore = (data: ReturnType<typeof parseBackup>) => {
+    const report = restoreEverything(data)
+    toast(t('backupRestored'), { icon: 'check', type: 'ok' })
+    // El informe solo se enseña si hay algo que contar: un «0 cobros
+    // reconciliados» seria ruido sobre una restauracion limpia.
+    const lineas = restoreReportLines(report, t)
+    if (lineas.length) toast(lineas.join(' '), { icon: 'info', duration: 8000 })
+    onClose()
+  }
+
   const importBackup = async () => {
     try {
       const text = await openBackup()
@@ -160,10 +234,20 @@ export function SettingsData({ mkey, activeSheet, onOpen, onClose, grouped }: Sh
         return
       }
       const data = parseBackup(text)
-      finance.restoreBackup(data)
-      useNotes.getState().importNotes(data.notes ?? [])
-      toast(t('backupRestored'), { icon: 'check', type: 'ok' })
-      onClose()
+      /*
+       * EL AVISO QUE FALTABA.
+       *
+       * Una copia vieja (v1-v3) no trae clientes. Restaurarla sobre datos
+       * actuales te deja sin ellos, y hasta ahora nadie lo decia: el usuario
+       * se enteraba al abrir Negocio y encontrarlo vacio.
+       */
+      const resumen = describeBackup(data, useBusiness.getState().clients.length)
+      if (resumen.missingBusiness) {
+        setPendingRestore({ data, resumen })
+        onOpen('restoreWarn')
+        return
+      }
+      applyRestore(data)
     } catch (error) {
       toast(error instanceof Error ? error.message : t('invalidFile'), { icon: 'alert' })
     }
@@ -175,10 +259,7 @@ export function SettingsData({ mkey, activeSheet, onOpen, onClose, grouped }: Sh
     try {
       const decrypted = await decryptWithPassphrase(restorePendingText, restorePassword)
       const data = parseBackup(decrypted)
-      finance.restoreBackup(data)
-      useNotes.getState().importNotes(data.notes ?? [])
-      toast(t('backupRestored'), { icon: 'check', type: 'ok' })
-      onClose()
+      applyRestore(data)
     } catch (error) {
       toast(error instanceof Error ? error.message : t('invalidFile'), { icon: 'alert' })
     } finally {
@@ -269,11 +350,28 @@ export function SettingsData({ mkey, activeSheet, onOpen, onClose, grouped }: Sh
             toast(fixed > 0 ? t('balancesFixed').replace('{n}', String(fixed)) : t('balancesOk'),
               { icon: 'check', type: 'ok' })
           }} />
+        {/*
+          CUADRE GENERAL, junto a «Recalcular»: son los dos arreglos de saldo y
+          la gente los confunde. «Recalcular» recompone el saldo desde los
+          movimientos; «Cuadrar» compara con lo que dice el banco y anota la
+          diferencia. Separados en dos sitios distintos nadie entenderia cual
+          necesita.
+        */}
+        <SettingsRow icon="coins" iconColor="#5bc0ff" label={t('recTitle')}
+          sublabel={t('recSub')}
+          onClick={() => onOpen('reconcileAll')} />
         <SettingsRow icon="download" iconColor="#35d0a2" label={t('exportData')}
           sublabel={t('exportDataSub')}
           onClick={() => onOpen('export')} />
         <SettingsRow icon="upload" iconColor="#5bc0ff" label={t('restoreBackup')}
           onClick={() => void importBackup()} />
+        {/* La papelera va junto a restaurar, que es donde se busca cuando hace
+            falta recuperar algo. El contador a la derecha es lo que la hace
+            descubrible: sin él, nadie entra a mirar una lista que cree vacía. */}
+        <SettingsRow icon="trash" iconColor="#f59e0b" label={t('trashTitle')}
+          sublabel={t('trashSub')}
+          value={trashCount > 0 ? String(trashCount) : undefined}
+          onClick={() => onOpen('trash')} />
         {isTauri() && (
           <SettingsRow icon="fileJson" iconColor="#a78bfa" label={t('weeklyBackupLastLabel')}
             sublabel={backupScheduleLabel}
@@ -288,6 +386,17 @@ export function SettingsData({ mkey, activeSheet, onOpen, onClose, grouped }: Sh
         )}
       </div>
       <div className="mset-card">
+        {/* El archivo solo aparece cuando hay algo archivado: una fila que
+            lleva a una lista vacia es una fila que estorba. */}
+        {archivedCount > 0 && (
+          <SettingsRow icon="clock" iconColor="#a78bfa" label={t('arcTitle')}
+            sublabel={t('arcSub')}
+            value={String(archivedCount)}
+            onClick={() => onOpen('archive')} />
+        )}
+        <SettingsRow icon="refresh" iconColor="#f59e0b" label={t('pcTitle')}
+          sublabel={t('pcSub')}
+          onClick={() => onOpen('periodClose')} />
         <SettingsRow icon="trash" iconColor="#ff6b8a" label={t('deleteAllData')}
           danger onClick={() => onOpen('reset')} />
       </div>
@@ -525,6 +634,76 @@ export function SettingsData({ mkey, activeSheet, onOpen, onClose, grouped }: Sh
                   </button>
                 </div>
               </div>
+            )}
+          </div>
+        </SettingsSheet>
+      )}
+
+      <SettingsReconcile activeSheet={activeSheet} onOpen={onOpen} onClose={onClose} />
+
+      {activeSheet === 'restoreWarn' && pendingRestore && (
+        <SettingsSheet title={t('restoreWarnTitle')} onClose={() => { setPendingRestore(null); onClose() }}>
+          <div className="mset-sheet-body">
+            <p className="mrec-intro">{t('restoreWarnText')}</p>
+            <div className="mrec-warn">
+              <Icon name="alert" size={15} />
+              <span>
+                {t('restoreWarnLoses')
+                  .replace('{n}', String(useBusiness.getState().clients.length))}
+              </span>
+            </div>
+            <div className="mrec-total">
+              <span>{t('restoreWarnBrings')}</span>
+              <b>{t('pcNMovements').replace('{n}', String(pendingRestore.resumen.transactions))}</b>
+            </div>
+            <button
+              className="mset-sheet-danger"
+              onClick={() => { const p = pendingRestore; setPendingRestore(null); applyRestore(p.data) }}
+            >
+              {t('restoreWarnGo')}
+            </button>
+            <button className="mset-sheet-cancel" onClick={() => { setPendingRestore(null); onClose() }}>
+              {t('cancel')}
+            </button>
+          </div>
+        </SettingsSheet>
+      )}
+
+      {activeSheet === 'trash' && (
+        <SettingsSheet title={t('trashTitle')} onClose={onClose}>
+          <div className="mset-sheet-body">
+            <p className="mtrash-note">{t('trashExplainer').replace('{days}', String(TRASH_DAYS))}</p>
+            {trashItems.length === 0 ? (
+              <div className="mtrash-empty">
+                <Icon name="trash" size={28} />
+                <strong>{t('trashEmptyTitle')}</strong>
+                <span>{t('trashEmptyText')}</span>
+              </div>
+            ) : (
+              <>
+                {trashItems.map(entry => (
+                  <div className="mtrash-row" key={entry.tx.id}>
+                    <span className="mtrash-id">
+                      <b>{entry.tx.type === 'transfer' ? t('transfer') : entry.tx.note}</b>
+                      <small>
+                        {new Date(`${entry.tx.date}T00:00:00`).toLocaleDateString(dateLocale(lang), { day: 'numeric', month: 'short' })}
+                        {' · '}
+                        {t('trashDaysLeft').replace('{n}', String(daysLeft(entry)))}
+                      </small>
+                    </span>
+                    <span className={`mtrash-amt ${entry.tx.type}`}>
+                      {entry.tx.type === 'income' ? '+' : entry.tx.type === 'expense' ? '-' : ''}
+                      {fmt(entry.tx.amount, finance.currency)}
+                    </span>
+                    <button className="mtrash-restore" onClick={() => restoreFromTrash(entry.tx.id)}>
+                      {t('trashRestore')}
+                    </button>
+                  </div>
+                ))}
+                <button className="mset-sheet-cancel" onClick={() => { clearTrash(); toast(t('trashEmptied'), { icon: 'trash' }) }}>
+                  {t('trashEmptyAction')}
+                </button>
+              </>
             )}
           </div>
         </SettingsSheet>

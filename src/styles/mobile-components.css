@@ -1714,6 +1714,44 @@
   .msub-action-btn.warn { background: color-mix(in oklab, #f59e0b 12%, transparent); color: #f59e0b; }
   .msub-action-btn.danger { background: color-mix(in oklab, var(--m-expense) 12%, transparent); color: var(--m-expense); }
 
+  /* «Esta la revendo»: el enlace con un servicio de Negocio.
+     Va en la hoja de la suscripcion y no en la ficha del servicio porque es
+     aqui, mirando el recibo, donde se le ocurre que ese gasto no es suyo. */
+  .msub-resold {
+    background: color-mix(in oklab, var(--m-info) 9%, transparent);
+    border-radius: 12px;
+    display: grid;
+    gap: 7px;
+    padding: 13px 14px;
+  }
+  .msub-resold-label {
+    color: var(--m-text);
+    font-size: 14px;
+    font-weight: 700;
+  }
+  .msub-resold-pick {
+    background: var(--m-surface);
+    border: 1px solid var(--m-border);
+    border-radius: 10px;
+    color: var(--m-text);
+    font-size: 14px;
+    min-height: 44px;
+    padding: 0 11px;
+    width: 100%;
+  }
+  .msub-resold small { color: var(--m-muted); font-size: 12px; line-height: 1.45; }
+  /* Dos numeros que el usuario escribio en sitios distintos y que ahora se
+     pueden comparar. No se corrige solo: cual es el bueno lo sabe el. */
+  .msub-resold-warn {
+    color: var(--m-warn);
+    font-size: 12.5px;
+    line-height: 1.45;
+    margin: 0;
+  }
+  .msub-resold-empty { color: var(--m-muted); font-size: 13px; line-height: 1.45; margin: 0; }
+  .msub-hero-resold { color: var(--m-muted); font-size: 12.5px; margin-top: 3px; }
+  .msub-hero-resold b { color: var(--m-text); font-variant-numeric: tabular-nums; }
+
   .msub-confirm { background: color-mix(in oklab, var(--m-expense) 8%, transparent); border-radius: 12px; padding: 16px; }
   .msub-confirm p { color: var(--m-text); font-size: 14px; line-height: 1.5; margin: 0 0 14px; }
   .msub-confirm-row { display: flex; gap: 10px; }
@@ -1741,6 +1779,44 @@
   }
   .msub-dismiss-btn:active { opacity: .7; }
   .msub-detected-hint { color: var(--m-muted); font-size: 12px; line-height: 1.5; margin: 0; }
+
+  /*
+   * Tres clases que la seccion de sugerencias usaba SIN estilo, desde que
+   * existe: el boton de descartarlas todas se leia como texto corrido, la
+   * fila detectada no se distinguia de una suscripcion de verdad, y el «hay
+   * N mas» quedaba pegado al borde con el tamano del cuerpo.
+   *
+   * Lo cazo el guardian de cobertura al extenderlo a este prefijo. Una clase
+   * que no existe es una cadena valida: ni el typechecker ni ningun test de
+   * comportamiento lo ven.
+   */
+  .msub-dismiss-all {
+    background: transparent;
+    border: 0;
+    color: var(--m-muted);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .04em;
+    min-height: 32px;
+    padding: 0 2px;
+    text-transform: uppercase;
+  }
+  .msub-dismiss-all:active { opacity: .6; }
+
+  /* Una sugerencia no es una suscripcion todavia: se marca al margen para que
+     no se confunda con las que el usuario ya confirmo. */
+  .msub-detected-row {
+    background: color-mix(in oklab, var(--m-info) 6%, transparent);
+    box-shadow: inset 3px 0 0 color-mix(in oklab, var(--m-info) 45%, transparent);
+  }
+
+  .msub-more-hint {
+    color: var(--m-muted);
+    font-size: 12px;
+    line-height: 1.5;
+    margin: 0;
+    padding: 10px 16px 2px;
+  }
   .mgl-btn-save:disabled { opacity: .5; }
 
   .msub-header-row { display: flex; justify-content: flex-end; padding: 10px 16px 0; }
@@ -2566,6 +2642,10 @@
   .mcash-event-expense { background: var(--m-expense)1f; color: var(--m-expense); }
   .mcash-event-income  { background: var(--m-income)1f; color: var(--m-income); }
   .mcash-event-goal    { background: #a78bfa1f; color: #a78bfa; }
+  /* Un cobro a un cliente: entra dinero, pero no es un ingreso TUYO. Lleva el
+     tono de dato y no el verde de lo cobrado, para que se vea de un golpe
+     cual de las entradas depende de que otra persona pague. */
+  .mcash-event-charge  { background: var(--m-info)1f; color: var(--m-info); }
   .mcash-event-note { color: var(--m-text); flex: 1; font-size: 13.5px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .mcash-event b { font-size: 13.5px; font-weight: 750; }
   b.mcash-event-income { background: transparent; color: var(--m-income); }

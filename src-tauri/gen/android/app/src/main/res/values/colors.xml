@@ -1,7 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Fondo del splash nativo de Android. Antes azul marino. -->
-    <color name="sharky_bg">#FF06211F</color>
+    <!--
+         EL FONDO DEL SPLASH ES EL FONDO DE LA APP.
+
+         Era #06211F, el verde del icono. El fondo real de la app es #0A0E16,
+         azul casi negro: en cada arranque la pantalla saltaba de un color al
+         otro justo cuando el splash daba paso al contenido. Ese salto es lo
+         que hace que la app "aparezca de golpe" en vez de continuar.
+
+         El verde no se pierde: lo sigue llevando el icono, que es lo que se
+         dibuja encima. Lo que desaparece es la costura.
+    -->
+    <color name="sharky_bg">#FF0A0E16</color>
     <color name="sharky_surface">#FF12403C</color>
     <color name="sharky_yellow">#FFF5B62B</color>
     <color name="ic_launcher_background">#FF12403C</color>

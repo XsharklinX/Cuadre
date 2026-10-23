@@ -12,6 +12,8 @@ import { advanceRecurrenceDate } from '@/hooks/useRecurring'
 import { playConfirmSound } from '@/lib/sound'
 import { accountSavingsRate, amountForCategory, byCategory, categoryParts, currentMonthKey, dateLocale, monthLabel, monthlySeries, netWorthBreakdown, rollingNetWorthSeries, savingsBalance, shortMonth, totalBalanceInBase, totals, transactionsForTotals, txForMonth, type NetWorthPoint } from '@/data/helpers'
 import { projectNetWorth } from '@/data/netWorthProjection'
+import { canScope, scopeTransactions, type ReportScope } from '@/data/reportScope'
+import { useBusiness } from '@/store/business'
 import { useAnalyticsSections, type AnalyticsSectionId } from '@/store/analyticsSections'
 import { useDismissals } from '@/store/dismissals'
 import { useFinance } from '@/store/finance'
@@ -147,16 +149,22 @@ function NetWorthHistoryChart({ history, projected, currency, lang, fmtAmount }:
     <div className="man-networth-chart">
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none">
         <line x1={0} y1={H - PAD_Y} x2={W} y2={H - PAD_Y} stroke="rgba(255,255,255,.08)" strokeWidth={1} />
-        <path d={areaPath} fill="url(#nwGrad)" stroke="none" />
+        <path className="man-nw-area" d={areaPath} fill="url(#nwGrad)" stroke="none" />
         <defs>
           <linearGradient id="nwGrad" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="var(--income)" stopOpacity="0.28" />
             <stop offset="100%" stopColor="var(--income)" stopOpacity="0" />
           </linearGradient>
         </defs>
-        <polyline points={historyPoints} fill="none" stroke="var(--income)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+        {/* `pathLength={1}` normaliza el largo del trazo a 1, asi el CSS puede
+            dibujarlo de 1 a 0 sin saber cuantos pixeles mide. Con un valor
+            inventado, una serie corta se dibujaria a trozos y una larga se
+            quedaria a medias. */}
+        <polyline className="man-nw-linea" pathLength={1} points={historyPoints} fill="none" stroke="var(--income)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
         <polyline points={projectedPoints} fill="none" stroke="var(--income)" strokeWidth={1.6} strokeDasharray="3 3" strokeLinecap="round" strokeLinejoin="round" opacity={0.55} />
-        <circle cx={xOf(history.length - 1)} cy={yOf(current.value)} r={3} fill="var(--income)" />
+        {/* El punto de HOY llega al final del trazo, no antes: marca donde
+            estas justo cuando la linea termina de contarlo. */}
+        <circle className="man-nw-hoy" cx={xOf(history.length - 1)} cy={yOf(current.value)} r={3} fill="var(--income)" />
       </svg>
       <div className="man-networth-legend">
         <div>
@@ -246,7 +254,42 @@ export function MobileAnalytics({ mkey, onBudgets, onImport, onEditTx, initialPe
     }
   }
   const year = Number(mkey.slice(0, 4))
-  const visTx = useMemo(() => transactionsForTotals(transactions, accounts, currency), [transactions, accounts, currency])
+
+  /*
+   * NEGOCIO Y PERSONAL, SEPARADOS.
+   *
+   * Esta pantalla miraba el libro entero, y para quien cobra a clientes eso
+   * mezcla dos cosas que no se comparan: lo que gana vendiendo y lo que gasta
+   * viviendo. «Gastaste un 40% mas que el mes pasado» no dice nada si la
+   * subida fue comprar otra cuenta de Netflix para cinco clientes nuevos.
+   *
+   * El filtro va aqui arriba, sobre `visTx`, para que lo herede TODO lo de
+   * abajo: el veredicto, las categorias, la serie, los informes. Filtrar
+   * seccion por seccion habria dejado la mitad de la pantalla contestando a
+   * una pregunta y la otra mitad a otra.
+   *
+   * Se recuerda en el dispositivo: es una preferencia de como miras tus
+   * numeros, no un dato tuyo, y no tiene por que viajar en las copias.
+   */
+  const businesses = useBusiness(s => s.businesses)
+  const puedeFiltrar = canScope(businesses)
+  const [scope, setScope] = useState<ReportScope>(() => {
+    try {
+      const guardado = localStorage.getItem('cuadre-report-scope')
+      return guardado === 'business' || guardado === 'personal' ? guardado : 'all'
+    } catch { return 'all' }
+  })
+  const cambiarScope = (s: ReportScope) => {
+    setScope(s)
+    try { localStorage.setItem('cuadre-report-scope', s) }
+    catch { /* en privado no se recuerda, y no pasa nada */ }
+  }
+
+  const todoTx = useMemo(() => transactionsForTotals(transactions, accounts, currency, categories), [transactions, accounts, currency, categories])
+  const visTx = useMemo(
+    () => scopeTransactions(todoTx, businesses, puedeFiltrar ? scope : 'all'),
+    [todoTx, businesses, puedeFiltrar, scope],
+  )
   const monthTx = txForMonth(visTx, mkey)
   const weekWindow = useMemo(() => {
     if (!monthTx.length) return { start: '', end: '', tx: [] as typeof monthTx }
@@ -668,6 +711,41 @@ export function MobileAnalytics({ mkey, onBudgets, onImport, onEditTx, initialPe
           </button>
         ))}
       </div>
+
+      {/*
+        NEGOCIO O PERSONAL.
+        Solo sale si hay una frontera real que trazar: sin negocios con
+        categorias, «solo personal» seria todo y «solo negocio» nada, y
+        ofrecer un filtro que no filtra es peor que no ofrecerlo.
+      */}
+      {puedeFiltrar && (
+        <>
+          <div className="mobile-segment man-scope" role="tablist" aria-label={t('scopeAll')}>
+            {([
+              { id: 'all' as const, label: t('scopeAll') },
+              { id: 'business' as const, label: t('scopeBusiness') },
+              { id: 'personal' as const, label: t('scopePersonal') },
+            ]).map(o => (
+              <button
+                key={o.id}
+                className={scope === o.id ? 'on' : ''}
+                role="tab"
+                aria-selected={scope === o.id}
+                onClick={() => cambiarScope(o.id)}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+          {/* Con un filtro puesto se dice QUE se esta mirando: si no, las
+              cifras de abajo parecen las de siempre y no cuadran con nada. */}
+          {scope !== 'all' && (
+            <p className="man-scope-note">
+              {scope === 'business' ? t('scopeBusinessNote') : t('scopePersonalNote')}
+            </p>
+          )}
+        </>
+      )}
 
       {/* ── VEREDICTO ────────────────────────────────────────
           La pantalla responde UNA pregunta —¿cómo voy?— antes de ofrecer

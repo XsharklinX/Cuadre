@@ -97,13 +97,13 @@ export function MobileNotes({ mkey }: ViewProps) {
 
   // Gasto del mes por categoría — para el aviso de "no cabe en tu presupuesto".
   const spentByCat = useMemo(() => {
-    const monthTx = txForMonth(transactionsForTotals(finance.transactions, finance.accounts, finance.currency), mkey)
+    const monthTx = txForMonth(transactionsForTotals(finance.transactions, finance.accounts, finance.currency, finance.categories), mkey)
     const map: Record<string, number> = {}
     for (const tx of monthTx) {
       if (tx.type === 'expense' && tx.categoryId) map[tx.categoryId] = (map[tx.categoryId] ?? 0) + tx.amount
     }
     return map
-  }, [finance.transactions, finance.accounts, finance.currency, mkey])
+  }, [finance.transactions, finance.accounts, finance.currency, finance.categories, mkey])
 
   // Sin selector de tipo: crear abre una lista directa. El tipo por defecto es
   // 'checklist' — con checks y precios OPCIONALES por ítem, así que sirve para

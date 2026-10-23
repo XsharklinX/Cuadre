@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useFinance } from '@/store/finance'
+import { useSettings } from '@/store/settings'
 import { fmt } from '@/data/helpers'
 import type { CurrencyCode } from '@/types'
 
@@ -46,6 +47,10 @@ export function fitScale(text: string): number {
 export function AnimatedMoney({ value, compact, decimals, style, className, currency: currencyOverride, fit }: Props) {
   const baseCurrency = useFinance(s => s.currency)
   const currency = currencyOverride ?? baseCurrency
+  // El enmascarado del modo privado lo aplica `fmt`, pero hay que suscribirse
+  // al ajuste para repintar al encenderlo: sin esto la cifra se quedaba a la
+  // vista hasta que algo ajeno forzara un render.
+  useSettings(s => s.privacyMode)
   const [disp, setDisp] = useState(0)
   const from = useRef(0)
 

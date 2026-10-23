@@ -38,7 +38,7 @@ class MlkitOcrPlugin(private val activity: Activity) : Plugin(activity) {
             return
         }
 
-        val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        val bitmap = decodeSampled(bytes)
         if (bitmap == null) {
             invoke.reject("No se pudo decodificar la imagen")
             return
@@ -59,6 +59,36 @@ class MlkitOcrPlugin(private val activity: Activity) : Plugin(activity) {
             .addOnFailureListener { e ->
                 invoke.reject(e.message ?: "Error al reconocer el texto")
             }
+    }
+
+    /**
+     * Decodifica la foto SIN cargarla entera en memoria.
+     *
+     * El camino normal ya llega reducido: `receiptOcr.ts` encoge a 1600 px
+     * antes de enviar. Pero su propio comentario avisa de que, si esa
+     * reducción falla, el llamador manda LA IMAGEN ORIGINAL — y la foto de un
+     * móvil de 12 MP ocupa unos 48 MB como ARGB_8888. En un teléfono modesto
+     * eso es el proceso muerto por falta de memoria justo cuando el usuario
+     * fotografía un recibo.
+     *
+     * Primero se leen las dimensiones sin reservar píxeles
+     * (`inJustDecodeBounds`), y solo después se decodifica con el factor de
+     * reducción que haga falta. El tope de 2048 va POR ENCIMA de los 1600 de
+     * JS a propósito: así el camino normal entra sin reducirse otra vez y la
+     * calidad del OCR no cambia; esto solo actúa en el caso de respaldo.
+     */
+    private fun decodeSampled(bytes: ByteArray, maxDim: Int = 2048): android.graphics.Bitmap? {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+
+        var sample = 1
+        val mayor = maxOf(bounds.outWidth, bounds.outHeight)
+        // Potencias de dos: es lo que BitmapFactory redondea internamente, así
+        // que pedir otra cosa daría un tamaño distinto del esperado.
+        while (mayor / sample > maxDim) sample *= 2
+
+        val options = BitmapFactory.Options().apply { inSampleSize = sample }
+        return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
     }
 
     // Lanza la pantalla de cámara nativa (Fase 1 del roadmap) en vez del

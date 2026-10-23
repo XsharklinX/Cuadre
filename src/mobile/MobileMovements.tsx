@@ -1,13 +1,19 @@
 import { useMemo, useState } from 'react'
 import { AnimatedMoney } from '@/components/ui/AnimatedMoney'
 import { Icon } from '@/components/ui/Icon'
-import { accountBalanceInBase, accountCurrency, availableBalanceInBase, convertTxAmountsToBase, fmt, localToday, totals, transactionsForTotals, txForMonth, visibleAccounts } from '@/data/helpers'
+import { toast } from '@/components/ui/Toast'
+import { EmptyArt } from '@/components/ui/EmptyArt'
+import { accountBalanceInBase, accountCurrency, availableBalanceInBase, convertTxAmountsToBase, dateLocale, fmt, localToday, monthLabel, totals, transactionsForTotals, txForMonth, visibleAccounts } from '@/data/helpers'
 import { creditUsed } from '@/data/creditCard'
+import { backupNudge } from '@/data/backupNudge'
+import { lastMonthClose, monthCloseAlertId } from '@/data/monthClose'
+import { useDetectionHealth } from '@/hooks/useDetectionHealth'
 import { weeklyDigest } from '@/data/weeklyDigest'
 import { proactiveInsights } from '@/data/proactiveInsights'
 import { translateCategoryName, useT } from '@/i18n'
 import { useMoneyDecimals } from '@/hooks/useFmt'
 import { useFinance } from '@/store/finance'
+import { useIncidents } from '@/store/incidents'
 import { useSettings } from '@/store/settings'
 import type { Transaction } from '@/types'
 import { MobileTransactionList } from './MobileTransactionList'
@@ -21,19 +27,25 @@ export function MobileMovements({
   onEditTx,
   onDeleteTx,
   onOpenSecurity,
+  onOpenBackup,
+  onOpenDetection,
 }: {
   mkey: string
   onAdd: () => void
   onEditTx: (tx: Transaction) => void
   onDeleteTx?: (id: string) => void
   onOpenSecurity?: () => void
+  onOpenBackup?: () => void
+  onOpenDetection?: () => void
 }) {
-  const { transactions, accounts, currency, categories } = useFinance()
+  const { transactions, accounts, currency, categories, addTx } = useFinance()
   const { compactNumbers, appPin, appPattern, dismissedAlerts, dismissAlert, language,
-    hiddenShowInMovements, hiddenCountInBalance, hiddenCountInSummary } = useSettings()
+    hiddenShowInMovements, hiddenCountInBalance, hiddenCountInSummary,
+    lastManualBackupAt, lastWeeklyBackupAt, backupNudgeDismissedAt, dismissBackupNudge } = useSettings()
   const t = useT()
   const moneyDecimals = useMoneyDecimals()
   const lang = (language ?? 'es') as 'en' | 'es'
+  const locale = dateLocale(lang)
 
   // Resumen semanal proactivo: los últimos 7 días destilados. Se descarta por
   // semana (la clave lleva el inicio de semana), así reaparece cada lunes con
@@ -51,6 +63,93 @@ export function MobileMovements({
   const topInsight = insights.find(i => !dismissedAlerts.includes(i.id))
   const showWeekly = digest.txCount > 0 && digest.expense > 0 && !dismissedAlerts.includes(weeklyDismissId)
   const topCategory = digest.topCategoryId ? categories.find(c => c.id === digest.topCategoryId) : undefined
+  /*
+   * LA RACHA YA NO VIVE AQUÍ.
+   *
+   * Estuvo una versión como tarjeta fija desde el tercer día, y era un error:
+   * esta pantalla es para DINERO, y la racha es un apunte al margen ocupando
+   * el sitio de más peso de la app. Un premio que te persigue todos los días
+   * deja de ser un premio a los dos días.
+   *
+   * Sigue contándose (`loggingStreak`) y sigue celebrándose, pero solo en los
+   * días redondos y FUERA de la app, como aviso. El contador se puede mirar en
+   * Perfil quien quiera.
+   */
+
+  /*
+   * EL MES QUE CIERRAS EN VERDE.
+   *
+   * Si sobró dinero, eso es exactamente lo que la app existe para ayudarte a
+   * conseguir y merece decirse. Si el mes salió mal, no se dice nada: nadie
+   * necesita que su teléfono le recuerde que se pasó.
+   */
+  const close = useMemo(
+    () => lastMonthClose(convertTxAmountsToBase(transactions, accounts, currency), localToday()),
+    [transactions, accounts, currency],
+  )
+  const closeDismissId = close ? monthCloseAlertId(close.monthKey) : null
+  const showClose = !!close && !!closeDismissId && !dismissedAlerts.includes(closeDismissId)
+
+  /*
+   * EL DETECTOR CALLADO.
+   *
+   * `detectionHealth` ya existía y ya sabía distinguir «apagado» de «el
+   * permiso está dado pero Android soltó el servicio» de «lleva diez días sin
+   * captar nada». Lo que faltaba era que se viera: hasta ahora solo aparecía
+   * en el centro de notificaciones, una pantalla a la que hay que entrar a
+   * propósito — y el sentido entero de este aviso es que NO vas a entrar.
+   */
+  /*
+   * EL FALLO, CONTADO EN EL MOMENTO.
+   *
+   * Un guardado que no ocurrió deja constancia aquí hasta que alguien la lee.
+   * Va por delante de todo lo demás, incluido el detector: esto no es «algo
+   * puede estar fallando», es «este dinero NO está anotado».
+   */
+  const incidents = useIncidents(s => s.items)
+  const takeIncident = useIncidents(s => s.take)
+  const dismissIncident = useIncidents(s => s.dismiss)
+  const recordSaveFailure = useIncidents(s => s.recordSaveFailure)
+  const topIncident = incidents[0]
+
+  const retryIncident = (id: string) => {
+    const incident = takeIncident(id)
+    if (!incident) return
+    try {
+      addTx(incident.payload)
+      toast(t('movementSaved'), { icon: 'check', type: 'ok' })
+    } catch (error) {
+      // Sigue sin poder guardarse: vuelve a la lista con el motivo NUEVO, que
+      // puede no ser el de antes. Perderlo aquí sería borrar el intento justo
+      // en el sitio que existe para no perderlo.
+      recordSaveFailure(incident.payload, error instanceof Error ? error.message : t('couldNotSave'))
+      toast(error instanceof Error ? error.message : t('couldNotSave'), { icon: 'alert' })
+    }
+  }
+
+  const detection = useDetectionHealth()
+  const detectionDismissId = detection ? `detection-${detection.state}-${detection.daysSilent ?? 'never'}` : null
+  const showDetection = !!detection?.alert && !!detectionDismissId && !dismissedAlerts.includes(detectionDismissId)
+
+  /*
+   * LA COPIA DE SEGURIDAD, DICHA DONDE SE VE.
+   *
+   * Estos datos viven solo en este teléfono: no hay servidor ni cuenta. La
+   * copia lleva versiones existiendo en Ajustes, esperando a que alguien entre
+   * a buscarla, y nadie entra a Ajustes a hacer una copia.
+   */
+  const nudge = useMemo(() => {
+    // La más reciente de las dos: da igual si la copia fue manual o semanal.
+    const fechas = [lastManualBackupAt, lastWeeklyBackupAt].filter(Boolean) as string[]
+    const ultima = fechas.length ? fechas.sort()[fechas.length - 1] : null
+    return backupNudge({
+      lastBackupAt: ultima,
+      txCount: transactions.length,
+      dismissedAt: backupNudgeDismissedAt,
+      now: Date.now(),
+    })
+  }, [lastManualBackupAt, lastWeeklyBackupAt, transactions.length, backupNudgeDismissedAt])
+
   const [showBalanceBreakdown, setShowBalanceBreakdown] = useState(false)
   const showPinNudge = !!onOpenSecurity && !appPin && !appPattern
     && transactions.length >= PIN_NUDGE_MIN_TXNS && !dismissedAlerts.includes(PIN_NUDGE_ID)
@@ -58,7 +157,7 @@ export function MobileMovements({
   // Configuración. Preparamos ambos conjuntos (con y sin ocultas) y elegimos
   // según cada ajuste.
   const allMonthTx = txForMonth(convertTxAmountsToBase(transactions, accounts, currency), mkey)
-  const visibleMonthTx = txForMonth(transactionsForTotals(transactions, accounts, currency), mkey)
+  const visibleMonthTx = txForMonth(transactionsForTotals(transactions, accounts, currency, categories), mkey)
   const monthTx = hiddenShowInMovements ? allMonthTx : visibleMonthTx     // lista
   const summary = totals(hiddenCountInSummary ? allMonthTx : visibleMonthTx) // ingresos/gastos
   const activeAccounts = visibleAccounts(accounts)
@@ -192,6 +291,92 @@ export function MobileMovements({
         </div>
       )}
 
+      {/* ANTES QUE NADA: dinero que el usuario creyó anotar y no se anotó. */}
+      {topIncident && (
+        <div className="minc-card">
+          <span className="minc-ico"><Icon name="alert" size={16} /></span>
+          <div className="minc-body">
+            <strong>{t('incidentSaveFailedTitle')}</strong>
+            <p>
+              {t('incidentSaveFailedWhat')
+                .replace('{amount}', fmt(topIncident.payload.amount, currency))
+                .replace('{when}', new Date(topIncident.at).toLocaleString(locale, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }))}
+            </p>
+            <p className="minc-why">{topIncident.message}</p>
+            <div className="minc-actions">
+              <button onClick={() => retryIncident(topIncident.id)}>{t('incidentRetry')}</button>
+              <button className="ghost" onClick={() => dismissIncident(topIncident.id)}>{t('incidentDiscard')}</button>
+            </div>
+          </div>
+          {incidents.length > 1 && <span className="minc-more">+{incidents.length - 1}</span>}
+        </div>
+      )}
+
+      {/* Primero lo que está ROTO, que es lo único que no puede esperar: un
+          detector muerto deja de anotar tus gastos sin decírtelo, y sin copia
+          una pérdida del teléfono se lleva el libro entero. Las celebraciones
+          van después. */}
+      {showDetection && detection && (
+        <div className="mhome-alert warn mhome-alert-standalone">
+          <span className="mhome-alert-ico"><Icon name="alert" size={16} /></span>
+          <p>
+            <strong>{t(detection.state === 'no-access' ? 'detectionNoAccessTitle' : 'detectionSilentTitle')}</strong>
+            {detection.daysSilent !== null
+              ? t('detectionSilentDays').replace('{n}', String(detection.daysSilent))
+              : t('detectionSilentNever')}
+          </p>
+          {onOpenDetection && (
+            <button className="mhome-alert-action" onClick={onOpenDetection}>{t('detectionSilentAction')}</button>
+          )}
+          <button aria-label={t('dismissAlertLabel')} onClick={() => dismissAlert(detectionDismissId!)}>
+            <Icon name="close" size={14} />
+          </button>
+        </div>
+      )}
+
+      {nudge.show && (
+        <div className="mhome-alert warn mhome-alert-standalone">
+          <span className="mhome-alert-ico"><Icon name="shield" size={16} /></span>
+          <p>
+            <strong>
+              {nudge.daysSince === null
+                ? t('backupNeverTitle')
+                : t('backupStaleTitle').replace('{n}', String(nudge.daysSince))}
+            </strong>
+            {t('backupNudgeText')}
+          </p>
+          {onOpenBackup && (
+            <button className="mhome-alert-action" onClick={onOpenBackup}>{t('backupNudgeAction')}</button>
+          )}
+          <button aria-label={t('dismissAlertLabel')} onClick={dismissBackupNudge}>
+            <Icon name="close" size={14} />
+          </button>
+        </div>
+      )}
+
+      {/* El mes cerrado, por delante de los avisos de siempre: es noticia y
+          solo dura unos días. */}
+      {showClose && close && (
+        <div className="mclose-card">
+          <button className="mclose-dismiss" aria-label={t('dismiss')} onClick={() => dismissAlert(closeDismissId!)}>
+            <Icon name="close" size={14} />
+          </button>
+          <span className="mclose-label">{t('monthCloseTitle').replace('{month}', monthLabel(close.monthKey, locale))}</span>
+          <strong className="mclose-net">
+            +<AnimatedMoney value={close.net} compact={compactNumbers} fit />
+          </strong>
+          <small>
+            {t('monthCloseLeftover')}
+            {' · '}
+            {close.greenRun > 1
+              ? t('monthCloseRun').replace('{n}', String(close.greenRun))
+              : close.prevNet !== null && close.net > close.prevNet
+                ? t('monthCloseBetter')
+                : t('monthCloseSame')}
+          </small>
+        </div>
+      )}
+
       {topInsight && (
         <div className={`minsight-card minsight-${topInsight.severity}`}>
           <span className="minsight-ico"><Icon name={topInsight.icon} size={16} /></span>
@@ -261,9 +446,7 @@ export function MobileMovements({
         />
       ) : (
         <div className="mobile-movements-empty">
-          <span className="mobile-movements-empty-icon">
-            <Icon name="list" size={22} />
-          </span>
+          <EmptyArt kind="movements" />
           <strong>{t('noMovementsTitle')}</strong>
           <p>{t('noMovementsMonth')}</p>
           <button onClick={onAdd}>{t('addMovement')}</button>

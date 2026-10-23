@@ -6,6 +6,7 @@ import { isTauri } from '@/hooks/useTauri'
 import { getNotificationAccessStatus, openNotificationAccessSettings } from '@/lib/bankNotifications'
 import { useBankSuggestions } from '@/store/bankSuggestions'
 import { useBankNotificationsDebug, type DebugVerdict } from '@/store/bankNotificationsDebug'
+import { shouldAutoEnableDetection } from '@/data/detectionAutoEnable'
 import { useDismissals } from '@/store/dismissals'
 import { useFinance } from '@/store/finance'
 import { useSettings } from '@/store/settings'
@@ -109,10 +110,15 @@ export function SettingsBankNotifications({ activeSheet, onOpen, onClose, groupe
        * ya es el consentimiento. Pedir un segundo si despues de lo dificil es
        * una trampa.
        *
-       * Solo la primera vez (`enabledSince === 0`): si alguien lo apago a
-       * proposito y dejo el permiso puesto, su decision se respeta.
+       * La regla vive en `data/detectionAutoEnable.ts`, compartida con el
+       * arranque de la app: tenerla dos veces era como se separaron, y por eso
+       * la deteccion solo se encendia si el usuario entraba AQUI.
        */
-      if (status.granted && status.connected && !suggestions.enabled && !suggestions.enabledSince) {
+      if (shouldAutoEnableDetection({
+        granted: status.granted,
+        enabled: suggestions.enabled,
+        enabledSince: suggestions.enabledSince,
+      })) {
         suggestions.setEnabled(true)
         toast(t('detectionAutoEnabled'), { icon: 'check', type: 'ok' })
       }

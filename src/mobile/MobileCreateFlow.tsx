@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState, type TouchEvent as ReactTouchEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type TouchEvent as ReactTouchEvent } from 'react'
 import { AccountPickerRow } from '@/components/ui/AccountPickerRow'
 import { Icon } from '@/components/ui/Icon'
 import { NoteSuggestionList } from '@/components/ui/NoteSuggestionList'
@@ -10,9 +10,10 @@ import { isDuplicateTransaction } from '@/data/bankCsv'
 import { accountCurrency, fmt, fmtCompact, localToday } from '@/data/helpers'
 import { checkOverdraft } from '@/data/overdraft'
 import { suggestAccount } from '@/data/lastAccount'
+import { MAX_SPLIT, splitEvenly, splitIsComplete, splitRemainder, toggleCategory } from '@/data/categorySplit'
 import { ACCENT_COLORS } from '@/constants'
 import { dateLocale } from '@/data/helpers'
-import { CURRENCIES } from '@/data/seed'
+import { CURRENCIES, newId } from '@/data/seed'
 import { CURRENCIES as CURRENCY_METAS, entryInAccountCurrency, getCurrencyMeta } from '@/data/currencies'
 import { hasSecondaryBalance } from '@/data/creditCard'
 import { computeFees, findBankProfile, guessBankProfile, totalFees } from '@/data/bankFees'
@@ -23,7 +24,11 @@ import { useSettings } from '@/store/settings'
 import { useNotes } from '@/store/notes'
 import { noteTotals } from '@/data/notes'
 import { translateCategoryName, useT } from '@/i18n'
-import { playBackspaceSound, playDoneSound, playKeySound, playOperatorSound, playSoftHaptic } from '@/lib/sound'
+import { playBackspaceSound, playDoneSound, playExpenseSound, playIncomeSound, playKeySound, playOperatorSound, playSoftHaptic } from '@/lib/sound'
+import { useJuice } from '@/store/juice'
+import { useIncidents } from '@/store/incidents'
+import { useCaprices } from '@/store/caprices'
+import { compressReceipt, putReceipt } from '@/lib/receiptStore'
 import { deriveQuickAdds, lastMovementQuickAdd, type QuickAdd } from '@/data/quickAdds'
 import { useQuickAdds } from '@/store/quickAdds'
 import { openNativeScanner } from '@/lib/mlkitOcr'
@@ -128,7 +133,20 @@ export function MobileCreateFlow({
   const galleryInputRef = useRef<HTMLInputElement>(null)
   const [mode, setMode] = useState<MobileTxMode>(initialMode ?? 'expense')
   const [amountText, setAmountText] = useState('')
-  const [categoryId, setCategoryId] = useState<string | null>(null)
+  /*
+   * LAS CATEGORIAS ELEGIDAS, EN ORDEN.
+   *
+   * Una compra del super trae comida, limpieza y a veces una medicina. Meterla
+   * entera en «Super» miente en los informes. El libro ya sabia guardar
+   * `splits`; lo que faltaba era poder elegirlas aqui.
+   *
+   * Es una LISTA y no un valor suelto porque el orden es lo que el usuario ve
+   * numerado: la primera que toco es la 1. La primera sigue siendo la
+   * categoria «principal» para todo lo que antes esperaba una sola.
+   */
+  const [cats, setCats] = useState<string[]>([])
+  const categoryId = cats[0] ?? null
+  const setCategoryId = useCallback((id: string | null) => setCats(id ? [id] : []), [])
   /*
    * La cuenta arranca SUGERIDA, no vacia.
    *
@@ -155,6 +173,17 @@ export function MobileCreateFlow({
   // Categoría que se está editando (pulsación larga en la grilla). null = crear.
   const [editingCategory, setEditingCategory] = useState<Category | null>(null)
   const { submitting, beginSubmit, endSubmit } = useSubmitGuard()
+  const markLanded = useJuice(s => s.markLanded)
+  const recordSaveFailure = useIncidents(s => s.recordSaveFailure)
+  const openCaprice = useCaprices(s => s.open)
+  /*
+   * MARCAR UN CAPRICHO AL CREARLO.
+   *
+   * Un chip, no una pantalla: quien anota un gasto en la fila del super no
+   * va a entrar a un submenu para calificarlo. Solo en gastos — un ingreso
+   * o una transferencia no pueden ser un capricho.
+   */
+  const [esCapricho, setEsCapricho] = useState(false)
   const [transferPicker, setTransferPicker] = useState<'from' | 'to' | null>(null)
   const [accountPicker, setAccountPicker] = useState(false)
   const [datePicker, setDatePicker] = useState(false)
@@ -208,6 +237,23 @@ export function MobileCreateFlow({
   const visibleCategories = showAllCats ? allCategories : allCategories.slice(0, CATS_SHOWN)
   const hiddenCats = allCategories.length - visibleCategories.length
   const activeCategory = allCategories.find(c => c.id === categoryId) ?? null
+  const dividido = cats.length >= 2
+
+  /*
+   * El reparto arranca en partes iguales y se puede retocar. Se rehace cuando
+   * cambia el monto o el numero de categorias —que es cuando el reparto
+   * anterior deja de tener sentido— y no en cada tecla, para no borrar lo que
+   * el usuario acaba de escribir.
+   */
+  const [splitAmounts, setSplitAmounts] = useState<number[]>([])
+  useEffect(() => {
+    setSplitAmounts(cats.length >= 2 ? splitEvenly(amount, cats.length) : [])
+    // Solo el numero de partes y el total mandan: retocar una parte no debe
+    // reiniciar las demas.
+  }, [cats.length, amount])
+
+  const sobra = dividido ? splitRemainder(amount, splitAmounts) : 0
+  const repartoListo = !dividido || splitIsComplete(amount, splitAmounts)
   const activeAccountId = accountId && accounts.some(a => a.id === accountId) ? accountId : null
   const activeAccount = activeAccountId ? accounts.find(a => a.id === activeAccountId) : null
   const fromAccountObj = accounts.find(a => a.id === fromAccount)
@@ -276,7 +322,10 @@ export function MobileCreateFlow({
   const canSave = amount > 0 && date && (
     mode === 'transfer'
       ? validTransfer
-      : !!activeCategory && !!activeAccountId
+      // Con varias categorias, las partes TIENEN que sumar el total: guardar
+      // un reparto incompleto dejaria el movimiento diciendo una cosa y sus
+      // categorias otra, y los informes dejarian de cuadrar contra el saldo.
+      : !!activeCategory && !!activeAccountId && repartoListo
   )
   const isToday = date === today()
 
@@ -302,7 +351,7 @@ export function MobileCreateFlow({
   const transferPickerRef = useDialogA11y<HTMLDivElement>(() => setTransferPicker(null), !!transferPicker)
   const scanMenuRef = useDialogA11y<HTMLDivElement>(() => setScanMenuOpen(false), scanMenuOpen)
 
-  const switchMode = useCallback((next: MobileTxMode) => { setMode(next); setCategoryId(null); setNote(''); setDescription(''); setAccountId(null); setTriedSave(false); setFormError(null) }, [])
+  const switchMode = useCallback((next: MobileTxMode) => { setMode(next); setCategoryId(null); setNote(''); setDescription(''); setAccountId(null); setTriedSave(false); setFormError(null) }, [setCategoryId])
 
   const cycleMode = useCallback((direction: 1 | -1) => {
     const currentIndex = MODE_ORDER.indexOf(mode)
@@ -522,6 +571,8 @@ export function MobileCreateFlow({
         ? t('amountError')
         : mode !== 'transfer' && !activeCategory
           ? t('categoryError')
+          : mode !== 'transfer' && !repartoListo
+            ? (sobra > 0 ? t('splitLeftLabel') : t('splitOverLabel')) + ' ' + fmt(Math.abs(sobra), targetCurrency)
           : mode !== 'transfer' && !activeAccountId
             ? t('accountError')
             : mode === 'transfer' && fromAccount === toAccount
@@ -568,6 +619,14 @@ export function MobileCreateFlow({
     setFormError(null)
     setOverdraftAck(false)
     if (!beginSubmit()) return
+    /*
+     * El intento vive FUERA del `try` para que el `catch` pueda verlo.
+     *
+     * Si guardar falla, el movimiento que el usuario acababa de teclear se
+     * perdía con el toast. Guardado aquí, el fallo queda apuntado con todo
+     * dentro y se puede reintentar de un toque, sin volver a teclear nada.
+     */
+    let intento: Transaction | null = null
     try {
       let duplicate = false
       if (mode === 'transfer') {
@@ -587,7 +646,12 @@ export function MobileCreateFlow({
         // sin restas mentales. El desglose viaja aparte para poder mostrarlo.
         const withFees = Math.round((entry.amount + feeTotal) * 100) / 100
         duplicate = isDuplicateTransaction(transactions, { date, amount: withFees, note: finalNote, accountId: activeAccountId! })
-        addTx({
+        // El id se crea AQUÍ y no dentro del store para poder señalar la fila
+        // recién llegada: `addTx` no devuelve nada, así que sin esto la lista
+        // no tiene forma de saber cuál de todas es la nueva.
+        const nuevoId = newId()
+        intento = {
+          id: nuevoId,
           type: mode, date,
           ...entry,
           amount: withFees,
@@ -595,7 +659,17 @@ export function MobileCreateFlow({
           ...(toSecondary ? { onSecondaryBalance: true as const } : {}),
           note: finalNote,
           ...(description.trim() ? { description: description.trim() } : {}),
-          categoryId: activeCategory!.id,
+          // La categoria PRINCIPAL es la parte de mayor monto, igual que en el
+          // formulario de escritorio: es la que sale en listas y busquedas, y
+          // tener dos criterios distintos daria resultados distintos segun por
+          // donde se creo el movimiento.
+          categoryId: dividido
+            ? cats.map((id, i) => ({ categoryId: id, amount: splitAmounts[i] }))
+                .sort((x, y) => y.amount - x.amount)[0].categoryId
+            : activeCategory!.id,
+          ...(dividido
+            ? { splits: cats.map((id, i) => ({ categoryId: id, amount: splitAmounts[i] })) }
+            : {}),
           accountId: activeAccountId!,
           ...(recurring ? {
             recurring: recurFreq,
@@ -603,9 +677,41 @@ export function MobileCreateFlow({
             recurringEnd: recurEnd || undefined,
             recurringNext: advanceRecurrenceDate(date, recurFreq),
           } : {}),
-        })
+          /*
+           * LA FOTO SE QUEDA CON EL MOVIMIENTO.
+           *
+           * Hasta ahora la app abría la cámara, le leía el monto al ticket y
+           * TIRABA la foto. Aquí solo va la marca de que existe; la imagen,
+           * comprimida, se guarda aparte en IndexedDB bajo el id de este
+           * movimiento (ver `lib/receiptStore.ts`). No puede ir en el libro:
+           * el libro vive en `localStorage` y veinte fotos lo llenarían.
+           */
+          ...(scannedImage ? { hasReceipt: true as const } : {}),
+        } as Transaction
+        addTx(intento)
+        // El bote se abre DESPUES de que el movimiento exista: su id es la
+        // referencia, y un bote apuntando a un gasto que no se guardo no se
+        // podria ni entender ni cerrar.
+        if (esCapricho && mode === 'expense') openCaprice(nuevoId, withFees, finalNote)
+        /*
+         * A propósito SIN `await`: comprimir y escribir tarda cientos de
+         * milisegundos, y el movimiento ya está guardado. Hacer esperar al
+         * usuario por la foto sería cobrarle el extra como si fuera el gasto.
+         * Si falla, el movimiento se queda sin imagen — nunca al revés.
+         */
+        if (scannedImage) {
+          void compressReceipt(scannedImage.dataUrl)
+            .then(comprimida => { if (comprimida) return putReceipt(nuevoId, comprimida) })
+            .catch(() => { /* el recibo es un extra; el gasto ya está a salvo */ })
+        }
+        markLanded(nuevoId)
       }
-      playDoneSound()
+      // Entrar y salir dinero suenan distinto: el oído confirma cuál fue sin
+      // tener que mirar. Una transferencia no es ninguna de las dos —el dinero
+      // no entra ni sale, cambia de bolsillo— y conserva su sonido neutro.
+      if (mode === 'income') playIncomeSound()
+      else if (mode === 'expense') playExpenseSound()
+      else playDoneSound()
       toast(
         duplicate
           ? t('possibleDuplicateMovement')
@@ -615,9 +721,12 @@ export function MobileCreateFlow({
         { icon: duplicate ? 'alert' : 'check', type: duplicate ? undefined : 'ok' },
       )
       setAmountText('')
+      setEsCapricho(false)
+      setScannedImage(null)
       setDescription('')
       setNote('')
-      setCategoryId(null)
+      setCats([])
+      setSplitAmounts([])
       setAccountId(null)
       setRecurring(false)
       setRecurEnd('')
@@ -625,7 +734,19 @@ export function MobileCreateFlow({
       onSaved()
     } catch (error) {
       endSubmit()
-      toast(error instanceof Error ? error.message : t('couldNotSave'), { icon: 'alert' })
+      const message = error instanceof Error ? error.message : t('couldNotSave')
+      /*
+       * El toast se queda: avisa al instante, que para eso está. Pero dura
+       * tres segundos, y si en ese momento mirabas a otro lado o el teléfono
+       * se bloqueó, el movimiento no se guardó y no quedaba ni rastro de que
+       * lo habías intentado. Eso es el peor fallo posible en una app de
+       * dinero, porque el agujero se descubre semanas después cuadrando.
+       *
+       * Solo se apunta lo que PERDIÓ datos: un guardado que no ocurrió. Si se
+       * apuntara cualquier error, la lista sería ruido y nadie la miraría.
+       */
+      if (intento) recordSaveFailure(intento, message)
+      toast(message, { icon: 'alert' })
     }
   }
 
@@ -748,7 +869,20 @@ export function MobileCreateFlow({
   const showFirstMovementHint = transactions.length === 0 && !settings.dismissedAlerts.includes('create-first-movement')
 
   return (
-    <div className="mobile-create-flow" aria-label={t('addMovement')}>
+    /*
+     * EL MONTO MANDA HASTA QUE ESTÁ PUESTO.
+     *
+     * Conviene ser exacto sobre qué cambia, porque es menos de lo que parece:
+     * el teclado YA estaba abajo y YA funcionaba al abrir, sin tocar nada
+     * antes. Teclear el monto primero siempre se pudo.
+     *
+     * Lo que no estaba era la jerarquía. Al abrir, lo que llena la pantalla
+     * es la rejilla de categorías, y la cifra es una línea pequeña abajo — o
+     * sea, lo contrario del orden en que se usa: primero la cifra, que ya la
+     * sabes, y la categoría después. Mientras el monto está vacío, la cifra
+     * manda y la rejilla se aparta. En cuanto hay monto, vuelven a su sitio.
+     */
+    <div className={`mobile-create-flow${!amountText ? ' amount-first' : ''}`} aria-label={t('addMovement')}>
 
       {/* ─── Scrollable top section ─── */}
       <div className="mobile-create-scroll" onTouchStart={handleSwipeStart} onTouchEnd={handleSwipeEnd}>
@@ -894,18 +1028,41 @@ export function MobileCreateFlow({
             {visibleCategories.length ? (
               <div className={`mobile-category-grid${triedSave && !activeCategory ? ' field-error' : ''}`}>
                 {visibleCategories.map(category => {
-                  const selected = activeCategory?.id === category.id
+                  const orden = cats.indexOf(category.id)
+                  const selected = orden >= 0
                   return (
                     <button key={category.id} className={selected ? 'on' : ''} aria-pressed={selected}
                       {...categoryPressHandlers(category)}
                       onClick={() => {
                         // Si venía de una pulsación larga, ya se abrió el editor: no seleccionar.
                         if (longPress.current.fired) return
-                        setCategoryId(category.id); setTriedSave(false)
+                        setCats(prev => toggleCategory(prev, category.id)); setTriedSave(false)
                       }}>
                       <span style={{ color: category.color, background: `color-mix(in oklab, ${category.color} 22%, transparent)` }}>
                         <Icon name={category.icon} size={20} />
                       </span>
+                      {/* El numero dice EN QUE ORDEN la elegiste, y la X que se
+                          puede soltar sin tener que adivinar que volver a
+                          tocarla la quita. */}
+                      {selected && (
+                        <>
+                          <i className="mobile-cat-orden" aria-hidden="true">{orden + 1}</i>
+                          <i
+                            className="mobile-cat-quitar"
+                            role="button"
+                            tabIndex={-1}
+                            aria-label={t('removeCategoryLabel')}
+                            onClick={event => {
+                              // La X tiene su propia accion: sin esto, el click
+                              // subiria al boton y volveria a alternarla.
+                              event.stopPropagation()
+                              setCats(prev => toggleCategory(prev, category.id))
+                            }}
+                          >
+                            <Icon name="close" size={10} />
+                          </i>
+                        </>
+                      )}
                       <small>{translateCategoryName(category, lang)}</small>
                     </button>
                   )
@@ -926,6 +1083,70 @@ export function MobileCreateFlow({
             ) : (
               <button className="mobile-empty-action" onClick={() => setCategoryEditorOpen(true)}>
                 {t('createCategoryToContinue')}
+              </button>
+            )}
+
+            {/*
+              EL REPARTO. Solo aparece con dos o mas categorias: con una, un
+              gasto es un gasto y una fila de desglose seria ruido.
+
+              Arranca en partes iguales y se puede retocar. Lo que falta por
+              repartir se dice SIEMPRE, porque el libro exige que las partes
+              sumen el total — si no, el movimiento diria una cosa y sus
+              categorias otra.
+            */}
+            {dividido && (
+              <div className={`mobile-split${!repartoListo && triedSave ? ' field-error' : ''}`}>
+                <div className="mobile-split-head">
+                  <span>
+                    {t('splitAmongLabel').replace('{n}', String(cats.length))}
+                    {cats.length >= MAX_SPLIT && ` · ${MAX_SPLIT} máx.`}
+                  </span>
+                  <button onClick={() => setSplitAmounts(splitEvenly(amount, cats.length))}>
+                    {t('splitEvenLabel')}
+                  </button>
+                </div>
+                {cats.map((id, i) => {
+                  const cat = allCategories.find(c => c.id === id)
+                  if (!cat) return null
+                  return (
+                    <label key={id} className="mobile-split-row">
+                      <i style={{ background: cat.color }} aria-hidden="true">{i + 1}</i>
+                      <span>{translateCategoryName(cat, lang)}</span>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        step="0.01"
+                        min="0"
+                        value={Number.isFinite(splitAmounts[i]) ? splitAmounts[i] : ''}
+                        onChange={event => {
+                          const v = parseFloat(event.target.value)
+                          setSplitAmounts(prev => prev.map((n, j) => j === i ? (Number.isFinite(v) ? v : 0) : n))
+                        }}
+                      />
+                    </label>
+                  )
+                })}
+                {Math.abs(sobra) > 0.009 && (
+                  <p className="mobile-split-resto">
+                    {sobra > 0 ? t('splitLeftLabel') : t('splitOverLabel')}
+                    {' '}
+                    <b>{fmt(Math.abs(sobra), targetCurrency)}</b>
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Solo en gastos: un ingreso no es un capricho. */}
+            {mode === 'expense' && (
+              <button
+                type="button"
+                className={`mobile-create-caprice${esCapricho ? ' on' : ''}`}
+                aria-pressed={esCapricho}
+                onClick={() => { setEsCapricho(v => !v); playSoftHaptic() }}
+              >
+                <Icon name="piggy" size={14} />
+                {esCapricho ? t('capMarkedChip') : t('capMarkAsSplurge')}
               </button>
             )}
 
@@ -1428,10 +1649,15 @@ function MobileCategoryEditor({
 
   return (
     <div className="mobile-editor-screen" role="dialog" aria-modal="true">
+      {/*
+        LO QUE SE LEE ARRIBA, LO QUE SE PULSA ABAJO.
+        Cancelar y Guardar vivían aquí, en las dos esquinas superiores de una
+        pantalla completa: en un teléfono de seis pulgadas y media eso obliga
+        a recolocar el aparato en la mano para cada guardado. El título sí se
+        queda arriba — leer no cuesta alcance.
+      */}
       <header>
-        <button onClick={onClose}>{t('cancel')}</button>
         <strong>{editing ? t('editCategory') : t('newCategory')}</strong>
-        <button onClick={() => onSave({ name, icon, color, budget: Number(budget) || 0 })}>{editing ? t('save') : t('create')}</button>
       </header>
       <div className="mobile-editor-body">
         <label>
@@ -1479,6 +1705,15 @@ function MobileCategoryEditor({
             <Icon name="trash" size={16} /> {t('deleteCategory')}
           </button>
         )}
+      </div>
+      <div className="mobile-editor-actions">
+        <button className="mobile-editor-cancel" onClick={onClose}>{t('cancel')}</button>
+        <button
+          className="mobile-editor-save"
+          onClick={() => onSave({ name, icon, color, budget: Number(budget) || 0 })}
+        >
+          {editing ? t('save') : t('create')}
+        </button>
       </div>
     </div>
   )

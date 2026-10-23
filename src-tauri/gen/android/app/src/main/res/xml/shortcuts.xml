@@ -28,6 +28,21 @@
             android:targetClass="com.sharky.miapp.MainActivity"
             android:data="sharky://shortcut/add-income" />
     </shortcut>
+    <!-- Cobrar es la accion del dia de quien vende: quien revende servicios
+         abre la app para eso y para nada mas, y tenia que pasar por la
+         pantalla de inicio y una pestana para llegar. -->
+    <shortcut
+        android:shortcutId="collect"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_collect_short"
+        android:shortcutLongLabel="@string/shortcut_collect_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.sharky.miapp"
+            android:targetClass="com.sharky.miapp.MainActivity"
+            android:data="sharky://shortcut/collect" />
+    </shortcut>
     <shortcut
         android:shortcutId="reports"
         android:enabled="true"

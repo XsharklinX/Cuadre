@@ -1,6 +1,8 @@
 import { advanceRecurrenceDate, firstRecurrenceDate } from '@/hooks/useRecurring'
 import { accountBalanceInBase, localToday } from '@/data/helpers'
 import { convertCurrency } from '@/data/currencies'
+import { outstanding, type Charge, type Client } from '@/data/clients'
+import { averageDelay } from '@/data/receivables'
 import type { Account, CurrencyCode, Goal, Transaction } from '@/types'
 
 export interface CashflowEvent {
@@ -8,7 +10,14 @@ export interface CashflowEvent {
   note: string
   /** Positivo = entra dinero, negativo = sale. */
   amount: number
-  kind: 'income' | 'expense' | 'goal'
+  /**
+   * `charge` es un cobro esperado a un cliente.
+   *
+   * Tiene su propio tipo y no es `income` a propósito: un recibo recurrente es
+   * un compromiso TUYO y va a pasar; que te paguen depende de otra persona. En
+   * la pantalla se distinguen, y en «¿cuánto puedo gastar?» no cuentan.
+   */
+  kind: 'income' | 'expense' | 'goal' | 'charge'
   sourceId: string           // tx template id o goal id
   categoryId?: string
 }
@@ -19,6 +28,12 @@ export interface CashflowDay {
   net: number
   /** Saldo total proyectado al cierre de este día. */
   balance: number
+}
+
+/** Lo que te deben y entra en el horizonte, aparte del resto. */
+export interface CashflowReceivables {
+  charges: Charge[]
+  clients: Client[]
 }
 
 export interface CashflowProjection {
@@ -64,9 +79,18 @@ export interface SafeToSpend {
 export function safeToSpend(projection: CashflowProjection, buffer = 0): SafeToSpend {
   // Primer ingreso futuro (entra dinero). Marca la frontera: lo que caiga antes
   // hay que cubrirlo con el saldo de hoy; lo de después ya lo cubre el ingreso.
+  /*
+   * Un cobro a un cliente NO cuenta como «tu próximo ingreso».
+   *
+   * Esta cifra es la que el usuario lee antes de gastar, y la frontera decide
+   * cuánto de lo que viene tiene que cubrir con lo que tiene hoy. Si la pone
+   * un cobro, la app estaría diciendo «gasta tranquilo, el jueves te pagan»
+   * —una promesa de otra persona—. Los cobros se ven en la proyección; lo
+   * gastable se calcula sin ellos.
+   */
   let nextIncome: SafeToSpend['nextIncome'] = null
   for (const day of projection.days) {
-    const inc = day.events.find(e => e.amount > 0)
+    const inc = day.events.find(e => e.amount > 0 && e.kind !== 'charge')
     if (inc) { nextIncome = { date: day.date, note: inc.note, amount: inc.amount }; break }
   }
 
@@ -108,6 +132,7 @@ export function projectCashflow(
   horizon: string,
   today = localToday(),
   base?: CurrencyCode,
+  receivables?: CashflowReceivables,
 ): CashflowProjection {
   const startBalance = currentTotalBalance(accounts, base)
   const events: CashflowEvent[] = []
@@ -138,6 +163,57 @@ export function projectCashflow(
       }
       next = advanceRecurrenceDate(next, template.recurring)
       guard++
+    }
+  }
+
+  /*
+   * LO QUE TE DEBEN, CON EL RETRASO QUE DE VERDAD TIENEN.
+   *
+   * ── POR QUÉ ENTRA AQUÍ ────────────────────────────────────────────────
+   * Esta pantalla contesta «¿me alcanza hasta fin de mes?», y para quien cobra
+   * a clientes la respuesta depende de ellos. Dejarlos fuera hacía que la
+   * proyección dijera que no llegas cuando en realidad te deben el doble de lo
+   * que te falta. Un cobro esperado no es dinero —y por eso no suma a ningún
+   * saldo— pero esto no es un saldo: es el futuro, igual que un recibo que
+   * tampoco ha pasado todavía.
+   *
+   * ── POR QUÉ DESPLAZADO Y NO EN SU FECHA ──────────────────────────────
+   * Si un cliente lleva meses pagando nueve días tarde, ponerle el dinero el
+   * día 1 es inventarse una puntualidad que no tiene, y la proyección mentiría
+   * a favor —el peor sentido en el que puede mentir­—. La app ya mide ese
+   * retraso (`averageDelay`) y lo usaba solo como etiqueta; aquí sirve para
+   * algo: cada cobro cae en la fecha en la que ese cliente suele pagar.
+   *
+   * ── LO QUE NO SE PROYECTA ────────────────────────────────────────────
+   * Lo YA atrasado. Un cobro vencido no tiene fecha: puede llegar mañana o
+   * nunca, y ponerle un día sería elegir uno al azar.
+   */
+  if (receivables) {
+    const { charges, clients } = receivables
+    for (const client of clients) {
+      const suyos = charges.filter(c => c.clientId === client.id)
+      const retraso = Math.max(0, averageDelay(suyos) ?? 0)
+      const tasa = base && client.currency && client.currency !== base
+        ? convertCurrency(1, client.currency, base)
+        : 1
+
+      for (const charge of suyos) {
+        if (charge.waived) continue
+        const falta = outstanding(charge)
+        if (falta <= 0) continue
+        // Lo atrasado se queda fuera: no tiene fecha que proyectar.
+        if (charge.dueDate <= today) continue
+        const fecha = retraso > 0 ? addDays(charge.dueDate, retraso) : charge.dueDate
+        if (fecha > horizon) continue
+        events.push({
+          date: fecha,
+          note: client.name,
+          amount: falta * tasa,
+          kind: 'charge',
+          sourceId: charge.id,
+          categoryId: client.categoryId,
+        })
+      }
     }
   }
 

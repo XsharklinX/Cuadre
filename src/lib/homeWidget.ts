@@ -1,6 +1,8 @@
 import { isTauri } from '@/hooks/useTauri'
 import { useFinance } from '@/store/finance'
 import { useSettings } from '@/store/settings'
+import { useBusiness } from '@/store/business'
+import { receivablesSummary } from '@/data/receivables'
 import { firstRecurrenceDate } from '@/hooks/useRecurring'
 import { accountCurrency, amountForCategory, availableBalanceInBase, currentMonthKey, dateLocale, fmt, fmtCompact, localToday, rollingNetWorthSeries, totals, transactionsForTotals, txForMonth, visibleAccounts } from '@/data/helpers'
 import { CURRENCIES } from '@/data/seed'
@@ -27,7 +29,7 @@ function buildWidgetSnapshot(): string {
   const { language, widgetAccountIds } = useSettings.getState()
 
   const mkey = currentMonthKey()
-  const visTx = transactionsForTotals(transactions, accounts, currency)
+  const visTx = transactionsForTotals(transactions, accounts, currency, categories)
   const monthTx = txForMonth(visTx, mkey)
   const locale = dateLocale(language)
 
@@ -118,6 +120,28 @@ function buildWidgetSnapshot(): string {
     ? new Date(fetchedAt).toLocaleDateString(locale, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })
     : ''
 
+  /*
+   * LO QUE TE DEBEN, EN LA PANTALLA DE INICIO.
+   *
+   * Es la cifra que mira todos los dias quien vive de cobrar, y abrir la app
+   * para verla es justo el trabajo que un widget existe para ahorrar. Va
+   * `null` cuando no hay clientes, para que el widget no reserve sitio a una
+   * seccion vacia.
+   */
+  const cobros = (() => {
+    const { charges } = useBusiness.getState()
+    if (!charges.length) return null
+    const r = receivablesSummary(charges, localToday())
+    if (r.outstandingTotal <= 0 && r.lateCount === 0) return null
+    return {
+      lateLabel: fmtCompact(r.lateAmount, currency),
+      lateCount: r.lateCount,
+      weekLabel: fmtCompact(r.weekAmount, currency),
+      weekCount: r.weekCount,
+      collectedLabel: fmtCompact(r.collectedThisMonth, currency),
+    }
+  })()
+
   return JSON.stringify({
     // Compacto para el 2x2 (donde una cifra larga se corta) y completo para el 4x2.
     totalBalanceLabel: fmtCompact(totalBalance, currency),
@@ -134,6 +158,7 @@ function buildWidgetSnapshot(): string {
     ratesBase: currency,
     ratesBaseLabel: `${getCurrencyMeta(currency).flag} ${currency}`,
     ratesUpdatedLabel,
+    receivables: cobros,
   })
 }
 

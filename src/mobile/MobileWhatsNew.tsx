@@ -21,8 +21,14 @@ function compareVersions(a: string, b: string): number {
   return 0
 }
 
-/** La última versión cuyas novedades ya vio el usuario. */
-function readSeenVersion(): string | null {
+/**
+ * La última versión cuyas novedades ya vio el usuario.
+ *
+ * Se exporta porque el cartel de versión mayor necesita saber DE DÓNDE viene
+ * el usuario, no solo que hay algo nuevo. Leerlo dos veces desde dos sitios
+ * distintos acabaría con dos ideas distintas de «ya visto».
+ */
+export function readSeenVersion(): string | null {
   try {
     return localStorage.getItem(SEEN_KEY)
   } catch {

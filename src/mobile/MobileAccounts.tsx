@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCarouselTilt } from '@/hooks/useCarouselTilt'
 import { Icon } from '@/components/ui/Icon'
 import { toast } from '@/components/ui/Toast'
 import { AnimatedMoney } from '@/components/ui/AnimatedMoney'
@@ -19,7 +20,7 @@ import { MobileBankPicker } from './MobileBankPicker'
 import { NetworkMark } from '@/components/ui/NetworkMark'
 import { useFinance } from '@/store/finance'
 import { useSettings } from '@/store/settings'
-import { useFmt } from '@/hooks/useFmt'
+import { useFmt, useMoneyDecimals } from '@/hooks/useFmt'
 import { playAccountsSound, playConfirmSound, playDeleteSound } from '@/lib/sound'
 import { deleteWithUndo } from '@/lib/undoDelete'
 import { translateCategoryName, useT } from '@/i18n'
@@ -55,6 +56,24 @@ const GROUP_LABEL: Record<CardGroupId, 'credit' | 'debit' | 'savings'> = {
   credit: 'credit', debit: 'debit', savings: 'savings',
 }
 
+/**
+ * La fila de tarjetas de un grupo.
+ *
+ * Existe solo para darle al carrusel su propio `ref`: hay un carrusel por
+ * grupo (crédito, débito, ahorro) y la inclinación necesita el elemento que
+ * de verdad se desplaza, no uno compartido entre los tres. En modo lista no
+ * hay inclinación porque no hay nada que deslizar.
+ */
+function CardsRow({ carousel, children }: { carousel: boolean; children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null)
+  useCarouselTilt(ref, carousel)
+  return (
+    <div ref={ref} className={carousel ? 'sacc-carousel' : 'sacc-cardlist'} role="list">
+      {children}
+    </div>
+  )
+}
+
 export function MobileAccounts({ mkey, createRequest, onEditTx, onDeleteTx }: {
   mkey: string
   createRequest?: ViewProps['createRequest']
@@ -63,6 +82,7 @@ export function MobileAccounts({ mkey, createRequest, onEditTx, onDeleteTx }: {
 }) {
   const { accounts, currency, addAccount, updateAccount, deleteAccount, restoreAccount } = useFinance()
   const fmtVal = useFmt()
+  const moneyDecimals = useMoneyDecimals()
   const t = useT()
   const TYPE_META = getTypeMeta(t)
   // Guardamos el id, no el objeto: si la cuenta cambia mientras el detalle
@@ -274,7 +294,7 @@ export function MobileAccounts({ mkey, createRequest, onEditTx, onDeleteTx }: {
                     </span>
                   </div>
 
-                  <div className={cardsView === 'list' ? 'sacc-cardlist' : 'sacc-carousel'} role="list">
+                  <CardsRow carousel={cardsView !== 'list'}>
                     {group.accounts.map(a => {
                       const fig = cardFigures(a, currency)
                       const bank = findBank(a.bankId) ?? guessBank(a.name)
@@ -371,8 +391,12 @@ export function MobileAccounts({ mkey, createRequest, onEditTx, onDeleteTx }: {
                               )}
                               <span className="sacc-plastic-figs">
                                 <small>{a.type === 'credit' ? t('cardOwedLabel') : t('cardAvailableLabel')}</small>
+                                {/* La cifra de la tarjeta LLEGA contando desde
+                                    cero en vez de aparecer puesta: es la que
+                                    manda en esta pantalla, y verla subir dice
+                                    que cambió — y cuánto — sin leer nada. */}
                                 <b className={a.type === 'credit' ? 'owed' : ''}>
-                                  {fmtVal(fig.primary, fig.currency)}
+                                  <AnimatedMoney value={fig.primary} currency={fig.currency} decimals={moneyDecimals} />
                                 </b>
                                 {/* Una tarjeta dominicana arrastra dos deudas
                                     que el banco liquida por separado. */}
@@ -411,7 +435,7 @@ export function MobileAccounts({ mkey, createRequest, onEditTx, onDeleteTx }: {
                           </button>
                         )
                     })}
-                  </div>
+                  </CardsRow>
                 </div>
               ))}
             </div>

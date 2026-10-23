@@ -833,9 +833,25 @@
 
 .sacc-plastic {
   aspect-ratio: 1.586;
-  background: linear-gradient(145deg,
-    color-mix(in oklab, var(--card) 88%, #000 12%) 0%,
-    color-mix(in oklab, var(--card) 62%, #000 38%) 100%);
+  /*
+   * PLASTICO, NO UN RECTANGULO DE COLOR.
+   *
+   * Antes era un degradado del color elegido y poco mas. Una tarjeta de verdad
+   * tiene un brillo arriba a la izquierda —de donde viene la luz—, el canto
+   * iluminado en el borde superior y el canto oscuro abajo, que es el grosor
+   * del plastico. Los tres juntos son lo que hace que se lea como un objeto.
+   *
+   * El color lo sigue poniendo el usuario: esto solo le añade material.
+   */
+  background:
+    radial-gradient(120% 85% at 16% 6%, rgba(255,255,255,.20), transparent 56%),
+    linear-gradient(145deg,
+      color-mix(in oklab, var(--card) 88%, #000 12%) 0%,
+      color-mix(in oklab, var(--card) 62%, #000 38%) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.30),
+    inset 0 -1px 0 rgba(0,0,0,.42),
+    0 10px 22px rgba(0,0,0,.34);
   border: 0;
   border-radius: 16px;
   color: #fff;
@@ -929,8 +945,14 @@
   position: relative;
   width: 26px;
 }
-.sacc-plastic.credit .sacc-chip { background: linear-gradient(140deg, #f5d98b, #c9a44c); }
-.sacc-plastic.debit  .sacc-chip { background: linear-gradient(140deg, #e8e8ea, #a9adb6); }
+.sacc-plastic.credit .sacc-chip {
+  background: linear-gradient(140deg, #fff0c4, #f5d98b 38%, #b8923f);
+  box-shadow: inset 0 .5px 0 rgba(255,255,255,.65), 0 1px 2px rgba(0,0,0,.4);
+}
+.sacc-plastic.debit  .sacc-chip {
+  background: linear-gradient(140deg, #fbfbfc, #e8e8ea 38%, #9aa0aa);
+  box-shadow: inset 0 .5px 0 rgba(255,255,255,.7), 0 1px 2px rgba(0,0,0,.4);
+}
 .sacc-chip > i { background: rgba(0,0,0,.26); position: absolute; }
 .sacc-chip > i:first-child { height: .5px; left: 3px; right: 3px; top: 50%; }
 .sacc-chip > i:last-child  { bottom: 3px; left: 50%; top: 3px; width: .5px; }
@@ -947,6 +969,9 @@
 .sacc-plastic-figs b {
   display: block;
   font-size: 19px;
+  /* Grabado: una sombra abajo y una luz arriba, como los numeros en relieve
+     de una tarjeta de verdad. */
+  text-shadow: 0 1px 1px rgba(0,0,0,.42), 0 -.5px 0 rgba(255,255,255,.16);
   font-variant-numeric: tabular-nums;
   font-weight: 800;
   letter-spacing: -.02em;

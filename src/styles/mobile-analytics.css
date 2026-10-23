@@ -11,6 +11,28 @@
   position: static;
 }
 
+/*
+ * NEGOCIO O PERSONAL.
+ *
+ * Va debajo del periodo y con menos peso: el periodo es la pregunta de
+ * siempre, el ambito es una excepcion que se pone y se quita. Mismo control
+ * que el de arriba para que se lea como lo que es —otro filtro de la misma
+ * pantalla— y no como una seccion nueva.
+ */
+.man-scope {
+  margin: 0 16px;
+  position: static;
+}
+.man-scope button { font-size: 12.5px; }
+/* Con un filtro puesto se dice QUE se esta mirando: si no, las cifras de
+   abajo parecen las de siempre y no cuadran con nada. */
+.man-scope-note {
+  color: var(--m-muted);
+  font-size: 11.5px;
+  line-height: 1.45;
+  margin: -4px 16px 0;
+}
+
 .man-hero,
 .man-panel {
   background: var(--m-surface);
@@ -861,6 +883,7 @@ button.man-quick-card {
 
 @media (max-width: 420px) {
   .man-tabs,
+  .man-scope,
   .man-metrics {
     margin: 0 10px;
     padding: 0;
@@ -1151,3 +1174,27 @@ button.man-quick-card {
   font-variant-numeric: tabular-nums;
   font-weight: 800;
 }
+
+  /* ── LA GRAFICA SE DIBUJA ────────────────────────────────────────────
+     Guia el ojo en el sentido del tiempo y termina señalando donde estas hoy.
+     Medio segundo: mas y se vuelve un espectaculo que hay que esperar cada vez
+     que entras a la pantalla. */
+  .man-nw-linea {
+    animation: manTrazo 620ms cubic-bezier(.3, .7, .3, 1) both;
+    stroke-dasharray: 1;
+  }
+  @keyframes manTrazo {
+    from { stroke-dashoffset: 1; }
+    to { stroke-dashoffset: 0; }
+  }
+  .man-nw-area { animation: manArea 620ms ease-out both; }
+  @keyframes manArea { from { opacity: 0; } to { opacity: 1; } }
+  /* El punto llega cuando la linea ya termino de contarlo. */
+  .man-nw-hoy { animation: manPunto 260ms cubic-bezier(.2, 1.4, .4, 1) 560ms both; }
+  @keyframes manPunto {
+    from { opacity: 0; transform-box: fill-box; transform-origin: center; transform: scale(0); }
+    to { opacity: 1; transform-box: fill-box; transform-origin: center; transform: scale(1); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .man-nw-linea, .man-nw-area, .man-nw-hoy { animation: none; stroke-dashoffset: 0; }
+  }

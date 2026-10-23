@@ -1300,3 +1300,131 @@
     color: var(--warn);
   }
   .mobile-create-advance:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* ── VARIAS CATEGORIAS EN UN GASTO ──────────────────────────────────
+     El numero dice en que ORDEN se eligio y la X permite soltarla sin tener
+     que adivinar que volver a tocarla la quita. Van sobre el icono, no al
+     lado, porque la celda ya es estrecha y partirla en dos la vuelve
+     ilegible. */
+  .mobile-category-grid button { position: relative; }
+  .mobile-cat-orden {
+    align-items: center;
+    background: var(--m-primary);
+    border-radius: 999px;
+    color: var(--m-primary-text);
+    display: flex;
+    font-family: inherit;
+    font-size: 9.5px;
+    font-style: normal;
+    font-weight: 900;
+    height: 17px;
+    justify-content: center;
+    left: 50%;
+    margin-left: 5px;
+    min-width: 17px;
+    padding: 0 3px;
+    position: absolute;
+    top: -3px;
+  }
+  .mobile-cat-quitar {
+    align-items: center;
+    background: var(--m-expense);
+    border-radius: 999px;
+    color: #fff;
+    display: flex;
+    height: 17px;
+    justify-content: center;
+    position: absolute;
+    right: 50%;
+    margin-right: 5px;
+    top: -3px;
+    width: 17px;
+  }
+  .mobile-cat-quitar:active { transform: scale(.88); }
+
+  /* El reparto. Solo sale con dos o mas: con una, una fila de desglose seria
+     ruido sobre algo que ya se entiende. */
+  .mobile-split {
+    background: var(--m-surface);
+    border: 1px solid var(--m-border);
+    border-radius: 16px;
+    display: grid;
+    gap: 7px;
+    margin-top: 10px;
+    padding: 11px 13px;
+  }
+  .mobile-split.field-error {
+    border-color: #ff4d6d;
+    box-shadow: 0 0 0 2px #ff4d6d44;
+  }
+  .mobile-split-head {
+    align-items: center;
+    color: var(--m-muted);
+    display: flex;
+    font-size: 11px;
+    font-weight: 800;
+    justify-content: space-between;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+  }
+  .mobile-split-head button {
+    background: color-mix(in oklab, var(--m-primary) 16%, transparent);
+    border: 0;
+    border-radius: 8px;
+    color: var(--m-primary);
+    font-family: inherit;
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: 0;
+    padding: 4px 9px;
+    text-transform: none;
+  }
+  .mobile-split-row {
+    align-items: center;
+    display: flex;
+    gap: 9px;
+  }
+  .mobile-split-row > i {
+    align-items: center;
+    border-radius: 999px;
+    color: #06231a;
+    display: flex;
+    flex: none;
+    font-size: 10px;
+    font-style: normal;
+    font-weight: 900;
+    height: 19px;
+    justify-content: center;
+    width: 19px;
+  }
+  .mobile-split-row > span {
+    flex: 1;
+    font-size: 13px;
+    font-weight: 650;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mobile-split-row input {
+    background: var(--m-surface-2);
+    border: 1px solid var(--m-border);
+    border-radius: 9px;
+    color: var(--m-text);
+    flex: none;
+    font-family: inherit;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 750;
+    min-height: 34px;
+    padding: 0 9px;
+    text-align: right;
+    width: 94px;
+  }
+  .mobile-split-resto {
+    color: var(--m-expense);
+    font-size: 11.5px;
+    font-weight: 700;
+    margin: 0;
+  }
+  .mobile-split-resto b { font-variant-numeric: tabular-nums; }

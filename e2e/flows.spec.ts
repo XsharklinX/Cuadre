@@ -36,6 +36,16 @@ async function boot(page: Page, finance: unknown = demoFinance()) {
 
 const nav = (page: Page, name: string) => page.getByLabel(/Navegaci/).getByRole('button', { name, exact: true }).click()
 
+/**
+ * Abre Perfil.
+ *
+ * Dejo de ser una pestaña de la barra inferior —ese sitio lo ocupa ahora
+ * Negocio— y vive en la cabecera, junto al engranaje. Perfil no es un destino:
+ * es una pantalla de ajustes a la que se entra de vez en cuando, y tenia uno de
+ * los cuatro sitios fijos.
+ */
+const goProfile = (page: Page) => page.getByRole('button', { name: 'Perfil' }).first().click()
+
 test('crear un gasto de extremo a extremo lo guarda', async ({ page }) => {
   await boot(page)
   await nav(page, 'Agregar')
@@ -65,7 +75,26 @@ test('editar un movimiento conserva su categoría', async ({ page }) => {
   await boot(page, finance)
 
   await page.locator('.mobile-tx-row', { hasText: 'Almuerzo' }).first().click({ force: true })
-  await page.locator('.mobile-transaction-sheet').getByRole('button', { name: /Editar/ }).click({ force: true })
+
+  /*
+   * Hay que esperar a que la hoja TERMINE de subir, y por eso este clic NO
+   * lleva `force`.
+   *
+   * Las hojas entran desde fuera de la pantalla, como una hoja de verdad.
+   * `force: true` se salta las comprobaciones de accionabilidad, y entre ellas
+   * esta la de ESTABILIDAD: con force, Playwright calcula el punto del boton
+   * mientras la hoja todavia se mueve, hace clic en esas coordenadas, y el
+   * boton ya no esta ahi — el clic aterriza en el fondo oscuro, que cierra la
+   * hoja. El test acababa de vuelta en Movimientos sin nada abierto, y fallaba
+   * una vez de cada dos segun lo cargada que estuviera la maquina.
+   *
+   * `toBeInViewport` no protegia de eso: pasa en cuanto el boton asoma por el
+   * borde, con la hoja a medio camino. Sin `force`, el clic espera a que el
+   * boton deje de moverse, que es exactamente lo que hacia falta.
+   */
+  const editar = page.locator('.mobile-transaction-sheet').getByRole('button', { name: /Editar/ })
+  await expect(editar).toBeInViewport()
+  await editar.click()
 
   const catRow = page.locator('.mpr-form-row').filter({ hasText: 'Categoría' })
   await expect(catRow).toContainText('Comida')
@@ -115,8 +144,12 @@ test('crear una meta y aportarle refleja el saldo', async ({ page }) => {
 test('crear un presupuesto lo muestra en la lista', async ({ page }) => {
   await boot(page)
   // Menú de herramientas (☰) → Presupuestos
+  //
+  // Se busca POR TEXTO, no por posición. Antes era `.first()`, y al añadir una
+  // herramienta nueva al menú el test empezó a abrir otra pantalla y a fallar
+  // por un cambio que no tenía nada que ver con los presupuestos.
   await page.locator('.mobile-topbar-menu').click()
-  await page.locator('.mobile-tools-row').first().click()
+  await page.locator('.mobile-tools-row', { hasText: /Presupuestos|Budgets/ }).first().click()
   await expect(page.locator('.mbud-root')).toBeVisible()
 
   await page.locator('.mbud-add-btn, .mbud-empty button').first().click()
@@ -150,17 +183,121 @@ test('las herramientas del menú ☰ abren sin caer en el error boundary', async
   }
 })
 
+/*
+ * EL CAMINO CRITICO DE NEGOCIO, DE EXTREMO A EXTREMO.
+ *
+ * Cubre lo unico que no se puede equivocar en todo el modulo: que «Me pago»
+ * cree un MOVIMIENTO DE VERDAD en el libro. Todo lo demas de Negocio son
+ * expectativas que no mueven dinero; este paso si, y es la frontera entre las
+ * dos mitades.
+ *
+ * Si esto se rompiera, un cobro quedaria marcado como pagado sin ingreso
+ * detras: el libro diria una cosa y la lista de clientes otra, y nadie sabria
+ * cual creer. Por eso se comprueba el saldo al final, no solo la pantalla.
+ */
+test('registrar un cliente y cobrarle crea el ingreso en el libro', async ({ page }) => {
+  await boot(page)
+
+  // Negocio es la cuarta pestaña de la barra: dejo de estar en el menu ☰
+  // cuando ocupo el sitio que tenia Perfil.
+  await nav(page, 'Negocio')
+  await expect(page.locator('.mbiz-screen')).toBeVisible()
+
+  // Sin clientes, la pantalla ofrece crear el primero.
+  await page.locator('.mbiz-empty button').first().click()
+  await expect(page.locator('.mbizs')).toBeVisible()
+
+  await page.locator('.mbizs-input').first().fill('Juan Perez')
+  // El monto es el cuarto campo de texto (nombre, concepto, telefono, monto).
+  await page.locator('.mbizs-input[type="number"]').first().fill('250')
+  await page.locator('.mbizs-save').click()
+  await expect(page.locator('.mbizs')).toHaveCount(0)
+
+  // El cliente aparece, y con el su cobro del ciclo en curso.
+  await expect(page.locator('.mbiz-client', { hasText: 'Juan Perez' })).toHaveCount(1)
+  const cobro = page.locator('.mbiz-charge').first()
+  await expect(cobro).toBeVisible()
+
+  await cobro.click()
+  await expect(page.locator('.mbizs-hero')).toBeVisible()
+  await page.locator('.mbizs-save').click()
+  await expect(page.locator('.mbizs')).toHaveCount(0)
+
+  await expect(page.getByText(ERROR_BOUNDARY)).toHaveCount(0)
+
+  /*
+   * LA COMPROBACION QUE IMPORTA: el ingreso esta en el libro de verdad.
+   *
+   * Se lee del almacen persistido y no de la pantalla: una pantalla puede
+   * pintar un numero correcto por casualidad, pero si el movimiento no esta
+   * guardado, al reabrir la app el dinero no existe.
+   */
+  const libro = await page.evaluate(() => {
+    const raw = localStorage.getItem('sharky-finance-v2')
+    return raw ? JSON.parse(raw).state : null
+  })
+  expect(libro).not.toBeNull()
+  const ingresos = (libro.transactions as Array<{ type: string; amount: number }>)
+    .filter(t => t.type === 'income')
+  expect(ingresos).toHaveLength(1)
+  expect(ingresos[0].amount).toBe(250)
+  // Y el saldo de la cuenta subio con el: 5000 + 250.
+  expect((libro.accounts as Array<{ balance: number }>)[0].balance).toBe(5250)
+})
+
+/*
+ * MARCAR UN CAPRICHO Y VERLO EN EL BOTE.
+ *
+ * La version anterior traia toda la logica del bote, su almacen y sus pruebas,
+ * y NINGUNA forma de crear uno: la pantalla solo podia estar vacia. Este test
+ * existe para que eso no pueda repetirse — recorre el camino entero desde el
+ * gasto hasta el bote.
+ */
+test('marcar un gasto como capricho lo lleva al bote', async ({ page }) => {
+  await boot(page)
+
+  // Un gasto cualquiera, marcado como capricho al crearlo. Mismo camino que el
+  // test de crear un gasto, para no inventar otra forma de llegar.
+  await nav(page, 'Agregar')
+  await page.locator('.mobile-category-grid button', { hasText: 'Comida' }).first().click()
+  for (const k of ['3', '2', '0', '0']) {
+    await page.locator('.mobile-keypad-compact button', { hasText: new RegExp(`^${k}$`) }).first().click()
+  }
+  await page.locator('.mobile-create-pad-account').first().click()
+  await page.locator('.mobile-picker-row').first().click()
+  await page.locator('.mobile-create-caprice').click()
+  await expect(page.locator('.mobile-create-caprice.on')).toBeVisible()
+  await page.locator('.mobile-done-button').click()
+  await page.waitForTimeout(400)
+
+  // El bote existe y lleva el monto del gasto.
+  await page.locator('.mobile-topbar-menu').click()
+  await page.locator('.mobile-tools-row', { hasText: /El bote|The jar/ }).first().click()
+  await expect(page.locator('.mcap-hero')).toBeVisible()
+  await expect(page.locator('.mcap-hero strong')).toContainText('3,200')
+
+  await expect(page.getByText(ERROR_BOUNDARY)).toHaveCount(0)
+
+  // Y esta guardado de verdad, no solo pintado.
+  const botes = await page.evaluate(() => {
+    const raw = localStorage.getItem('cuadre-caprices-v1')
+    return raw ? JSON.parse(raw).state.items : []
+  })
+  expect(botes).toHaveLength(1)
+  expect(botes[0].amount).toBe(3200)
+})
+
 test('las tarjetas Explorar del Perfil abren sin caer en el error boundary', async ({ page }) => {
   await boot(page)
-  await nav(page, 'Perfil')
+  await goProfile(page)
   await expect(page.locator('.mpr-explore-tile').first()).toBeVisible({ timeout: 8000 })
   const tiles = await page.locator('.mpr-explore-tile').count()
   expect(tiles).toBeGreaterThan(0)
 
   // Suscripciones, Reporte anual, Calendario. Cada tarjeta abre una sub-vista;
-  // se vuelve tocando la pestaña Perfil de la barra inferior.
+  // se vuelve tocando Perfil en la cabecera.
   for (let i = 0; i < tiles; i++) {
-    await nav(page, 'Perfil')
+    await goProfile(page)
     await expect(page.locator('.mpr-explore-tile').nth(i)).toBeVisible()
     await page.locator('.mpr-explore-tile').nth(i).click()
     await page.waitForTimeout(350)
@@ -170,14 +307,14 @@ test('las tarjetas Explorar del Perfil abren sin caer en el error boundary', asy
 
 test('Deudas y Flujo de caja (KPI del Perfil) abren sin caer en el error boundary', async ({ page }) => {
   await boot(page)
-  await nav(page, 'Perfil')
+  await goProfile(page)
   await expect(page.locator('.mpr-kpi-card').first()).toBeVisible({ timeout: 8000 })
   const cards = await page.locator('.mpr-kpi-card').count()
   expect(cards).toBeGreaterThanOrEqual(2)
 
   // Las dos primeras tarjetas KPI abren Deudas y Flujo de caja (vistas lazy).
   for (let i = 0; i < 2; i++) {
-    await nav(page, 'Perfil')
+    await goProfile(page)
     await expect(page.locator('.mpr-kpi-card').nth(i)).toBeVisible()
     await page.locator('.mpr-kpi-card').nth(i).click()
     await page.waitForTimeout(400)

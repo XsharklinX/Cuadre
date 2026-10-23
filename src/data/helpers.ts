@@ -390,12 +390,40 @@ export function accountSavingsRate(accounts: Account[]): number {
  */
 export function transactionsForTotals(
   transactions: Transaction[], accounts: Account[], base?: CurrencyCode,
+  categories?: Category[],
 ): Transaction[] {
   const excluded = new Set(accounts.filter(a => a.includeInTotal === false).map(a => a.id))
   const filtered = excluded.size === 0
     ? transactions
     : transactions.filter(t => !t.accountId || !excluded.has(t.accountId))
-  return base ? convertTxAmountsToBase(filtered, accounts, base) : filtered
+  // Las categorías llegan opcionales por compatibilidad: quien no las pase
+  // obtiene el comportamiento de siempre. Pasarlas quita además los
+  // movimientos que no describen nada (los ajustes de cuadre).
+  const reportables = categories ? reportable(filtered, categories) : filtered
+  return base ? convertTxAmountsToBase(reportables, accounts, base) : reportables
+}
+
+/**
+ * Quita los movimientos cuya categoría está marcada fuera de informes.
+ *
+ * Es UNA función y no una condición repetida en cada pantalla a propósito: hay
+ * quince sitios en la app que suman movimientos, y una regla copiada quince
+ * veces es una regla que acabará aplicándose en catorce.
+ *
+ * Las transferencias nunca se filtran: no tienen categoría y no suman a
+ * ingresos ni a gastos, así que no hay nada que excluir.
+ */
+export function reportable(transactions: Transaction[], categories: Category[]): Transaction[] {
+  const fuera = new Set(categories.filter(c => c.excludeFromReports).map(c => c.id))
+  if (fuera.size === 0) return transactions
+  return transactions.filter(t => !t.categoryId || !fuera.has(t.categoryId))
+}
+
+/** Los movimientos que SÍ son ajustes, para poder contarlos aparte. */
+export function adjustmentsOnly(transactions: Transaction[], categories: Category[]): Transaction[] {
+  const fuera = new Set(categories.filter(c => c.excludeFromReports).map(c => c.id))
+  if (fuera.size === 0) return []
+  return transactions.filter(t => !!t.categoryId && fuera.has(t.categoryId))
 }
 
 /**

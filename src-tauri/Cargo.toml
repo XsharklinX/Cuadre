@@ -1,6 +1,6 @@
 [package]
 name        = "sharky"
-version     = "1.9.11"
+version     = "2.1.0"
 description = "Cuadre - Gestion de gastos"
 edition     = "2021"
 

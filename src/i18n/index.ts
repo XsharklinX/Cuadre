@@ -44,6 +44,10 @@ export const CATEGORY_NAME_MAP: Record<string, { es: string; en: string }> = {
   cat_salario: { es: 'Salario',         en: 'Salary' },
   cat_free:    { es: 'Freelance',       en: 'Freelance' },
   cat_inv:     { es: 'Inversiones',     en: 'Investments' },
+  // Las dos del ajuste de cuadre, que la app crea sola al conciliar. Van aquí
+  // para que no se queden en español cuando el usuario cambia de idioma.
+  cat_ajuste_in:  { es: 'Ajuste de cuadre', en: 'Balance adjustment' },
+  cat_ajuste_out: { es: 'Ajuste de cuadre', en: 'Balance adjustment' },
 }
 
 /** Traduce el nombre de una categoría semilla si aún tiene su nombre original (es/en). */

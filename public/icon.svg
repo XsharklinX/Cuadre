@@ -12,40 +12,91 @@
       x/y de 87 a 425), para que Android pueda recortarlo redondo, cuadrado
       o en gota sin comerse una esquina.
     · Los degradados son de UN solo tono cada uno — profundidad, no arcoíris.
+
+    ── EL FONDO LLEVA id="bg" Y ESO IMPORTA ──────────────────────────────
+    `scripts/gen-icons.mjs` construye la capa FRONTAL del ícono adaptativo
+    quitando este rect. Lo hacía con una expresión que exigía un solo carácter
+    entre `<rect` y `/>`, así que nunca casaba: la capa frontal se generaba con
+    el fondo oscuro incluido, y Android la escala al 66% — quedaba un cuadrado
+    opaco dentro del ícono en vez de las tarjetas flotando sobre el fondo real.
+    Ahora se quita por id, que no se puede fallar por accidente.
+
+    ── DE DÓNDE VIENE LA PROFUNDIDAD ─────────────────────────────────────
+    De tres cosas, ninguna de ellas un desenfoque:
+    · cada tarjeta tiene su propia sombra de contacto, desplazada hacia abajo;
+    · el canto superior lleva un filo claro y el inferior uno oscuro, que es
+      el grosor del plástico;
+    · la luz entra desde arriba a la izquierda, igual en las dos, así que el
+      par se lee como dos objetos bajo la misma lámpara.
   -->
   <defs>
-    <linearGradient id="fondo" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#12403C"/>
-      <stop offset="1" stop-color="#06211F"/>
+    <linearGradient id="fondo" x1="0" y1="0" x2="0.75" y2="1">
+      <stop offset="0" stop-color="#17514A"/>
+      <stop offset="0.55" stop-color="#0C332F"/>
+      <stop offset="1" stop-color="#05191A"/>
     </linearGradient>
-    <linearGradient id="oro" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#FFD166"/>
-      <stop offset="1" stop-color="#F09F1A"/>
+    <!-- Oro: tres paradas del MISMO tono. La clara arriba a la izquierda es
+         de donde viene la luz; la oscura abajo a la derecha es la sombra
+         propia de la tarjeta. -->
+    <linearGradient id="oro" x1="0.08" y1="0" x2="0.78" y2="1">
+      <stop offset="0" stop-color="#FFE9B5"/>
+      <stop offset="0.42" stop-color="#F6B43A"/>
+      <stop offset="1" stop-color="#BE7D12"/>
     </linearGradient>
-    <linearGradient id="turquesa" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#5FEBC9"/>
-      <stop offset="1" stop-color="#17A38E"/>
+    <linearGradient id="turquesa" x1="0.08" y1="0" x2="0.78" y2="1">
+      <stop offset="0" stop-color="#A6FFE8"/>
+      <stop offset="0.42" stop-color="#3ED3B4"/>
+      <stop offset="1" stop-color="#0E7566"/>
+    </linearGradient>
+    <!-- El filo: claro arriba, se apaga a la mitad. Es lo que da grosor sin
+         dibujar un borde completo, que a tamaño pequeño ensucia la forma. -->
+    <linearGradient id="filo" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.55"/>
+      <stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0.06"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0.22"/>
     </linearGradient>
   </defs>
 
-  <rect width="512" height="512" fill="url(#fondo)"/>
+  <!--
+    EL FONDO ENTERO VA EN ESTE GRUPO, y por eso lleva el id.
+
+    `scripts/gen-icons.mjs` quita este grupo para construir la capa FRONTAL del
+    ícono adaptativo, que debe ser solo las tarjetas sobre transparencia.
+
+    La luz ambiente va DENTRO del grupo a propósito: es iluminación del fondo,
+    no parte del dibujo. Cuando estaba fuera, viajaba en la capa frontal y
+    pintaba un disco tenue sobre el fondo real del lanzador.
+  -->
+  <g id="bg">
+    <rect width="512" height="512" fill="url(#fondo)"/>
+    <!-- Un círculo muy tenue, no un filtro: a 48dp desaparece sin dejar mancha. -->
+    <circle cx="118" cy="86" r="196" fill="#3ED3B4" opacity="0.10"/>
+  </g>
 
   <!-- Tarjeta de atrás, girada a la izquierda -->
   <g transform="rotate(-9 223 213)">
+    <!-- Su sombra de contacto: antes solo la tenía la de delante, así que la
+         de atrás parecía pegada al fondo en vez de apoyada sobre él. -->
+    <rect x="85" y="134" width="275" height="180" rx="38" fill="#02100E" opacity="0.42"/>
     <rect x="85" y="123" width="275" height="180" rx="38" fill="url(#oro)"/>
+    <rect x="85" y="123" width="275" height="180" rx="38" fill="none" stroke="url(#filo)" stroke-width="3"/>
   </g>
 
-  <!-- Sombra de contacto: da el orden de apilado sin usar un filtro -->
+  <!-- Sombra de contacto de la de delante: da el orden de apilado sin filtro -->
   <g transform="rotate(7 299 308)">
-    <rect x="161" y="218" width="275" height="180" rx="38" fill="#04120F" opacity="0.28"/>
+    <rect x="161" y="232" width="275" height="180" rx="38" fill="#02100E" opacity="0.52"/>
   </g>
 
   <!-- Tarjeta de delante, girada a la derecha -->
   <g transform="rotate(7 299 308)">
     <rect x="161" y="218" width="275" height="180" rx="38" fill="url(#turquesa)"/>
+    <rect x="161" y="218" width="275" height="180" rx="38" fill="none" stroke="url(#filo)" stroke-width="3"/>
     <!-- La banda: lo poco que hace falta para que se lea "tarjeta" y no
          "rectángulo". A 48dp desaparece, y está bien: a ese tamaño lo que
          se reconoce es el par de formas superpuestas. -->
-    <rect x="190" y="276" width="114" height="19" rx="9" fill="#08332D" opacity="0.42"/>
+    <rect x="190" y="276" width="114" height="19" rx="9" fill="#06302A" opacity="0.5"/>
+    <!-- Grabado: una línea clara en el canto superior de la banda, como el
+         relieve de una banda magnética de verdad. -->
+    <rect x="190" y="276" width="114" height="4" rx="2" fill="#0B4A40" opacity="0.55"/>
   </g>
 </svg>

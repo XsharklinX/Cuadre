@@ -3,6 +3,7 @@ import { Icon } from '@/components/ui/Icon'
 import { CatBadge } from '@/views/shared'
 import { accountCurrency, dateLocale, fmt, getAccount, getCategory } from '@/data/helpers'
 import { matchSynonymCategoryIds, normalizeSearchText, parseSearchQuery } from '@/data/searchQuery'
+import { amountDistance, matchesNearAmount, parseNearAmount } from '@/data/amountSearch'
 import { useFinance } from '@/store/finance'
 import { useSettings } from '@/store/settings'
 import { translateCategoryName, useT } from '@/i18n'
@@ -81,6 +82,22 @@ export function MobileGlobalSearch({
     [parsedQuery, categories],
   )
 
+  /*
+   * BUSCAR POR MONTO APROXIMADO.
+   *
+   * Solo cuando lo tecleado es SOLO una cifra, y solo si no hay ya un filtro
+   * explícito («más de 1000» manda sobre esto). No sustituye al match de
+   * texto: se suma. Lo que hoy aparece al teclear «2450» seguirá apareciendo;
+   * lo que se añade son los 2,448 y los 2,460, que como texto no se parecen
+   * en nada a lo buscado y nadie encontraba nunca.
+   */
+  const nearAmount = useMemo(
+    () => (parsedQuery && !parsedQuery.amountFilter && !parsedQuery.tagFilters.length && !parsedQuery.monthFilter)
+      ? parseNearAmount(parsedQuery.freeText)
+      : null,
+    [parsedQuery],
+  )
+
   const matchedTx = useMemo(() => {
     if (!q || !parsedQuery) return []
     const monthKeyFilter = parsedQuery.monthFilter
@@ -105,6 +122,10 @@ export function MobileGlobalSearch({
         }
         if (!freeText) return true
 
+        // El monto cercano entra por su cuenta, antes del texto: si no, un
+        // 2,448 se descartaría por no contener los dígitos tecleados.
+        if (nearAmount && matchesNearAmount(tx.amount, nearAmount)) return true
+
         const category = getCategory(tx.categoryId, categories)
         if (synonymCategoryIds.length && category && synonymCategoryIds.includes(category.id)) return true
 
@@ -120,9 +141,17 @@ export function MobileGlobalSearch({
           .join(' '))
         return haystack.includes(freeText)
       })
-      .sort((a, b) => b.date.localeCompare(a.date))
+      /*
+       * Buscando por monto, el orden lo manda la CERCANÍA a la cifra, no la
+       * fecha: quien teclea 2500 quiere ver primero el de 2,498 aunque sea de
+       * hace un año. En cualquier otra búsqueda sigue mandando la fecha.
+       */
+      .sort((a, b) => nearAmount
+        ? (amountDistance(a.amount, nearAmount) - amountDistance(b.amount, nearAmount))
+          || b.date.localeCompare(a.date)
+        : b.date.localeCompare(a.date))
       .slice(0, MAX_TX_RESULTS)
-  }, [transactions, categories, accounts, q, parsedQuery, synonymCategoryIds, lang, currency])
+  }, [transactions, categories, accounts, q, parsedQuery, synonymCategoryIds, lang, currency, nearAmount])
 
   // Etiquetas del usuario, por frecuencia — se ofrecen como chips para que el
   // filtro por `#tag` sea descubrible en vez de un truco oculto. Es la potencia
@@ -182,6 +211,17 @@ export function MobileGlobalSearch({
           </button>
         )}
       </label>
+
+      {/* El rango se ENSEÑA, con sus dos extremos. Un buscador que de pronto
+          devuelve cifras que no coinciden con lo tecleado parece roto si no
+          dice por qué; dicho, se entiende de un vistazo. */}
+      {nearAmount && (
+        <div className="msearch-near" role="status">
+          <Icon name="target" size={12} />
+          {t('searchNearAmount').replace('{amount}', fmt(nearAmount.value, currency))}
+          <small>{fmt(nearAmount.min, currency)} – {fmt(nearAmount.max, currency)}</small>
+        </div>
+      )}
 
       {topTags.length > 0 && (
         <div className="mobile-search-tags" role="group" aria-label={t('filterByTagLabel')}>

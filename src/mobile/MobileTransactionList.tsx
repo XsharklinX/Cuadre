@@ -11,6 +11,10 @@ import { playDeleteHaptic, playSoftHaptic } from '@/lib/sound'
 import { deleteWithUndo } from '@/lib/undoDelete'
 import { toast } from '@/components/ui/Toast'
 import { useFinance } from '@/store/finance'
+import { useJuice } from '@/store/juice'
+import { getReceipt } from '@/lib/receiptStore'
+import { useCaprices } from '@/store/caprices'
+import { remaining } from '@/data/caprices'
 import { useSettings } from '@/store/settings'
 import type { Transaction } from '@/types'
 import { CatBadge } from '@/views/shared'
@@ -82,6 +86,10 @@ export function MobileTransactionList({
   className?: string
 }) {
   const { accounts, categories, currency, addTx } = useFinance()
+  const landedTxId = useJuice(s => s.landedTxId)
+  const caprices = useCaprices(s => s.items)
+  const openCaprice = useCaprices(s => s.open)
+  const removeCaprice = useCaprices(s => s.remove)
   const updateTx = useFinance(s => s.updateTx)
   const storeDeleteTx = useFinance(s => s.deleteTx)
   const allTransactions = useFinance(s => s.transactions)
@@ -102,6 +110,14 @@ export function MobileTransactionList({
   const [fFrom, setFFrom] = useState('')
   const [fTo, setFTo] = useState('')
   const [selected, setSelected] = useState<Transaction | null>(null)
+  /*
+   * La foto del recibo se lee de IndexedDB al abrir el detalle, no antes.
+   * Son cientos de kilobytes por movimiento: cargarlas con la lista pondría
+   * megas en memoria para enseñar filas de texto.
+   */
+  const [receiptUrl, setReceiptUrl] = useState<string | null>(null)
+  const [receiptLoading, setReceiptLoading] = useState(false)
+  const [receiptFull, setReceiptFull] = useState(false)
   const [openActionId, setOpenActionId] = useState<string | null>(null)
   // Selección múltiple: entra con pulsación larga; en este modo tocar una fila
   // la marca en vez de abrir su detalle, y aparece una barra de acciones en lote.
@@ -220,6 +236,19 @@ export function MobileTransactionList({
     closeSwipe()
   }, [filter, query, fAccount, fCategory, fFrom, fTo, transactions])
 
+  // La foto del recibo entra al abrir el detalle y se suelta al cerrarlo.
+  useEffect(() => {
+    setReceiptFull(false)
+    if (!selected?.hasReceipt) { setReceiptUrl(null); setReceiptLoading(false); return }
+    let cancelado = false
+    setReceiptUrl(null)
+    setReceiptLoading(true)
+    getReceipt(selected.id)
+      .then(url => { if (!cancelado) setReceiptUrl(url) })
+      .finally(() => { if (!cancelado) setReceiptLoading(false) })
+    return () => { cancelado = true }
+  }, [selected])
+
   const virtualizer = useVirtualizer({
     count: items.length,
     getScrollElement: () => scrollElement,
@@ -298,6 +327,9 @@ export function MobileTransactionList({
     const income = tx.type === 'income'
     const opened = openActionId === tx.id
     const isSelected = selectedIds.has(tx.id)
+    // La fila recién guardada cae desde arriba y se asienta: cierra el gesto
+    // de guardar enseñando dónde fue a parar lo que acabas de anotar.
+    const landed = tx.id === landedTxId
     const subtitle = tx.type === 'transfer'
       ? `${mapGet(accountMap, tx.fromAccount)?.name ?? t('origin')} -> ${mapGet(accountMap, tx.toAccount)?.name ?? t('destination')}`
       : `${category ? translateCategoryName(category, lang) : t('noCategoryLabel')} • ${account?.name ?? t('noAccountLabel')}`
@@ -305,7 +337,7 @@ export function MobileTransactionList({
     // En modo selección la fila no se desliza ni abre detalle: solo marca.
     return (
       <div
-        className={`mobile-tx-swipe${opened ? ' open' : ''}${!selectMode && !compact && tx.type !== 'transfer' ? ' has-dup' : ''}${isSelected ? ' selected' : ''}`}
+        className={`mobile-tx-swipe${opened ? ' open' : ''}${!selectMode && !compact && tx.type !== 'transfer' ? ' has-dup' : ''}${isSelected ? ' selected' : ''}${landed ? ' landed' : ''}`}
         onTouchStart={selectMode ? undefined : event => { startX.current = event.touches[0]?.clientX ?? 0 }}
         onTouchEnd={selectMode ? undefined : event => {
           const delta = (event.changedTouches[0]?.clientX ?? 0) - startX.current
@@ -580,6 +612,62 @@ export function MobileTransactionList({
               <p className="mobile-tx-description">{selected.description}</p>
             )}
 
+            {/*
+              MARCAR COMO CAPRICHO, DESPUES.
+              Muchas veces uno se da cuenta al dia siguiente, asi que no basta
+              con poder marcarlo al crearlo. Solo en gastos.
+            */}
+            {selected.type === 'expense' && (() => {
+              const bote = caprices.find(c => c.txId === selected.id)
+              return (
+                <div className="mtx-caprice">
+                  <button
+                    className={bote ? 'on' : ''}
+                    aria-pressed={!!bote}
+                    onClick={() => {
+                      if (bote) {
+                        removeCaprice(bote.id)
+                        toast(t('capUnmarked'), { icon: 'check' })
+                      } else {
+                        openCaprice(selected.id, selected.amount, selected.note)
+                        playSoftHaptic()
+                        toast(t('capOpened'), { icon: 'piggy', type: 'ok' })
+                      }
+                    }}
+                  >
+                    <Icon name="piggy" size={15} />
+                    {bote ? t('capUnmark') : t('capMarkAsSplurge')}
+                  </button>
+                  {bote && (
+                    <small>
+                      {remaining(bote) > 0
+                        ? t('capRemaining').replace('{amount}', fmt(remaining(bote), currency))
+                        : t('capSettled')}
+                    </small>
+                  )}
+                </div>
+              )
+            })()}
+
+            {/* EL RECIBO.
+                Antes la foto se usaba para leer el monto y se tiraba. Ahora
+                está aquí, que es donde sirve: el mes que haya que reclamar
+                una garantía o justificar un gasto.
+                Si el movimiento dice tener recibo y la imagen no aparece, se
+                DICE por qué en vez de dejar un hueco roto: casi siempre es
+                que el libro se restauró de una copia, y las copias son JSON
+                y no llevan imágenes. */}
+            {selected.hasReceipt && (
+              <div className="mtx-receipt">
+                <span className="mtx-receipt-label">{t('receiptLabel')}</span>
+                {receiptUrl
+                  ? <img src={receiptUrl} alt={t('receiptLabel')} onClick={() => setReceiptFull(true)} />
+                  : receiptLoading
+                    ? <p className="mtx-receipt-missing">{t('receiptLoading')}</p>
+                    : <p className="mtx-receipt-missing">{t('receiptMissing')}</p>}
+              </div>
+            )}
+
             <dl>
               <div><dt>{t('date')}</dt><dd>{dateLabel(selected.date, locale)}</dd></div>
               <div><dt>{t('category')}</dt><dd>{(() => {
@@ -639,6 +727,24 @@ export function MobileTransactionList({
               }}><Icon name="trash" size={18} />{t('delete')}</button>}
             </div>
           </section>
+        </div>,
+        sheetRoot(),
+      )}
+
+      {/* El recibo a pantalla completa: un ticket de supermercado no se lee
+          en una miniatura, y leerlo es para lo único que sirve guardarlo. */}
+      {receiptFull && receiptUrl && createPortal(
+        <div
+          className="mtx-receipt-full"
+          role="dialog"
+          aria-modal="true"
+          aria-label={t('receiptLabel')}
+          onClick={() => setReceiptFull(false)}
+        >
+          <img src={receiptUrl} alt={t('receiptLabel')} />
+          <button aria-label={t('close')} onClick={() => setReceiptFull(false)}>
+            <Icon name="close" size={20} />
+          </button>
         </div>,
         sheetRoot(),
       )}

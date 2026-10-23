@@ -4,10 +4,14 @@ import { toast } from '@/components/ui/Toast'
 import { useDialogs } from '@/components/ui/DialogProvider'
 import { backupNeedsAttention, daysSinceBackup } from '@/data/backupSchedule'
 import { getDataHealthStatus } from '@/data/dataHealth'
+import { BUSINESS_ISSUE_KEY, businessHealth, isAutoFixable } from '@/data/businessHealth'
 import { accountCurrency, accountMovementsTotal, accountSecondaryMovementsTotal, dateLocale } from '@/data/helpers'
 import { useFmt } from '@/hooks/useFmt'
 import { useT } from '@/i18n'
 import { playSuccessHaptic } from '@/lib/sound'
+import { useBusiness } from '@/store/business'
+import { useCaprices } from '@/store/caprices'
+import { restoreEverything } from '@/lib/restoreAll'
 import { useFinance } from '@/store/finance'
 import { useSettings } from '@/store/settings'
 import { useDialogA11y } from './useDialogA11y'
@@ -82,6 +86,65 @@ export function MobileDataHealth({ onClose }: { onClose: () => void }) {
 
   const health = useMemo(() => getDataHealthStatus(state), [state])
 
+  /*
+   * LA MITAD NUEVA DE LA APP, QUE NO TENIA REDES.
+   *
+   * Esta pantalla es la que el usuario abre cuando algo le huele mal, y no
+   * sabia que existieran clientes ni cobros: decia «todo correcto» con cobros
+   * apuntando a movimientos borrados.
+   */
+  const negocio = useBusiness()
+  const botes = useCaprices(st => st.items)
+  const bizHealth = useMemo(() => businessHealth({
+    clients: negocio.clients,
+    businesses: negocio.businesses,
+    services: negocio.services,
+    charges: negocio.charges,
+    caprices: botes,
+    transactions: state.transactions,
+    accounts: state.accounts,
+    categories: state.categories,
+  }), [negocio, botes, state.transactions, state.accounts, state.categories])
+
+  /**
+   * Arregla los problemas que no necesitan decidir nada.
+   *
+   * Los demas piden una eleccion del usuario —a que cuenta mueves ese cliente,
+   * que categoria le pones— y hacerlo por el seria elegir en su nombre algo que
+   * afecta a su dinero. Esos se enseñan y se deja que entre a arreglarlos.
+   */
+  const arreglarNegocio = () => {
+    const txIds = new Set(state.transactions.map(tx => tx.id))
+    const clientIds = new Set(negocio.clients.map(c => c.id))
+    const businessIds = new Set(negocio.businesses.map(b => b.id))
+
+    useBusiness.setState(st => ({
+      // Un cobro cuyo movimiento ya no esta vuelve a PENDIENTE, no se borra: el
+      // cobro sigue siendo cierto, lo que se perdio es la prueba de que llego.
+      charges: st.charges
+        .filter(c => clientIds.has(c.clientId))
+        .map(c => {
+          const vivos = c.txIds.filter(id => txIds.has(id))
+          return vivos.length === c.txIds.length ? c : { ...c, txIds: vivos, paid: 0, paidAt: 0 }
+        }),
+      services: st.services.filter(v => businessIds.has(v.businessId)),
+    }))
+
+    // Un capricho SI se descarta: es la referencia a un gasto, y sin el gasto
+    // no queda nada que recuperar.
+    useCaprices.setState(st => ({
+      items: st.items
+        .filter(c => txIds.has(c.txId))
+        .map(c => {
+          const vivos = c.payments.filter(pago => txIds.has(pago.txId))
+          return vivos.length === c.payments.length ? c : { ...c, payments: vivos }
+        }),
+    }))
+
+    playSuccessHaptic()
+    toast(t('bhFixed'), { icon: 'check', type: 'ok' })
+  }
+
   /**
    * Las cuentas descuadradas CON su diferencia. Mostrar "3 cuentas
    * descuadradas" sin decir cuáles ni por cuánto no deja hacer nada: el
@@ -133,7 +196,6 @@ export function MobileDataHealth({ onClose }: { onClose: () => void }) {
   const recomputeAccount = useFinance(st => st.recomputeAccount)
   const recomputeGoal = useFinance(st => st.recomputeGoal)
   const restoreAccountBalances = useFinance(st => st.restoreAccountBalances)
-  const restoreBackup = useFinance(st => st.restoreBackup)
   const repairIncomeFees = useFinance(st => st.repairIncomeFees)
 
   /*
@@ -213,6 +275,45 @@ export function MobileDataHealth({ onClose }: { onClose: () => void }) {
               </small>
             </div>
           </div>
+
+          {/* NEGOCIO: lo que esta pantalla no sabia mirar. */}
+          {(bizHealth.clients > 0 || bizHealth.businesses > 0 || bizHealth.caprices > 0) && (
+            <div className="mhealth-biz">
+              <div className="mhealth-biz-stats">
+                <div><strong>{bizHealth.clients}</strong><small>{t('bizClients')}</small></div>
+                <div><strong>{bizHealth.charges}</strong><small>{t('bizTabCollect')}</small></div>
+                <div><strong>{fmtVal(bizHealth.outstanding, state.currency)}</strong><small>{t('bizLate')}</small></div>
+              </div>
+
+              {bizHealth.issues.length === 0 ? (
+                <p className="mhealth-biz-ok"><Icon name="check" size={13} /> {t('bhAllGood')}</p>
+              ) : (
+                <>
+                  {bizHealth.issues.map(issue => (
+                    <p className="mset-warning" key={issue.kind}>
+                      <Icon name="alert" size={13} />
+                      {t(BUSINESS_ISSUE_KEY[issue.kind] as never).replace('{n}', String(issue.ids.length))}
+                    </p>
+                  ))}
+                  {/* El boton solo si hay algo que la app pueda arreglar sola:
+                      ofrecerlo para problemas que necesitan una decision seria
+                      prometer algo que no va a pasar. */}
+                  {bizHealth.issues.some(i => isAutoFixable(i.kind)) && (
+                    <button className="mhealth-biz-fix" onClick={async () => {
+                      const ok = await confirm({
+                        title: t('bhFixTitle'),
+                        description: t('bhFixConfirm'),
+                        confirmLabel: t('bhFixAction'),
+                      })
+                      if (ok) arreglarNegocio()
+                    }}>
+                      {t('bhFixAction')}
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          )}
 
           {/*
             IMPUESTO COBRADO DE MAS EN INGRESOS.
@@ -509,7 +610,15 @@ export function MobileDataHealth({ onClose }: { onClose: () => void }) {
                       tone: 'danger',
                     })
                     if (!ok) return
-                    restoreBackup(readRecoverySnapshot(snap.id))
+                    /*
+                     * Por el sitio unico, no por `restoreBackup` a pelo.
+                     *
+                     * Un punto de recuperacion es la red de seguridad que la
+                     * app crea sola antes de cada operacion destructiva. Si
+                     * usarla te dejara los cobros apuntando a movimientos
+                     * borrados, la red seria parte del problema.
+                     */
+                    restoreEverything(readRecoverySnapshot(snap.id))
                     refreshLog()
                     toast(t('recoveryRestoredToast'), { icon: 'check', type: 'ok' })
                   }}>{t('recoveryRestoreLabel')}</button>

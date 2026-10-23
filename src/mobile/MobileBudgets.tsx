@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Icon } from '@/components/ui/Icon'
+import { EmptyArt } from '@/components/ui/EmptyArt'
 import { toast } from '@/components/ui/Toast'
 import { AnimatedMoney } from '@/components/ui/AnimatedMoney'
 import { categoryRollover, fmt, fmtCompact, prevMonthKey, transactionsForTotals, txForMonth } from '@/data/helpers'
@@ -33,7 +34,7 @@ export function MobileBudgets({ txns, mkey }: ViewProps) {
   const [editing, setEditing] = useState<Category | 'new' | null>(null)
   const [transferOpen, setTransferOpen] = useState(false)
 
-  const visTxns = transactionsForTotals(txns, accounts, currency)
+  const visTxns = transactionsForTotals(txns, accounts, currency, categories)
   const monthTx = txForMonth(visTxns, mkey)
   const prevMonthTx = txForMonth(visTxns, prevMonthKey(mkey))
   const cats = categories.filter(c => c.type === 'expense')
@@ -221,7 +222,7 @@ export function MobileBudgets({ txns, mkey }: ViewProps) {
       <div className="mbud-list">
         {cats.length === 0 ? (
           <div className="mbud-empty">
-            <span><Icon name="target" size={32} /></span>
+            <EmptyArt kind="budgets" />
             <strong>{t('noBudgetsYet')}</strong>
             <p>{t('createExpenseCategoriesHint')}</p>
             <button onClick={() => setEditing('new')}>

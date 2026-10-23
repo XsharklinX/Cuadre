@@ -65,7 +65,7 @@ export function MobileCalendar({
   const { byDay, monthIncome, monthExpense } = useMemo(() => {
     // Los montos se convierten a la divisa base ANTES de sumar: sin esto un
     // gasto de US$25 contaba como 25 PESOS en el total del dia y del mes.
-    const monthTx = txForMonth(transactionsForTotals(transactions, accounts, currency), mk)
+    const monthTx = txForMonth(transactionsForTotals(transactions, accounts, currency, categories), mk)
     const grouped = monthTx.reduce<Record<number, Transaction[]>>((acc, tx) => {
       const d = Number(tx.date.slice(8, 10))
       ;(acc[d] ??= []).push(tx)
@@ -77,7 +77,7 @@ export function MobileCalendar({
       else if (tx.type === 'expense') exp += tx.amount
     }
     return { byDay: grouped, monthIncome: inc, monthExpense: exp }
-  }, [transactions, accounts, currency, mk])
+  }, [transactions, accounts, currency, categories, mk])
 
   // Cobros PREVISTOS del mes: ocurrencias futuras de los pagos recurrentes que
   // caen en el mes mostrado. Es lo que faltaba — el calendario ahora mira hacia

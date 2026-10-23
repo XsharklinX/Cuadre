@@ -10,7 +10,8 @@ export type Sheet =
   | 'theme' | 'accent' | 'density' | 'currency' | 'overdraft' | 'name' | 'reset' | 'language'
   | 'comments' | 'about' | 'privacy' | 'terms' | 'export' | 'pin' | 'categories' | 'bankNotifications'
   | 'syncConflicts' | 'widgetAccounts' | 'backupSchedule' | 'soundProfile' | 'fxAlert' | 'anomalyAlert'
-  | 'backupPassword' | 'restorePassword' | 'categoryRules' | 'qrMigration'
+  | 'backupPassword' | 'restorePassword' | 'categoryRules' | 'qrMigration' | 'trash'
+  | 'reconcileAll' | 'periodClose' | 'archive' | 'restoreWarn'
   // Ocultas: solo existen con el modo desarrollador abierto.
   | 'dev' | 'vip'
 

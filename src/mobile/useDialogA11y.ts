@@ -1,5 +1,19 @@
 import { useEffect, useRef } from 'react'
 
+/*
+ * LA PILA DE DIÁLOGOS ABIERTOS.
+ *
+ * Cada diálogo escucha `keydown` en `window`, así que un Escape llegaba a
+ * TODOS los montados a la vez: con una hoja abierta encima de otra —la ficha
+ * de un cliente y su formulario de editar— una sola tecla cerraba las dos y
+ * te devolvía a la lista en vez de a donde estabas.
+ *
+ * El botón atás de Android ya se resolvía con una pila (ver
+ * `useMobileBackDismiss`); esto es la misma idea para el teclado: solo el de
+ * arriba se cierra.
+ */
+const dialogStack: object[] = []
+
 let mobileContentLockCount = 0
 let previousMobileContentOverflow = ''
 
@@ -61,13 +75,21 @@ export function useDialogA11y<T extends HTMLElement>(onClose: () => void, active
       firstFocusable?.focus()
     }
 
+    const token = {}
+    dialogStack.push(token)
+
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onCloseRef.current()
+      if (event.key !== 'Escape') return
+      // Solo el de arriba. Los de debajo siguen escuchando, pero callados.
+      if (dialogStack[dialogStack.length - 1] !== token) return
+      onCloseRef.current()
     }
     window.addEventListener('keydown', onKeyDown)
     lockMobileContent()
 
     return () => {
+      const idx = dialogStack.indexOf(token)
+      if (idx !== -1) dialogStack.splice(idx, 1)
       window.removeEventListener('keydown', onKeyDown)
       previous?.focus()
       unlockMobileContent()

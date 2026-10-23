@@ -11,6 +11,7 @@ import { isTauri } from '@/hooks/useTauri'
 import { tt } from '@/i18n'
 import { getNotificationAccessStatus, listenBankNotifications, takePendingBankNotifications } from '@/lib/bankNotifications'
 import { classifyBankNotification } from '@/lib/bankNotificationParser'
+import { shouldAutoEnableDetection } from '@/data/detectionAutoEnable'
 import { useBankSuggestions } from '@/store/bankSuggestions'
 import { useBankNotificationsDebug } from '@/store/bankNotificationsDebug'
 import { useFinance } from '@/store/finance'
@@ -27,6 +28,40 @@ import { useFinance } from '@/store/finance'
  */
 export function useBankNotifications() {
   const enabled = useBankSuggestions((state) => state.enabled)
+
+  /*
+   * ENCENDER LA DETECCION SOLA — Y ESTO CORRE SIEMPRE, ENCENDIDA O NO.
+   *
+   * Tiene que estar FUERA del efecto de abajo: aquel sale en su primera linea
+   * cuando `enabled` es false, que es justo el estado que hay que reparar.
+   *
+   * El encendido automatico vivia dentro de `SettingsBankNotifications`, asi
+   * que solo ocurria si el usuario entraba a Ajustes › Notificaciones. Quien
+   * concedia el permiso y no volvia a pasar por ahi se quedaba con la
+   * deteccion apagada para siempre: la cola nativa se llenaba hasta su tope y
+   * se descartaba, sin un solo error. Es el mismo fallo que ya se arreglo para
+   * el re-vinculo del servicio, pero el encendido se quedo atras.
+   *
+   * Pedir el estado repara ademas el vinculo: si el permiso esta concedido y
+   * Android solto el servicio —lo hace en cada actualizacion del APK—, el lado
+   * nativo pide el re-vinculo al consultarlo.
+   */
+  useEffect(() => {
+    if (!isTauri()) return
+    let cancelado = false
+    void getNotificationAccessStatus().then(status => {
+      if (cancelado) return
+      const bank = useBankSuggestions.getState()
+      if (shouldAutoEnableDetection({
+        granted: status.granted,
+        enabled: bank.enabled,
+        enabledSince: bank.enabledSince,
+      })) {
+        bank.setEnabled(true)
+      }
+    })
+    return () => { cancelado = true }
+  }, [])
 
   useEffect(() => {
     if (!enabled || !isTauri()) return
@@ -135,17 +170,6 @@ export function useBankNotifications() {
         draining = false
       }
     }
-
-    /*
-     * Pedir el estado REPARA de paso: el lado nativo, si ve el permiso
-     * concedido y el servicio desvinculado, pide el re-vínculo.
-     *
-     * Antes esto solo pasaba al abrir Ajustes → Detección, una pantalla a la
-     * que nadie entra. Por eso la detección podía quedarse muerta desde la
-     * actualización del APK hasta que a alguien se le ocurriera mirar. Ahora
-     * se intenta en cada arranque, que es cuando Android la había soltado.
-     */
-    void getNotificationAccessStatus()
 
     void drain() // lo capturado mientras la app estaba cerrada
 

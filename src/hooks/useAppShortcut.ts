@@ -1,10 +1,18 @@
 import { useEffect, useState } from 'react'
 import { isTauri } from './useTauri'
 
-export type AppShortcut = 'add-expense' | 'add-income' | 'reports' | 'converter' | 'accounts' | 'budgets'
+export type AppShortcut = 'add-expense' | 'add-income' | 'reports' | 'converter' | 'accounts' | 'budgets' | 'collect'
 
 const SHORTCUT_PREFIX = 'sharky://shortcut/'
-const SHORTCUT_IDS: AppShortcut[] = ['add-expense', 'add-income', 'reports', 'converter', 'accounts', 'budgets']
+/*
+ * La lista en tiempo de EJECUCION, que es la que decide.
+ *
+ * El tipo de arriba no existe en el navegador: un id que falte aqui llega
+ * desde Android, no pasa `isShortcutId` y el atajo no hace nada —sin error y
+ * sin pista—. Por eso `shortcuts.test.ts` comprueba que esta lista, el tipo y
+ * el `shortcuts.xml` de Android digan los mismos ids.
+ */
+const SHORTCUT_IDS: AppShortcut[] = ['add-expense', 'add-income', 'reports', 'converter', 'accounts', 'budgets', 'collect']
 
 function isShortcutId(id: string): id is AppShortcut {
   return (SHORTCUT_IDS as string[]).includes(id)

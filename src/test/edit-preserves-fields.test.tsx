@@ -39,6 +39,7 @@ const GASTO: Transaction = {
   id: 'tx_1', type: 'expense', amount: 800, date: '2026-09-20',
   note: 'Tostadas', accountId: 'acc_cash', categoryId: 'cat_food',
   description: 'Desayuno con Ana, incluia el cafe',
+  hasReceipt: true,
 } as Transaction
 
 const TRANSFERENCIA: Transaction = {
@@ -92,6 +93,22 @@ describe('editar sin cambiar nada', () => {
     expect(g.date).toBe(GASTO.date)
     expect(g.accountId).toBe(GASTO.accountId)
     expect(g.categoryId).toBe(GASTO.categoryId)
+  })
+
+  /*
+   * La marca del recibo es el MISMO riesgo que la descripcion, y por eso esta
+   * aqui: `normalizeTransaction` reconstruye el movimiento desde una lista
+   * blanca, asi que cualquier campo nuevo que no se nombre ahi se borra solo
+   * al editar. La foto seguiria en IndexedDB y el movimiento habria dejado de
+   * saber que existe — invisible para siempre, sin ningun error.
+   */
+  it('un gasto conserva la marca de su recibo', () => {
+    seed(GASTO)
+    render(<TransactionForm value={GASTO} mkey="2026-09" onClose={vi.fn()} onDelete={vi.fn()} />)
+    guardarSinCambios()
+
+    const guardado = useFinance.getState().transactions.find(t => t.id === 'tx_1')!
+    expect(guardado.hasReceipt).toBe(true)
   })
 
   /* La transferencia sí la cargaba; se comprueba para que siga haciéndolo. */

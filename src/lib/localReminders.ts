@@ -6,6 +6,11 @@ import { useSettings } from '@/store/settings'
 import { firstRecurrenceDate } from '@/hooks/useRecurring'
 import { amountForCategory, currentMonthKey, dateLocale, fmtCompact, localToday, txForMonth } from '@/data/helpers'
 import { currentRate, fxAlertTriggered } from '@/data/fxAlerts'
+import { readFxHistory } from '@/data/exchangeRates'
+import { changeOver, seriesFor } from '@/data/fxHistory'
+import { chargesToRemind } from '@/data/chargeReminders'
+import { daysLate, outstanding } from '@/data/clients'
+import { useBusiness } from '@/store/business'
 import { getCurrencyMeta } from '@/data/currencies'
 import { detectSpendingAnomalies } from '@/data/financeIntelligence'
 import { useNotificationHistory, type NotificationHistoryEntry } from '@/store/notificationHistory'
@@ -125,12 +130,34 @@ function buildReminderSnapshot(): string {
     threshold: fxAlertThreshold,
     direction: fxAlertDirection,
   }
+  /*
+   * EL AVISO LLEVA LA CIFRA, NO EL UMBRAL.
+   *
+   * Antes el titulo era «El USD subio sobre tu limite» y el numero quedaba en
+   * el cuerpo, que en una notificacion colapsada no se ve. Asi que el aviso
+   * avisaba de que algo habia pasado sin decir QUE: para enterarte del valor
+   * del dolar habia que abrir la app, que es justo lo que el aviso venia a
+   * ahorrar.
+   *
+   * Ahora el titulo ES la cifra, y el cuerpo explica por que suena y cuanto se
+   * movio desde la ultima vez — eso ultimo solo si hay historial suficiente,
+   * porque inventarse un «subio» sin con que comparar seria peor que callarlo.
+   */
+  const fxRate = currentRate(fxAlertCurrency as CurrencyCode, currency)
+  const fxPoints = seriesFor(readFxHistory(), fxAlertCurrency as CurrencyCode, 30)
+  const fxChange = changeOver(fxPoints)
   const fx = fxAlertTriggered(fxConfig, currency) ? {
     currency: fxAlertCurrency,
-    rateLabel: fmtCompact(currentRate(fxAlertCurrency as CurrencyCode, currency), currency),
+    rate: fxRate,
+    rateLabel: fmtCompact(fxRate, currency),
     thresholdLabel: fmtCompact(fxAlertThreshold, currency),
     direction: fxAlertDirection,
     currencyFlag: getCurrencyMeta(fxAlertCurrency as CurrencyCode).flag,
+    // El movimiento, si hay con que compararlo.
+    changeLabel: fxChange && fxChange.direction !== 'flat'
+      ? fmtCompact(Math.abs(fxChange.delta), currency)
+      : '',
+    changeUp: fxChange ? fxChange.direction === 'up' : false,
   } : null
 
   // Gasto inusual: solo transacciones de hoy, para que el worker avise una
@@ -148,6 +175,33 @@ function buildReminderSnapshot(): string {
     : []
 
   const on = (kind: ReminderKind) => isReminderKindOn(reminderKinds, kind)
+
+  /*
+   * Los cobros que TOCA recordar hoy, con su nombre para el aviso.
+   *
+   * No son todos los pendientes: salia uno cada dia por cada cobro atrasado,
+   * asi que un cliente con cuarenta dias de retraso generaba cuarenta avisos
+   * identicos. Un aviso diario se aprende a descartar sin leerlo, y el dia
+   * que llega uno que si importaba ya se descarto con los demas.
+   *
+   * Ahora van en escalera —el dia que vence, a los 3 y a los 7— y despues
+   * silencio. Ver `chargeReminders.ts`.
+   */
+  const chargesSnapshot = (() => {
+    const { charges, clients } = useBusiness.getState()
+    const hoy = localToday()
+    return chargesToRemind(charges, hoy)
+      .map(c => {
+        const cliente = clients.find(x => x.id === c.clientId)
+        return {
+          id: `charge:${c.id}:${hoy}`,
+          name: cliente?.name ?? '',
+          amountLabel: fmtCompact(outstanding(c), cliente?.currency ?? currency),
+          daysLate: daysLate(c, hoy),
+        }
+      })
+      .filter(c => !!c.name)
+  })()
 
   return JSON.stringify({
     dismissedAlerts,
@@ -170,6 +224,12 @@ function buildReminderSnapshot(): string {
       weeklyTitle:        tt('notifWeeklyTitle'),
       fxTitle:            tt('notifFxTitle'),
       fxText:             tt('notifFxText'),
+      fxTextChange:       tt('notifFxTextChange'),
+      chargeTodayTitle:   tt('notifChargeTodayTitle'),
+      chargeLateTitle:    tt('notifChargeLateTitle'),
+      chargeText:         tt('notifChargeText'),
+      fxUp:               tt('notifFxUp'),
+      fxDown:             tt('notifFxDown'),
       anomalyTitle:       tt('notifAnomalyTitle'),
       anomalyText:        tt('notifAnomalyText'),
       today:              tt('notifToday'),
@@ -187,6 +247,15 @@ function buildReminderSnapshot(): string {
     weekly:     on('weekly') ? weekly : null,
     fx:         on('fx') ? fx : null,
     anomalies:  on('anomaly') ? anomaliesSnapshot : [],
+    /*
+     * COBRAR ES ACORDARSE DE PEDIRLO.
+     *
+     * El dia que a un cliente le toca pagar, un aviso. Van los de hoy y los
+     * atrasados; nada mas, porque un aviso por cada cobro futuro seria ruido.
+     * Reusa el interruptor de 'recurring': quien apago los recordatorios de
+     * pagos no quiere que le recuerden los cobros tampoco.
+     */
+    charges: on('recurring') ? chargesSnapshot : [],
   })
 }
 
@@ -244,7 +313,7 @@ interface NativeHistoryRecord {
 
 function isNotificationTargetType(v: unknown): v is NotificationTargetType {
   return typeof v === 'string' &&
-    ['budget', 'recurring', 'lowfunds', 'goal', 'weekly', 'fx', 'anomaly', 'activity'].includes(v)
+    ['budget', 'recurring', 'lowfunds', 'goal', 'weekly', 'fx', 'anomaly', 'activity', 'charge'].includes(v)
 }
 
 /**

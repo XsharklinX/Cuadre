@@ -4,7 +4,9 @@ import { Icon } from '@/components/ui/Icon'
 import { BrandLogo } from '@/components/ui/BrandLogo'
 import { toast } from '@/components/ui/Toast'
 import { currentMonthKey, dateLocale, fmt, localToday } from '@/data/helpers'
+import { serviceCostPerMonth, type Service } from '@/data/business'
 import { detectSubscriptions, subscriptionInsightKey as insightKey, type SubscriptionInsight } from '@/data/financeIntelligence'
+import { useBusiness } from '@/store/business'
 import { deleteWithUndo } from '@/lib/undoDelete'
 import { CURRENCIES } from '@/data/seed'
 import { SUBSCRIPTION_CATALOG, suggestedCategoryId, type SubscriptionCatalogItem } from '@/data/subscriptionCatalog'
@@ -132,7 +134,26 @@ export function MobileSubscriptions() {
   const monthly   = recurring.filter(tx => tx.recurring === 'monthly')
   const weekly    = recurring.filter(tx => tx.recurring === 'weekly')
 
-  const totalMonthly = recurring.reduce((s, tx) => s + monthlyEquivalent(tx), 0)
+  /*
+   * LO QUE REVENDES NO ES GASTO TUYO.
+   *
+   * Quien revende Netflix lo tiene apuntado dos veces —la suscripción real y
+   * el servicio de su negocio— y esta pantalla sumaba ese Netflix a «lo que
+   * gastas al mes en suscripciones». No lo está gastando: lo cubren sus
+   * clientes, y la cifra que de verdad quería ver salía inflada.
+   *
+   * Las dos siguen contando en el libro, porque el dinero sí sale de su
+   * cuenta. Lo que cambia es de quién se dice que es el gasto.
+   */
+  const services = useBusiness(s => s.services)
+  const esRevendida = (tx: Transaction) =>
+    !!tx.resoldAs && services.some(v => v.id === tx.resoldAs)
+
+  const revendidas = recurring.filter(esRevendida)
+  const propias = recurring.filter(tx => !esRevendida(tx))
+
+  const totalMonthly = propias.reduce((s, tx) => s + monthlyEquivalent(tx), 0)
+  const totalResold = revendidas.reduce((s, tx) => s + monthlyEquivalent(tx), 0)
   const totalAnnual = totalMonthly * 12
   const nextRecurring = [...recurring].sort((a, b) => (a.recurringNext ?? a.date).localeCompare(b.recurringNext ?? b.date))[0]
 
@@ -284,6 +305,13 @@ export function MobileSubscriptions() {
               {t(recurring.length === 1 ? 'recurringPaymentSingular' : 'recurringPaymentPlural').replace('{n}', String(recurring.length))}
               {' · '}{t('annualEquivalentLabel').replace('{amount}', fmt(totalAnnual, currency))}
             </div>
+            {/* Solo si hay alguna: con ninguna, esta línea solo explicaría una
+                función que el usuario no usa. */}
+            {totalResold > 0 && (
+              <div className="msub-hero-resold">
+                {t('subResoldTotal')}: <b>{fmt(totalResold, currency)}</b>
+              </div>
+            )}
           </div>
           <span className="msub-hero-icon">
             <Icon name="repeat" size={26} />
@@ -359,6 +387,24 @@ export function MobileSubscriptions() {
 
               {!sheet.confirm ? (
                 <>
+                  <ResoldRow
+                    tx={sheet.tx}
+                    services={services}
+                    currency={currency}
+                    t={t}
+                    onPick={id => {
+                      /*
+                       * `undefined` quita el enlace, no cadena vacía:
+                       * `normalizeTransaction` reconstruye desde una lista
+                       * blanca y una cadena vacía se guardaría como un enlace
+                       * a un servicio con id «».
+                       */
+                      updateTx(sheet.tx.id, { resoldAs: id || undefined })
+                      const svc = services.find(v => v.id === id)
+                      if (svc) toast(t('subResoldSaved').replace('{name}', svc.name), { icon: 'check', type: 'ok' })
+                      setSheet(st => st ? { ...st, tx: { ...st.tx, resoldAs: id || undefined } } : st)
+                    }}
+                  />
                   <button className="msub-action-btn" onClick={() => handleSkipNext(sheet.tx)}>
                     <Icon name="calendar" size={16} /> {t('skipNextOccurrence')}
                   </button>
@@ -395,6 +441,67 @@ export function MobileSubscriptions() {
       {adding && (
         <AddSubscriptionSheet dialogRef={addRef} categories={categories} accounts={accounts} currency={currency}
           lang={lang} t={t} onClose={() => setAdding(false)} onConfirm={handleAddSubscription} />
+      )}
+    </div>
+  )
+}
+
+/**
+ * «ESTA LA REVENDO»: el enlace con un servicio de Negocio.
+ *
+ * Va en la hoja de la suscripción y no en la ficha del servicio porque es
+ * aquí, mirando el recibo, donde al usuario se le ocurre que ese gasto no es
+ * suyo del todo.
+ *
+ * ── EL AVISO DEL DESCUADRE ────────────────────────────────────────────
+ * Si el recibo son 750 al mes y en el servicio declaró 600, su ganancia está
+ * calculada con 600 y se cree 150 más rico cada mes. Son dos números que el
+ * usuario escribió en sitios distintos sin forma de compararlos; una vez
+ * enlazados, la app puede decirlo. No se corrige solo: cuál de los dos es el
+ * bueno lo sabe él, no la app.
+ */
+function ResoldRow({ tx, services, currency, t, onPick }: {
+  tx: Transaction
+  services: Service[]
+  currency: CurrencyCode
+  t: ReturnType<typeof useT>
+  onPick: (serviceId: string) => void
+}) {
+  const enlazado = services.find(v => v.id === tx.resoldAs)
+
+  if (!services.length) {
+    return <p className="msub-resold-empty">{t('subResoldNoServices')}</p>
+  }
+
+  const declarado = enlazado ? serviceCostPerMonth(enlazado, currency) : 0
+  const real = monthlyEquivalent(tx)
+  // Un peso de diferencia es redondeo, no un descuadre que merezca un aviso.
+  const descuadra = !!enlazado && Math.abs(declarado - real) > 1
+
+  return (
+    <div className="msub-resold">
+      <label className="msub-resold-label" htmlFor="msub-resold-pick">
+        {t('subResoldTitle')}
+      </label>
+      <select
+        id="msub-resold-pick"
+        className="msub-resold-pick"
+        value={tx.resoldAs ?? ''}
+        onChange={e => onPick(e.target.value)}
+      >
+        <option value="">{t('subResoldNone')}</option>
+        {services.map(v => (
+          <option key={v.id} value={v.id}>{v.name}</option>
+        ))}
+      </select>
+      <small>{t('subResoldHint')}</small>
+      {descuadra && (
+        <p className="msub-resold-warn">
+          {t('subResoldMismatch')
+            .replace('{name}', enlazado.name)
+            .replace('{declared}', fmt(declarado, currency))
+            .replace('{real}', fmt(real, currency))}
+        </p>
       )}
     </div>
   )

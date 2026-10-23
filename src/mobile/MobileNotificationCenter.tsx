@@ -18,6 +18,9 @@ import { ACCT_ICONS, useBankSuggestionActions } from './settings/bankSuggestionA
 
 const HISTORY_ICONS: Record<NotificationTargetType, IconName> = {
   budget: 'wallet',
+  // Los cobros comparten icono con los pagos recurrentes: para el usuario
+  // son la misma clase de aviso, «algo de dinero pasa hoy».
+  charge: 'repeat',
   recurring: 'repeat',
   lowfunds: 'alert',
   goal: 'target',

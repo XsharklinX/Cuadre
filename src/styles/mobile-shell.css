@@ -57,8 +57,24 @@
     --m-radius: 20px;
     --m-radius-lg: 26px;
     --m-touch: 44px;
+    /*
+     * ALTURA, NO SOLO BORDES.
+     *
+     * En oscuro la altura se cuenta con el TONO y la sombra: lo que esta mas
+     * cerca es mas claro y proyecta mas. Antes casi todo vivia en el mismo
+     * tono, separado por un borde de un pixel, asi que la pantalla no tenia
+     * orden — todo pesaba igual.
+     *
+     * Tres niveles y basta. Con mas, la diferencia entre dos contiguos deja de
+     * verse y vuelve a ser ruido.
+     */
+    --m-surface-3: color-mix(in oklab, var(--surface-2, #242424) 82%, var(--text, #f5f5f5) 18%);
     --m-elevation: 0 18px 44px rgba(0,0,0,.26);
     --m-elevation-sm: 0 10px 28px rgba(0,0,0,.18);
+    --m-elevation-lg: 0 26px 60px rgba(0,0,0,.42);
+    /* El filo iluminado de arriba: lo que separa una superficie elevada de un
+       rectangulo mas claro. Va con la sombra, nunca solo. */
+    --m-filo: inset 0 1px 0 color-mix(in oklab, var(--text, #f5f5f5) 11%, transparent);
     --m-duration-fast: 160ms;
     --m-duration: 190ms;
     --m-duration-slow: 220ms;
@@ -161,6 +177,30 @@
       box-shadow: 0 0 0 1px var(--m-border), 0 24px 80px rgba(0,0,0,.5);
     }
   }
+  /*
+   * LA ENTRADA CONTINUA EL SPLASH DE ANDROID.
+   *
+   * El icono del sistema se retira en cuanto la app pinta su primer fotograma;
+   * el contenido crece desde el centro, que es de donde venia. El fondo del
+   * splash ya coincide con el de la app, asi que no hay salto de color — eso
+   * era lo que mas delataba el corte.
+   *
+   * Corta, 380ms: es un relevo, no una presentacion, y se ve en cada arranque.
+   * NO añade tiempo — corre con la app ya lista, no antes. El splash propio
+   * que hubo se quito porque eran dos segundos encima del de Android, y esto
+   * no lo devuelve.
+   */
+  .mobile-shell-entrada > * {
+    animation: mobileEntrada 380ms cubic-bezier(.22, .78, .3, 1) both;
+  }
+  @keyframes mobileEntrada {
+    from { opacity: 0; transform: scale(.965); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .mobile-shell-entrada > * { animation: none; }
+  }
+
   .mobile-shell {
     background: var(--m-bg);
     color: var(--m-text);
@@ -1629,6 +1669,27 @@
   .mobile-tool-pane-prev {
     animation: mobileToolPanePrev var(--m-duration) var(--m-ease-out) both;
   }
+  /*
+   * ENTRA POR DONDE FUISTE.
+   *
+   * Antes las cuatro pestañas principales se desvanecian 6px hacia ARRIBA,
+   * igual en los dos sentidos: nada decia si ibas hacia delante o hacia atras.
+   * Las sub-pestañas ya lo hacian bien; esto las iguala.
+   *
+   * El desplazamiento es corto (18px) a proposito: lo que orienta es la
+   * DIRECCION, no la distancia, y un recorrido largo se siente lento en un
+   * gesto que se repite todo el dia.
+   */
+  .mobile-route-next { animation-name: mobile-route-next; }
+  .mobile-route-prev { animation-name: mobile-route-prev; }
+  @keyframes mobile-route-next {
+    from { opacity: .4; transform: translate3d(18px, 0, 0); }
+    to { opacity: 1; transform: translate3d(0, 0, 0); }
+  }
+  @keyframes mobile-route-prev {
+    from { opacity: .4; transform: translate3d(-18px, 0, 0); }
+    to { opacity: 1; transform: translate3d(0, 0, 0); }
+  }
   @keyframes mobile-route-in {
     from { opacity: .88; transform: translate3d(0, 6px, 0); }
     to { opacity: 1; transform: translate3d(0, 0, 0); }
@@ -1651,10 +1712,16 @@
   }
   @media (prefers-reduced-motion: reduce) {
     .mobile-route,
+    .mobile-route-next,
+    .mobile-route-prev,
     .mobile-report-pane-next,
     .mobile-report-pane-prev,
     .mobile-tool-pane-next,
-    .mobile-tool-pane-prev {
+    .mobile-tool-pane-prev,
+    /* Las hojas tambien: subir media pantalla es justo el movimiento que
+       molesta a quien pide menos animacion. */
+    .mobile-detail-sheet,
+    .mobile-detail-sheet section {
       animation: none;
     }
   }
@@ -1787,7 +1854,9 @@
     background: var(--m-surface);
     border: 1px solid var(--m-border);
     border-radius: 22px;
-    box-shadow: var(--m-elevation-sm);
+    /* La sombra sola no eleva: hace falta el filo de arriba, que es lo que
+       distingue una superficie elevada de un rectangulo mas claro. */
+    box-shadow: var(--m-elevation-sm), var(--m-filo);
     overflow: hidden;
   }
   .mobile-list-card.mobile-list-card-flat {
@@ -2337,7 +2406,11 @@
   .mobile-detail-sheet {
     align-items: flex-end;
     animation: mobile-overlay-in var(--m-duration-fast) var(--m-ease) both;
-    background: rgba(0,0,0,.55);
+    /* El desenfoque es lo que separa la hoja del fondo. Sin el, el velo oscuro
+       solo apaga la pantalla y la hoja parece pegada encima. */
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    background: rgba(0,0,0,.52);
     bottom: 0;
     display: flex;
     left: 0;
@@ -2349,10 +2422,19 @@
     z-index: 125;
   }
   .mobile-detail-sheet section {
-    animation: mobile-sheet-up var(--m-duration) var(--m-ease-out);
+    /*
+     * SUBE, NO APARECE.
+     *
+     * Antes entraba desvaneciendose desde 18px: a esa distancia el movimiento
+     * no se lee como «viene de abajo», solo como un parpadeo. Ahora recorre su
+     * propia altura con un rebote corto, que es lo que cuenta de donde vino y
+     * por donde se ira.
+     */
+    animation: mobile-sheet-up var(--m-duration-slow) cubic-bezier(.2, 1.12, .32, 1);
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 26px 26px 0 0;
+    box-shadow: var(--m-elevation-lg), var(--m-filo);
     color: var(--text);
     max-height: min(88dvh, calc(calc(100dvh / var(--fs, 1)) - env(safe-area-inset-top) - 12px));
     overflow-y: auto;
@@ -2362,13 +2444,39 @@
     touch-action: pan-y pinch-zoom;
     width: 100%;
   }
+  /*
+   * EL ASA, con un pseudo-elemento.
+   *
+   * Es la señal universal de «esto se arrastra», y ponerla a mano obligaria a
+   * tocar cada una de las hojas de la app — y a que la siguiente que alguien
+   * escriba se olvide. Aqui sale en todas a la vez.
+   *
+   * Va `sticky` porque la hoja es su propio contenedor con scroll: sin eso, al
+   * deslizar el contenido el asa se iria hacia arriba y desapareceria.
+   */
+  .mobile-detail-sheet:not(.centered) > section::before {
+    background: color-mix(in oklab, var(--text) 24%, transparent);
+    border-radius: 999px;
+    content: '';
+    display: block;
+    flex: none;
+    height: 4px;
+    margin: -4px auto 13px;
+    position: sticky;
+    top: 0;
+    width: 38px;
+    z-index: 3;
+  }
+
   /* Variante centrada: para sheets cortos que deben verse completos sin
-     quedar tapados por la barra inferior (p.ej. detalle de transacción) */
+     quedar tapados por la barra inferior (p.ej. detalle de transacción).
+     Sin asa: no se arrastra, es un dialogo. */
   .mobile-detail-sheet.centered {
     align-items: center;
     padding: 16px;
   }
   .mobile-detail-sheet.centered section {
+    animation: mobile-sheet-pop var(--m-duration) cubic-bezier(.2, 1.1, .35, 1);
     border-radius: 24px;
     max-height: calc(calc(100dvh / var(--fs, 1)) - 32px);
     max-width: 420px;
@@ -3286,8 +3394,14 @@
     transform: rotate(90deg);
   }
   @keyframes mobile-sheet-up {
-    from { opacity: 0; transform: translateY(18px); }
+    from { opacity: .4; transform: translateY(100%); }
     to { opacity: 1; transform: translateY(0); }
+  }
+  /* El dialogo centrado no sube: crece desde su sitio. Subirlo desde abajo
+     diria que se arrastra, y no se arrastra. */
+  @keyframes mobile-sheet-pop {
+    from { opacity: 0; transform: scale(.94); }
+    to { opacity: 1; transform: scale(1); }
   }
   @keyframes mobile-overlay-in {
     from { background: rgba(0,0,0,0); }

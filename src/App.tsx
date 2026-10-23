@@ -1,10 +1,15 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { useFinance } from '@/store/finance'
 import { useSettings } from '@/store/settings'
+import { useArchive } from '@/store/archive'
+import { useCaprices } from '@/store/caprices'
+import { useTrash } from '@/store/trash'
 import { useT } from '@/i18n'
 import { currentMonthKey, monthKeys } from '@/data/helpers'
 import { ToastHost } from '@/components/ui/Toast'
 import { deleteWithUndo } from '@/lib/undoDelete'
+import { installTapFeedback } from '@/lib/tapFeedback'
+import { pruneOrphanReceipts } from '@/lib/receiptStore'
 import { DialogProvider } from '@/components/ui/DialogProvider'
 import { useRecurring } from '@/hooks/useRecurring'
 import { useGoalAutoContributions } from '@/hooks/useGoalAutoContributions'
@@ -36,6 +41,7 @@ import { useWhatsNew } from '@/hooks/useWhatsNew'
 import { MobileBatteryGuide } from '@/mobile/MobileBatteryGuide'
 import { MobileCardRescue } from '@/mobile/MobileCardRescue'
 import { MobileWhatsNew } from '@/mobile/MobileWhatsNew'
+import { MobileWelcome2 } from '@/mobile/MobileWelcome2'
 import { useExitConfirm } from '@/mobile/useExitConfirm'
 import { useMobileBackDismiss } from '@/mobile/useMobileBackDismiss'
 import type { Sheet } from '@/mobile/settings/shared'
@@ -50,6 +56,10 @@ const MobileUpdateDialog = lazy(() => import('@/mobile/MobileUpdateDialog').then
 const MobileSettings = lazy(() => import('@/mobile/MobileSettings').then(m => ({ default: m.MobileSettings })))
 const MobileBudgets = lazy(() => import('@/mobile/MobileBudgets').then(m => ({ default: m.MobileBudgets })))
 const MobileGoals = lazy(() => import('@/mobile/MobileGoals').then(m => ({ default: m.MobileGoals })))
+// Negocio: pantalla nueva de la 2.0 y la mas grande del lote. Diferida para
+// que no engorde el arranque de quien no la use.
+const MobileBusiness = lazy(() => import('@/mobile/MobileBusiness').then(m => ({ default: m.MobileBusiness })))
+const MobileCaprices = lazy(() => import('@/mobile/MobileCaprices').then(m => ({ default: m.MobileCaprices })))
 
 const CalendarView = lazy(() => import('@/views/Calendar').then(m => ({ default: m.Calendar })))
 const MobileNotesView = lazy(() => import('@/mobile/MobileNotes').then(m => ({ default: m.MobileNotes })))
@@ -58,6 +68,8 @@ export default function App() {
   const s = useSettings()
   const t = useT()
   const { transactions, addTx, deleteTx } = useFinance()
+  const pushToTrash = useTrash(s => s.push)
+  const popFromTrash = useTrash(s => s.pop)
 
   const { hydrated } = useAppLockHydration()
 
@@ -82,6 +94,60 @@ export default function App() {
     s.setLanguageAutoDetected(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated, s.languageAutoDetected, s.hasSeenOnboarding])
+
+  /*
+   * EL TOQUE QUE DEVUELVE ALGO.
+   *
+   * `playTapHaptic` llevaba versiones escrita y sin llamar desde ningún sitio:
+   * la app tenía el golpe de vibración más corto que existe y no lo usaba, así
+   * que casi toda la interfaz se pulsaba sin que el teléfono acusara el golpe.
+   *
+   * Un solo listener delegado en vez de doscientos `onClick`: cualquier botón
+   * que se añada mañana lo hereda sin acordarse de nada. Apagarlo sigue siendo
+   * un único ajuste, porque `playTapHaptic` ya consulta `hapticsEnabled`.
+   */
+  useEffect(() => installTapFeedback(), [])
+
+  /*
+   * FOTOS DE RECIBO SIN DUEÑO.
+   *
+   * Las imágenes viven en IndexedDB bajo el id de su movimiento, y el libro
+   * puede quedarse sin ese movimiento por caminos que no pasan por «borrar»:
+   * la papelera que caduca a los treinta días, vaciarla a mano, o restaurar
+   * una copia de seguridad —que es JSON y no trae imágenes—. En esos casos la
+   * foto se queda apuntando a nadie y no hay nada que vuelva a nombrarla.
+   *
+   * Se barre una vez por arranque, con el libro YA hidratado: hacerlo antes
+   * vería un libro vacío y borraría todas las fotos del usuario.
+   *
+   * Cuenta también lo que hay en la papelera: un movimiento borrado hace una
+   * semana se puede recuperar, y recuperarlo sin su recibo sería devolver la
+   * mitad.
+   *
+   * ── Y LO ARCHIVADO, QUE FALTABA ──────────────────────────────────────
+   * Cerrar un período SACA sus movimientos de `transactions` y los guarda en
+   * `useArchive` —así el saldo sigue siendo apertura + movimientos exacto—,
+   * pero siguen existiendo y se pueden consultar. Sin contarlos aquí, el
+   * primer arranque después de cerrar un período borraba la foto de recibo de
+   * todos ellos: un historial de solo lectura al que le faltan los recibos.
+   *
+   * ── LOS BOTES, POR LO MISMO ──────────────────────────────────────────
+   * Un capricho ES la referencia a un gasto. Si el gasto ya no está en
+   * ninguna parte —ni en el libro, ni en la papelera, ni archivado— el bote
+   * pide recuperar dinero de una compra que nadie puede ver, y lo único
+   * honesto es quitarlo. El mismo conjunto contesta las dos preguntas, así
+   * que se calcula una vez.
+   */
+  useEffect(() => {
+    if (!hydrated) return
+    const vivos = new Set<string>([
+      ...useFinance.getState().transactions.map(t => t.id),
+      ...useTrash.getState().items.map(e => e.tx.id),
+      ...useArchive.getState().periods.flatMap(p => p.transactions.map(t => t.id)),
+    ])
+    void pruneOrphanReceipts(vivos)
+    useCaprices.getState().prune(vivos)
+  }, [hydrated])
 
   // Tras hidratar el PIN/patrón cifrados (Android), re-bloquear si corresponde:
   // `credUnlocked` se inicializó antes de conocer el valor real de `hasAppLock`.
@@ -192,8 +258,21 @@ export default function App() {
     if (!tx) return
     deleteWithUndo({
       message: t('movementDeleted'),
-      onDelete: () => deleteTx(id),
-      onRestore: () => addTx(tx),
+      onDelete: () => {
+        deleteTx(id)
+        // La papelera va DETRÁS del «Deshacer» de cinco segundos, no en su
+        // lugar: aquellos cinco segundos cubren el dedo que se fue donde no
+        // era, y para eso no hay nada mejor. Esto cubre el otro caso —darte
+        // cuenta mañana—, que hasta ahora no tenía remedio ninguno.
+        pushToTrash(tx)
+      },
+      onRestore: () => {
+        addTx(tx)
+        // Si lo recupera con el «Deshacer», sobra en la papelera: si no, el
+        // mismo movimiento quedaría a la vez vivo y en la lista de borrados,
+        // y recuperarlo de nuevo lo duplicaría.
+        popFromTrash(tx.id)
+      },
     })
   }
 
@@ -217,6 +296,16 @@ export default function App() {
     ),
     goals: (props: ViewProps) => (
       <Suspense fallback={null}><MobileGoals {...props} /></Suspense>
+    ),
+    business: (props: ViewProps) => (
+      <Suspense fallback={<div style={{ padding: 24, color: 'var(--text-dim)' }}>{t('loading')}</div>}>
+        <MobileBusiness {...props} />
+      </Suspense>
+    ),
+    caprices: (props: ViewProps) => (
+      <Suspense fallback={<div style={{ padding: 24, color: 'var(--text-dim)' }}>{t('loading')}</div>}>
+        <MobileCaprices {...props} />
+      </Suspense>
     ),
     notes: (props: ViewProps) => (
       <Suspense fallback={<div style={{ padding: 24, color: 'var(--text-dim)' }}>{t('loading')}</div>}>
@@ -255,7 +344,12 @@ export default function App() {
           onConsumeNotificationTarget={consumeNotificationTarget}
         />
         <ToastHost />
-        {whatsNew.open && <MobileWhatsNew onClose={whatsNew.close} highlightLatest />}
+        {/* Un salto de version mayor mueve de sitio media app, y para eso una
+            lista de arreglos no sirve: hace falta decir DONDE esta lo nuevo.
+            Para un parche, el historial de siempre es lo adecuado. */}
+        {whatsNew.open && (whatsNew.major
+          ? <MobileWelcome2 onClose={whatsNew.close} />
+          : <MobileWhatsNew onClose={whatsNew.close} highlightLatest />)}
         {!whatsNew.open && startup.rescue && (
           <MobileCardRescue candidate={startup.rescue} onClose={startup.dismissRescue} />
         )}

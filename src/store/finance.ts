@@ -69,6 +69,28 @@ function fallbackCategoryId(categories: Category[], type: 'income' | 'expense'):
   return categories.find(c => c.type === type)?.id
 }
 
+/**
+ * LAS CATEGORÍAS DEL AJUSTE DE CUADRE.
+ *
+ * Dos, una por signo, porque el libro exige que un movimiento de ingreso tenga
+ * categoría de ingreso. Nacen con `excludeFromReports` para que cuadrar deje de
+ * ensuciar el mes: el movimiento sigue contando para el saldo —tiene que, o la
+ * igualdad se rompe— pero no finge haber sido un sueldo ni un gasto.
+ *
+ * Se crean al vuelo con `ensureCategory` en vez de en la semilla: quien ya
+ * tiene la app instalada nunca recibiría una categoría nueva de la semilla.
+ */
+export const ADJUST_CATEGORY: Record<'income' | 'expense', Category> = {
+  income: {
+    id: 'cat_ajuste_in', name: 'Ajuste de cuadre', type: 'income',
+    color: '#5bc0ff', budget: 0, icon: 'refresh', excludeFromReports: true,
+  },
+  expense: {
+    id: 'cat_ajuste_out', name: 'Ajuste de cuadre', type: 'expense',
+    color: '#5bc0ff', budget: 0, icon: 'refresh', excludeFromReports: true,
+  },
+}
+
 export function sanitizeFinanceData(value: unknown): FinanceData {
   const data = (value && typeof value === 'object' ? value : {}) as Partial<FinanceData>
   const CURRENCY_CODES = ['DOP','USD','EUR','MXN','GBP','COP','ARS','BRL','CAD']
@@ -474,8 +496,8 @@ function normalizeTransaction(tx: Transaction): Transaction {
 
   const {
     id, type, amount, date, note, categoryId, accountId, splits,
-    recurring, recurringStart, recurringEnd, recurringNext, skippedDates, serviceId, generatedFrom, tags,
-    detectedFrom, originalAmount, originalCurrency, fxRate, onSecondaryBalance, fees,
+    recurring, recurringStart, recurringEnd, recurringNext, skippedDates, serviceId, resoldAs, generatedFrom, tags,
+    detectedFrom, originalAmount, originalCurrency, fxRate, onSecondaryBalance, fees, hasReceipt,
   } = tx
   // Los 3 campos FX viajan JUNTOS o no viajan: un `originalAmount` sin su
   // `fxRate` no se puede auditar ni volver a explicar, así que se descarta el
@@ -488,12 +510,19 @@ function normalizeTransaction(tx: Transaction): Transaction {
     ...(type === 'expense' && splits && splits.length >= 2 ? { splits } : {}),
     ...(recurring ? { recurring, recurringStart, recurringEnd, recurringNext, skippedDates } : {}),
     ...(recurring && serviceId ? { serviceId } : {}),
+    // Igual que `serviceId`: solo tiene sentido en una plantilla recurrente, y
+    // sin nombrarlo aquí se perdería al editar el movimiento.
+    ...(recurring && resoldAs ? { resoldAs } : {}),
     ...(!recurring && generatedFrom ? { generatedFrom } : {}),
     ...(tags?.length ? { tags } : {}),
     ...(detectedFrom ? { detectedFrom } : {}),
     ...(hasFx ? { originalAmount, originalCurrency, fxRate } : {}),
     ...(onSecondaryBalance ? { onSecondaryBalance: true } : {}),
     ...(fees?.length ? { fees } : {}),
+    // Sin esta línea la marca del recibo se perdería al editar el movimiento,
+    // exactamente igual que le pasó a `description`: esta función reconstruye
+    // desde una lista blanca, así que lo que no se nombra aquí no existe.
+    ...(hasReceipt ? { hasReceipt: true } : {}),
   }
 }
 
@@ -860,20 +889,31 @@ export const useFinance = create<FinanceState>()(
         if (!account) return 0
         const diff = Math.round((balance - account.balance) * 100) / 100
         if (Math.abs(diff) < 0.005) return 0
-        // CON CATEGORÍA. El ajuste nacía sin ella y el saneador lo borraba al
-        // recargar: el usuario conciliaba, veía el saldo cuadrar, cerraba la
-        // app y al volver el descuadre estaba otra vez ahí. El saneador ya no
-        // borra (rellena), pero el ajuste debe nacer bien de todos modos: un
-        // movimiento sin categoría no se puede filtrar ni presupuestar.
+        // CON CATEGORÍA, Y CON LA SUYA.
+        //
+        // El ajuste nacía sin categoría y el saneador lo borraba al recargar:
+        // el usuario conciliaba, veía el saldo cuadrar, cerraba la app y al
+        // volver el descuadre estaba otra vez ahí.
+        //
+        // Después pasó a usar la categoría de reserva —la primera del tipo—,
+        // que arregló aquello y causó otro: cuadrar +3,000 aparecía como
+        // «Salario +3,000» y te inflaba los ingresos del mes. Por eso cuadrar
+        // se sentía como hacer trampa. Ahora va a una categoría propia, fuera
+        // de informes y presupuestos pero dentro del libro, que es exactamente
+        // lo que un ajuste es.
         const type = diff > 0 ? 'income' : 'expense'
+        const categoryId = get().ensureCategory(ADJUST_CATEGORY[type])
         const tx = normalizeTransaction({
           id: newId(), type, amount: Math.abs(diff),
           accountId: id, date: localToday(), note: tt('reconciliationAdjustmentNote'),
-          categoryId: fallbackCategoryId(s.categories, type),
+          categoryId,
         } as Transaction)
+        // `ensureCategory` pudo añadir la categoría, así que el estado se vuelve
+        // a leer: usar el `s` de arriba perdería esa categoría nueva.
+        const fresco = get()
         set({
-          transactions: sortTxns([tx, ...s.transactions]),
-          accounts: applyBalance(s.accounts, tx, 1),
+          transactions: sortTxns([tx, ...fresco.transactions]),
+          accounts: applyBalance(fresco.accounts, tx, 1),
         })
         return diff
       },

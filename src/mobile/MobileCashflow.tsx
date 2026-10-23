@@ -3,6 +3,7 @@ import { Area, AreaChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YA
 import { Icon } from '@/components/ui/Icon'
 import { projectCashflow, safeToSpend } from '@/data/cashflowProjection'
 import { currentMonthKey, dateLocale, fmtCompact, localToday, transactionsForTotals, txForMonth } from '@/data/helpers'
+import { useBusiness } from '@/store/business'
 import { useFinance } from '@/store/finance'
 import { useSettings } from '@/store/settings'
 import { useFmt } from '@/hooks/useFmt'
@@ -11,6 +12,19 @@ import { MobileAmountSheet } from './MobileAmountSheet'
 import { useMobileBackDismiss } from './useMobileBackDismiss'
 
 type Horizon = 'month' | '30d' | '60d'
+
+/**
+ * El icono de cada tipo de evento.
+ *
+ * Un cobro a un cliente lleva el suyo, no el de recurrente: la pantalla tiene
+ * que dejar ver de un golpe qué parte de lo que viene depende de otra persona.
+ */
+const EVENT_ICON = {
+  income: 'arrowUp',
+  expense: 'repeat',
+  goal: 'target',
+  charge: 'handCoins',
+} as const
 
 function horizonDate(horizon: Horizon, today: string): string {
   const d = new Date(`${today}T00:00:00`)
@@ -32,7 +46,7 @@ export function MobileCashflow() {
   const t = useT()
   const fmtVal = useFmt()
   const lang = useSettings(s => s.language)
-  const { transactions, accounts, goals, currency } = useFinance()
+  const { transactions, accounts, goals, categories, currency } = useFinance()
   const buffer = useSettings(s => s.cashflowBuffer)
   const setBuffer = useSettings(s => s.setCashflowBuffer)
   const [horizon, setHorizon] = useState<Horizon>('month')
@@ -41,9 +55,21 @@ export function MobileCashflow() {
   useMobileBackDismiss(bufferSheet, () => setBufferSheet(false))
 
   const today = localToday()
+  /*
+   * Los cobros a clientes entran en la proyección.
+   *
+   * Para quien cobra a clientes, «¿me alcanza hasta fin de mes?» depende de
+   * ellos: sin esto la pantalla decía que no llegas mientras te debían el
+   * doble de lo que te faltaba. Cada cobro cae en la fecha en la que ESE
+   * cliente suele pagar, no en la que debería —ver `projectCashflow`—.
+   */
+  const clients = useBusiness(s => s.clients)
+  const charges = useBusiness(s => s.charges)
+  const receivables = useMemo(() => ({ charges, clients }), [charges, clients])
+
   const projection = useMemo(
-    () => projectCashflow(transactions, accounts, goals, horizonDate(horizon, today), today, currency),
-    [transactions, accounts, goals, horizon, today, currency],
+    () => projectCashflow(transactions, accounts, goals, horizonDate(horizon, today), today, currency, receivables),
+    [transactions, accounts, goals, horizon, today, currency, receivables],
   )
 
   const safe = useMemo(() => safeToSpend(projection, buffer), [projection, buffer])
@@ -71,7 +97,7 @@ export function MobileCashflow() {
   const scenario = useMemo(() => {
     // Conversion a divisa base antes de medir el ritmo de gasto: el error no
     // solo desplaza el numero de hoy, se PROPAGA a toda la proyeccion.
-    const monthTx = txForMonth(transactionsForTotals(transactions, accounts, currency), currentMonthKey())
+    const monthTx = txForMonth(transactionsForTotals(transactions, accounts, currency, categories), currentMonthKey())
     // Discrecional = gasto de este mes que NO viene de una plantilla recurrente
     // (esos ya los cuenta la proyección). Solo hasta hoy, para medir el ritmo.
     const spentSoFar = monthTx
@@ -268,10 +294,12 @@ export function MobileCashflow() {
                 {day.events.map((event, index) => (
                   <div key={`${event.sourceId}:${index}`} className="mcash-event">
                     <span className={`mcash-event-icon mcash-event-${event.kind}`}>
-                      <Icon name={event.kind === 'income' ? 'arrowUp' : event.kind === 'goal' ? 'target' : 'repeat'} size={14} />
+                      <Icon name={EVENT_ICON[event.kind]} size={14} />
                     </span>
                     <span className="mcash-event-note">
-                      {event.kind === 'goal' ? `${t('cashflowGoalPrefix')} ${event.note}` : event.note}
+                      {event.kind === 'goal' ? `${t('cashflowGoalPrefix')} ${event.note}`
+                        : event.kind === 'charge' ? `${t('cashflowChargePrefix')} ${event.note}`
+                          : event.note}
                     </span>
                     <b className={event.amount < 0 ? 'text-expense' : 'mcash-event-income'}>
                       {event.amount >= 0 ? '+' : ''}{fmtCompact(event.amount, currency)}

@@ -123,6 +123,14 @@ interface SettingsState {
   /** Cuándo se guardó la última copia MANUAL (ISO). El backup semanal usa
    *  lastWeeklyBackupAt; la tarjeta de estado toma la más reciente de las dos. */
   lastManualBackupAt: string | null
+  /**
+   * Cuándo se descartó por última vez el aviso de «llevas sin copia» (ms).
+   *
+   * Va aparte de `dismissedAlerts` porque aquello descarta PARA SIEMPRE por
+   * id, y esto tiene que volver: el riesgo de no tener copia no desaparece
+   * porque taparas el aviso una vez, solo deja de ser urgente hoy.
+   */
+  backupNudgeDismissedAt: number
   /** Colchón que se aparta del "seguro para gastar" en Flujo de caja. 0 = sin colchón. */
   cashflowBuffer: number
   lastWeeklyBackupAt: string | null
@@ -186,6 +194,7 @@ interface SettingsState {
   setWidgetAccountIds: (ids: string[]) => void
   setLastWeeklyBackupAt: (v: string | null) => void
   setLastManualBackupAt: (v: string | null) => void
+  dismissBackupNudge: () => void
   setCashflowBuffer: (v: number) => void
   setWeeklyAutoBackupEnabled: (v: boolean) => void
   setWeeklyAutoBackupDay: (v: number) => void
@@ -244,6 +253,7 @@ export const useSettings = create<SettingsState>()(
       budgetRollover: false,
       widgetAccountIds: [],
       lastManualBackupAt: null,
+      backupNudgeDismissedAt: 0,
       cashflowBuffer: 0,
       lastWeeklyBackupAt: null,
       weeklyAutoBackupEnabled: true,
@@ -344,6 +354,7 @@ export const useSettings = create<SettingsState>()(
       setWidgetAccountIds: (widgetAccountIds) => set({ widgetAccountIds }),
       setLastWeeklyBackupAt: (lastWeeklyBackupAt) => set({ lastWeeklyBackupAt }),
       setLastManualBackupAt: (lastManualBackupAt) => set({ lastManualBackupAt }),
+      dismissBackupNudge: () => set({ backupNudgeDismissedAt: Date.now() }),
       setCashflowBuffer: (cashflowBuffer) => set({ cashflowBuffer: Math.max(0, cashflowBuffer) }),
       setWeeklyAutoBackupEnabled: (weeklyAutoBackupEnabled) => set({ weeklyAutoBackupEnabled }),
       setWeeklyAutoBackupDay: (weeklyAutoBackupDay) => set({ weeklyAutoBackupDay: Math.max(0, Math.min(6, weeklyAutoBackupDay)) }),

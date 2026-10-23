@@ -209,6 +209,34 @@ export function playDeleteSound() {
   tone(240, 0.08, { type: 'sine', gain: 0.032, delay: 0.045, endFreq: 210 })
 }
 
+/*
+ * ENTRAR Y SALIR DINERO SUENAN DISTINTO.
+ *
+ * Antes los dos guardaban con `playDoneSound`, así que guardar un sueldo y
+ * guardar la compra del súper sonaban exactamente igual. Son cosas opuestas y
+ * deberían sonar opuestas: el oído confirma lo que hiciste sin mirar, y si te
+ * equivocaste de pestaña lo notas antes de soltar el teléfono.
+ *
+ * El háptico es el mismo en los dos (14 ms): quien tiene el sonido apagado no
+ * debe notar que el gasto «vibra peor» que el ingreso.
+ */
+
+/** Ingreso: dos notas que SUBEN. Entra dinero. */
+export function playIncomeSound() {
+  haptic(14)
+  if (!enabled()) return
+  tone(587.33, 0.085, { type: 'triangle', gain: 0.042, endFreq: 659.25 })
+  tone(880, 0.14, { type: 'sine', gain: 0.042, delay: 0.06, endFreq: 987.77 })
+}
+
+/** Gasto: dos notas que BAJAN. Sale dinero — sin dramatismo, solo distinto. */
+export function playExpenseSound() {
+  haptic(14)
+  if (!enabled()) return
+  tone(659.25, 0.08, { type: 'triangle', gain: 0.04, endFreq: 587.33 })
+  tone(493.88, 0.13, { type: 'sine', gain: 0.036, delay: 0.055, endFreq: 440 })
+}
+
 export function playAchievementSound() {
   haptic(22)
   if (!enabled()) return

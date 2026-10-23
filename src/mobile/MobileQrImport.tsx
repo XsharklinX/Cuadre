@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { Icon } from '@/components/ui/Icon'
 import { toast } from '@/components/ui/Toast'
 import { parseBackup } from '@/data/backup'
+import { restoreEverything } from '@/lib/restoreAll'
 import { QrTransferReceiver, decompressPayload } from '@/data/qrTransfer'
-import { useFinance } from '@/store/finance'
 import { useNotes } from '@/store/notes'
 import { useT } from '@/i18n'
 import { useMobileBackDismiss } from './useMobileBackDismiss'
@@ -12,7 +12,6 @@ import { SheetPortal } from './SheetPortal'
 
 export function MobileQrImport({ onClose }: { onClose: () => void }) {
   const t = useT()
-  const finance = useFinance()
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const receiverRef = useRef(new QrTransferReceiver())
@@ -75,7 +74,9 @@ export function MobileQrImport({ onClose }: { onClose: () => void }) {
       try {
         const payload = await decompressPayload(compressed)
         const data = parseBackup(payload)
-        finance.restoreBackup(data)
+        // Por el sitio unico: traer un libro de otro telefono deja los
+        // cobros de ESTE apuntando a movimientos que nunca existieron aqui.
+        restoreEverything(data)
         useNotes.getState().importNotes(data.notes ?? [])
         toast(t('qrImportSuccessToast'), { icon: 'check', type: 'ok' })
         onClose()

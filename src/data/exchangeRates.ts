@@ -103,12 +103,18 @@ export function getRatesFetchedAt(): number | null {
   return readCache()?.fetchedAt ?? null
 }
 
-/** Aplica tasas en cache (si hay) y, si están vencidas o no existen, busca tasas frescas. */
-export async function syncExchangeRates(): Promise<boolean> {
+/**
+ * Aplica tasas en cache (si hay) y, si están vencidas o no existen, busca tasas frescas.
+ *
+ * `force` salta el TTL: lo usa el gesto de tirar de la lista, donde el usuario
+ * está PIDIENDO tasas nuevas. Sin esto, tirar dentro de las doce horas de vida
+ * de la cache no haría absolutamente nada y el gesto parecería roto.
+ */
+export async function syncExchangeRates(force = false): Promise<boolean> {
   const cached = readCache()
   let changed = cached ? applyRates(cached.rates) : false
 
-  if (cached && Date.now() - cached.fetchedAt < TTL_MS) return changed
+  if (!force && cached && Date.now() - cached.fetchedAt < TTL_MS) return changed
 
   const fresh = await fetchLiveRates()
   if (!fresh) return changed

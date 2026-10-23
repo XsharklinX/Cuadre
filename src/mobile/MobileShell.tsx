@@ -7,7 +7,7 @@ import type { NotificationRequest, NotificationTargetType } from '@/hooks/useNot
 import type { SharedReceipt } from '@/hooks/useTauri'
 import type { Transaction, ViewId, ViewProps } from '@/types'
 import type { BatchReceiptInput } from './MobileReceiptBatch'
-import { MobileBottomNav, type MobileRoute, type QuickAddMode } from './MobileBottomNav'
+import { ROUTE_ORDER, MobileBottomNav, type MobileRoute, type QuickAddMode } from './MobileBottomNav'
 import type { AnalyticsPeriod } from './MobileAnalytics'
 import { MobileCreateFlow } from './MobileCreateFlow'
 import { SheetPortal } from './SheetPortal'
@@ -35,6 +35,9 @@ const MobileReceiptBatch = lazy(() => import('./MobileReceiptBatch').then(m => (
 const MobileNotificationCenter = lazy(() => import('./MobileNotificationCenter').then(m => ({ default: m.MobileNotificationCenter })))
 import { MobileTopBar } from './MobileTopBar'
 import { useNotificationFeed } from '@/hooks/useNotificationFeed'
+import { usePullToRefresh } from '@/hooks/usePullToRefresh'
+import { syncExchangeRates } from '@/data/exchangeRates'
+import { toast } from '@/components/ui/Toast'
 import { useMobileBackDismiss } from './useMobileBackDismiss'
 import { useDialogA11y } from './useDialogA11y'
 import type { Sheet } from './settings/shared'
@@ -43,11 +46,11 @@ type MobileViewRenderer = (props: ViewProps) => React.ReactNode
 // Orden visual de las sub-pestañas: Cuentas primero (landing por defecto del
 // tab "Cuentas" en el bottom nav), luego Informes, luego Metas.
 const REPORT_TAB_VIEWS: ViewId[] = ['accounts', 'goals']
-const TOOL_VIEWS: ViewId[] = ['budgets', 'subscriptions', 'notes', 'debt', 'cashflow', 'calendar']
+const TOOL_VIEWS: ViewId[] = ['budgets', 'subscriptions', 'notes', 'debt', 'cashflow', 'calendar', 'caprices']
 // Pantallas que se abren como "herramienta" desde el menú (⋯) de Movimientos.
 // Al salir de una, volvemos al lugar de origen (normalmente Movimientos, que es
 // donde vive el menú de herramientas) en vez de aterrizar en Cuentas.
-const TOOL_SCREENS: ViewId[] = ['budgets', 'subscriptions', 'calendar', 'debt', 'cashflow', 'notes']
+const TOOL_SCREENS: ViewId[] = ['budgets', 'subscriptions', 'calendar', 'debt', 'cashflow', 'notes', 'caprices']
 
 function MobileSkeletonScreen() {
   return (
@@ -71,13 +74,16 @@ function routeFromView(view: ViewId): MobileRoute {
   // listado de cuentas — antes heredaban la pestaña "Cuentas" del bottom nav
   // por reusar la misma ruta, lo cual confundía (se veían como si fueran parte
   // de Cuentas).
-  if (view === 'budgets' || view === 'subscriptions' || view === 'notes' || view === 'debt' || view === 'cashflow' || view === 'calendar') return 'profile'
+  // Negocio tiene su propia pestaña: ya no hereda la de Perfil.
+  if (view === 'business') return 'business'
+  if (view === 'budgets' || view === 'subscriptions' || view === 'notes' || view === 'debt' || view === 'cashflow' || view === 'calendar' || view === 'caprices') return 'profile'
   return 'home'
 }
 
 function viewFromRoute(route: Exclude<MobileRoute, 'add'>): ViewId {
   if (route === 'analysis') return 'stats'
   if (route === 'reports') return 'accounts'
+  if (route === 'business') return 'business'
   if (route === 'profile') return 'dashboard'
   return 'transactions'
 }
@@ -147,6 +153,30 @@ export function MobileShell({
   const [analyticsInitialPeriod, setAnalyticsInitialPeriod] = useState<AnalyticsPeriod | undefined>(undefined)
   const [reportTransition, setReportTransition] = useState<'next' | 'prev'>('next')
   const [toolTransition, setToolTransition] = useState<'next' | 'prev'>('next')
+  /** Hacia donde se movio entre las cuatro pestañas principales. */
+  const [routeDir, setRouteDir] = useState<'next' | 'prev'>('next')
+
+  /*
+   * LA ENTRADA, SOLO LA PRIMERA VEZ.
+   *
+   * Android dibuja su splash con el icono y lo retira en cuanto la app pinta
+   * su primer fotograma. Hasta ahora ese relevo era un corte: el contenido
+   * simplemente estaba ahi. Esto lo convierte en una continuacion — el
+   * contenido crece desde el centro, de donde estaba el icono.
+   *
+   * NO añade tiempo: ocurre mientras la app ya esta lista, no antes. El splash
+   * propio que habia se quito justo por eso (eran dos segundos encima del de
+   * Android) y no se trata de devolverlo.
+   *
+   * Se apaga sola tras la animacion para que no se repita al cambiar de
+   * pestaña ni al volver del segundo plano.
+   */
+  const [primeraVez, setPrimeraVez] = useState(true)
+  useEffect(() => {
+    if (!primeraVez) return
+    const t = window.setTimeout(() => setPrimeraVez(false), 480)
+    return () => window.clearTimeout(t)
+  }, [primeraVez])
   const prevIsAdd = useRef(false)
   const previousReportTab = useRef(Math.max(0, REPORT_TAB_VIEWS.indexOf(view)))
   const previousToolTab = useRef(Math.max(0, TOOL_VIEWS.indexOf(view)))
@@ -246,7 +276,7 @@ export function MobileShell({
   }, [route, view])
 
 
-  const isInProfileSub = route === 'profile' && (view === 'budgets' || view === 'subscriptions' || view === 'notes' || view === 'debt' || view === 'cashflow' || view === 'calendar')
+  const isInProfileSub = route === 'profile' && (view === 'budgets' || view === 'subscriptions' || view === 'notes' || view === 'debt' || view === 'cashflow' || view === 'calendar' || view === 'caprices')
   useMobileBackDismiss(isInProfileSub, exitTool)
 
   useEffect(() => {
@@ -277,6 +307,10 @@ export function MobileShell({
       // 'accounts' es la vista por defecto de la ruta "reports" (ver
       // routeFromView): el ViewId 'reports' no mapea a ninguna ruta movil.
       gotoViewRef.current('accounts')
+    } else if (shortcut === 'collect') {
+      // Entra directo a Negocio, que abre en Cobros: quien revende abre la
+      // app para esto y tenia que pasar por el inicio y una pestana.
+      setRoute('business')
     } else if (shortcut === 'accounts') {
       gotoViewRef.current('accounts')
     } else if (shortcut === 'budgets') {
@@ -302,6 +336,10 @@ export function MobileShell({
       gotoViewRef.current('stats')
     } else if (type === 'fx') {
       setConverterOpen(true)
+    } else if (type === 'charge') {
+      // Un aviso de cobro lleva a Negocio: quedarse en Inicio obligaria a
+      // buscar en el menu justo lo que el aviso acaba de nombrar.
+      gotoViewRef.current('business')
     } else if (type === 'anomaly' || type === 'activity') {
       gotoViewRef.current('transactions')
     }
@@ -319,6 +357,19 @@ export function MobileShell({
 
   const goRoute = (next: MobileRoute) => {
     rememberScroll()
+    /*
+     * HACIA DONDE SE MOVIO.
+     *
+     * El boton central «+» no entra en el orden de la barra, asi que no tiene
+     * direccion: abrir Agregar no es ir a la derecha de nada. Cuando alguno de
+     * los dos no esta en la lista, se conserva la ultima direccion en vez de
+     * inventar una.
+     */
+    const desde = ROUTE_ORDER.indexOf(route)
+    const hasta = ROUTE_ORDER.indexOf(next)
+    if (desde >= 0 && hasta >= 0 && desde !== hasta) {
+      setRouteDir(hasta > desde ? 'next' : 'prev')
+    }
     if (next !== 'add') {
       setQuickAddMode(null)
       onConsumeSharedReceipt?.()
@@ -409,6 +460,8 @@ export function MobileShell({
           onEditTx={onEditTx}
           onDeleteTx={viewProps.onDeleteTx}
           onOpenSecurity={() => onSettings('pin')}
+          onOpenBackup={() => onSettings('export')}
+          onOpenDetection={() => onSettings('bankNotifications')}
         />
       )
     }
@@ -425,6 +478,23 @@ export function MobileShell({
       return renderReportsRoute()
     }
 
+    /*
+     * NEGOCIO, con su propia ruta.
+     *
+     * No pasa por el envoltorio de «herramienta» (`mobile-tool-pane`) porque ya
+     * no lo es: es una pestaña de la barra, y ese envoltorio trae la animación
+     * de entrar y salir de una herramienta, que aquí mentiría sobre de dónde
+     * vienes.
+     */
+    if (route === 'business') {
+      const renderer = mobileViews.business
+      return renderer ? (
+        <ViewErrorBoundary resetKey="business">
+          {renderer(viewProps)}
+        </ViewErrorBoundary>
+      ) : null
+    }
+
     if (route === 'profile') {
       if (view === 'subscriptions') {
         return (
@@ -435,7 +505,10 @@ export function MobileShell({
           </div>
         )
       }
-      if (view === 'budgets' || view === 'notes') {
+      // Negocio comparte el camino de Presupuestos y Listas: su renderizador
+      // vive en `mobileViews`, asi que entra en la misma rama en vez de
+      // repetir el envoltorio una cuarta vez.
+      if (view === 'budgets' || view === 'notes' || view === 'caprices') {
         const renderer = mobileViews[view]
         return renderer ? (
           <div className={`mobile-tool-pane mobile-tool-pane-${toolTransition}`} key={view}>
@@ -508,6 +581,21 @@ export function MobileShell({
     requestAnimationFrame(() => scroller.scrollTo({ top, behavior: 'auto' }))
   }, [routeResetKey, route])
 
+  /*
+   * TIRAR DE LA LISTA.
+   *
+   * El gesto vive aquí y no en Movimientos porque lo que se desplaza es este
+   * contenedor: todas las pestañas lo heredan, y no hay dos implementaciones
+   * compitiendo por el mismo `touchmove`.
+   *
+   * Mientras se está creando un movimiento no hay tirón: esa pantalla tiene
+   * su propio teclado y arrastrarla sería un accidente, no una intención.
+   */
+  const pullPhase = usePullToRefresh(contentRef, async () => {
+    const cambiaron = await syncExchangeRates(true)
+    toast(t('ratesUpdatedToast'), { icon: cambiaron ? 'refresh' : 'check', type: 'ok' })
+  }, route !== 'add')
+
   const handleContentScroll = () => {
     const scroller = contentRef.current
     if (!scroller || !activeScrollKey.current) return
@@ -521,7 +609,7 @@ export function MobileShell({
   )
 
   return (
-    <main className="mobile-shell">
+    <main className={`mobile-shell${primeraVez ? ' mobile-shell-entrada' : ''}`}>
       {csvOpen && (
         <Suspense fallback={<div className="mobile-loading-overlay mobile-loading-skeleton" aria-live="polite"><MobileSkeletonScreen /></div>}>
           <MobileCSVImport onClose={() => setCsvOpen(false)} />
@@ -600,6 +688,19 @@ export function MobileShell({
                   </div>
                   <Icon name="arrowUp" size={13} className="mobile-tools-row-arrow" />
                 </button>
+                {/* Con Presupuestos y Metas: las tres contestan «¿estoy
+                    gastando como quiero?». Con Negocio no pegaba — ese
+                    contesta «¿cuanto me deja esto?». */}
+                <button className="mobile-tools-row" onClick={() => { setToolsOpen(false); gotoView('caprices') }}>
+                  <span className="mobile-tools-row-icon" style={{ background: '#ff9a3d22', color: '#ff9a3d' }}>
+                    <Icon name="piggy" size={20} />
+                  </span>
+                  <div>
+                    <b>{t('capTitle')}</b>
+                    <small>{t('capQuickDesc')}</small>
+                  </div>
+                  <Icon name="arrowUp" size={13} className="mobile-tools-row-arrow" />
+                </button>
                 <button className="mobile-tools-row" onClick={() => { setToolsOpen(false); gotoView('notes') }}>
                   <span className="mobile-tools-row-icon" style={{ background: '#35d0a222', color: '#35d0a2' }}>
                     <Icon name="clipboard" size={20} />
@@ -636,6 +737,7 @@ export function MobileShell({
         onMenu={route === 'home' ? (() => setToolsOpen(true)) : undefined}
         onSelectMonth={onMonth}
         onSettings={() => onSettings()}
+        onProfile={() => goRoute('profile')}
         onCurrency={() => setCurrencyOpen(true)}
         onCalendar={route === 'home' ? () => gotoView('calendar') : undefined}
         onSearch={() => setSearchOpen(true)}
@@ -646,8 +748,17 @@ export function MobileShell({
         mainContent
       ) : (
         <>
-          <div className="mobile-content" ref={contentRef} onScroll={handleContentScroll}>
-            <div className="mobile-route" key={routeResetKey}>
+          <div className="mobile-content" ref={contentRef} onScroll={handleContentScroll} data-ptr={pullPhase}>
+            {/* El indicador del tirón vive DENTRO del bloque que se desplaza,
+                con altura cero: así solo asoma cuando se tira, y no deja un
+                hueco en blanco arriba de la pantalla cuando no se usa. */}
+            <div className="mobile-ptr" aria-hidden={pullPhase === 'idle'}>
+              <span className="mobile-ptr-inner">
+                <Icon name="refresh" size={14} />
+                {pullPhase === 'armed' ? t('releaseToRefreshHint') : t('pullToRefreshHint')}
+              </span>
+            </div>
+            <div className={`mobile-route mobile-route-${routeDir}`} key={routeResetKey}>
               {mainContent}
             </div>
           </div>

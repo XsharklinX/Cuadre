@@ -1,0 +1,568 @@
+/*
+ * QUE LA APP SE SIENTA.
+ *
+ * Todo lo que hay aquí es TACTO: nada cambia lo que la app hace, solo cómo
+ * responde cuando la tocas. Va en su propio archivo para poder leerlo —y
+ * quitarlo— de una pieza.
+ *
+ * Dos reglas que gobiernan el archivo entero:
+ *
+ * · Se premia el HÁBITO, nunca el gasto. Una app de dinero que celebra que
+ *   acabas de gastar RD$ 4,000 anima a lo contrario de lo que promete. Lo que
+ *   se celebra es haber anotado, haber llegado a la meta, haber cerrado el mes
+ *   con algo de sobra.
+ *
+ * · Nada obliga a esperar. Cada animación ocurre mientras la pantalla ya es
+ *   usable; ninguna bloquea el siguiente toque. Una animación que hay que
+ *   aguantar deja de ser jugo a la décima vez y pasa a ser peaje.
+ *
+ * Al final del archivo, el bloque de `prefers-reduced-motion` apaga el
+ * movimiento de todo lo de arriba de una sola vez.
+ */
+
+/* ── LA CIFRA ATERRIZA EN SU SITIO ────────────────────────────────────
+ *
+ * Al guardar, la hoja se cerraba y el movimiento YA estaba en la lista: se
+ * veía como si siempre hubiera estado ahí. Que la fila caiga desde arriba y
+ * se asiente con un rebote corto cierra el gesto — ves dónde fue a parar lo
+ * que acabas de anotar.
+ *
+ * El resalte se va solo. Dejarlo fijo convertiría «lo último que anoté» en un
+ * estado permanente de la lista, que no es lo que significa.
+ */
+@keyframes mjuice-aterriza {
+  0%   { opacity: 0; transform: translateY(-22px) scale(1.035); }
+  58%  { opacity: 1; transform: translateY(0) scale(1); }
+  72%  { transform: scale(.992); }
+  100% { transform: scale(1); }
+}
+@keyframes mjuice-resalte {
+  0%, 55% { background: color-mix(in oklab, var(--m-primary, #35d0a2) 16%, transparent); }
+  100%    { background: transparent; }
+}
+.mobile-tx-swipe.landed {
+  animation: mjuice-aterriza 460ms cubic-bezier(.2, .92, .28, 1) both;
+}
+.mobile-tx-swipe.landed .mobile-tx-row {
+  animation: mjuice-resalte 1100ms ease-out both;
+}
+
+/* ── EL MES QUE CIERRAS EN VERDE ──────────────────────────────────────
+ *
+ * Solo aparece cuando el mes salió BIEN, y solo los primeros días del mes
+ * siguiente. Si te pasaste, la app se calla: nadie necesita que su teléfono
+ * se lo recuerde.
+ */
+@keyframes mjuice-asoma {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.mclose-card {
+  animation: mjuice-asoma 320ms cubic-bezier(.2, .8, .2, 1) both;
+  background: linear-gradient(155deg, color-mix(in oklab, #35d0a2 14%, var(--m-surface)), var(--m-surface));
+  border: 1px solid color-mix(in oklab, #35d0a2 34%, var(--m-border));
+  border-radius: 16px;
+  padding: 12px 14px;
+  position: relative;
+}
+.mclose-dismiss {
+  background: transparent;
+  border: 0;
+  color: var(--m-muted);
+  display: grid;
+  height: 28px;
+  place-items: center;
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  width: 28px;
+}
+.mclose-label {
+  color: var(--m-muted);
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+.mclose-net {
+  /* El token, no el literal: la app tiene seis temas y uno es claro. */
+  color: var(--m-income);
+  display: block;
+  font-size: 26px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 900;
+  letter-spacing: -.03em;
+  line-height: 1.15;
+  margin-top: 2px;
+}
+.mclose-card small { color: var(--m-muted); display: block; font-size: 12px; line-height: 1.4; margin-top: 2px; }
+
+/* ── TIRAR DE LA LISTA CON ELASTICIDAD ────────────────────────────────
+ *
+ * Un tope seco al llegar arriba se siente roto aunque sea correcto. La
+ * distancia la escribe el gesto en `--ptr` (ver `usePullToRefresh`): aquí solo
+ * se dice qué se mueve.
+ */
+/*
+ * EL `transform` SOLO EXISTE MIENTRAS DURA EL GESTO.
+ *
+ * Esto NO puede ser un `transform: translateY(var(--ptr, 0px))` permanente,
+ * por tentador que sea. Cualquier `transform` distinto de `none` convierte al
+ * elemento en bloque contenedor de sus descendientes `position: fixed`, y
+ * dentro de las rutas hay hojas que se anclan al viewport a pantalla completa
+ * (la de exportar de Análisis, entre otras): dejarlo puesto las encogería al
+ * tamaño de la ruta. Esta app ya usa ese mecanismo a propósito en el modo
+ * tablet, con su aviso en `mobile-shell.css`.
+ *
+ * Con `--ptr` a cero el navegador no compone nada, así que no hay nada que
+ * ahorrar; en reposo simplemente no hay regla.
+ */
+.mobile-content[data-ptr="pulling"] > .mobile-route,
+.mobile-content[data-ptr="armed"] > .mobile-route,
+.mobile-content[data-ptr="busy"] > .mobile-route,
+.mobile-content.ptr-settling > .mobile-route {
+  transform: translateY(var(--ptr, 0px));
+}
+/* La vuelta a su sitio SÍ se anima; el arrastre no, o el contenido iría con
+   retraso respecto al dedo. */
+.mobile-content.ptr-settling > .mobile-route,
+.mobile-content.ptr-settling > .mobile-ptr {
+  transition: transform 300ms cubic-bezier(.2, .9, .25, 1);
+}
+.mobile-ptr {
+  /* Altura cero: solo asoma cuando se tira, y no deja hueco cuando no. */
+  height: 0;
+  overflow: visible;
+  pointer-events: none;
+  position: relative;
+  transform: translateY(var(--ptr, 0px));
+}
+.mobile-ptr-inner {
+  align-items: center;
+  background: var(--m-surface);
+  border: 1px solid var(--m-border);
+  border-radius: 999px;
+  bottom: 6px;
+  color: var(--m-muted);
+  display: inline-flex;
+  font-size: 11.5px;
+  font-weight: 700;
+  gap: 6px;
+  left: 50%;
+  opacity: calc(var(--ptr, 0px) / 48px);
+  padding: 5px 12px;
+  position: absolute;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+/* Armado: ya se puede soltar. El color lo dice antes que el texto. */
+.mobile-content[data-ptr="armed"] .mobile-ptr-inner {
+  border-color: color-mix(in oklab, var(--m-primary, #35d0a2) 60%, var(--m-border));
+  color: var(--m-primary, #35d0a2);
+}
+@keyframes mjuice-gira { to { transform: rotate(360deg); } }
+.mobile-content[data-ptr="busy"] .mobile-ptr-inner svg {
+  animation: mjuice-gira 820ms linear infinite;
+}
+.mobile-content[data-ptr="idle"] .mobile-ptr-inner { opacity: 0; }
+
+/* ── LA TARJETA SE INCLINA AL DESLIZARLA ──────────────────────────────
+ *
+ * El ángulo lo escribe `useCarouselTilt` en `--tilt`, a partir de la velocidad
+ * del carrusel. Sin perspectiva, `rotateY` sería un simple encogimiento
+ * horizontal; con ella, la tarjeta gira.
+ *
+ * `:active` ya tenía su propio `transform` (un encogimiento al pulsar). Como
+ * no se pueden tener dos, la escala se compone aquí dentro.
+ *
+ * TODO cuelga de `.tilting`, que el hook pone y quita. En reposo no hay
+ * ninguna regla puesta, y es a propósito: un `transform` permanente —aunque
+ * valga cero grados— convierte cada tarjeta en bloque contenedor de sus
+ * descendientes `position: fixed`, y `will-change` en todas a la vez es
+ * memoria de vídeo reservada para algo que no está pasando.
+ */
+.sacc-carousel.tilting .sacc-plastic {
+  transform: perspective(820px) rotateY(var(--tilt, 0deg));
+  transform-origin: center;
+  will-change: transform;
+}
+.sacc-carousel.tilting .sacc-plastic:active {
+  transform: perspective(820px) rotateY(var(--tilt, 0deg)) scale(.985);
+}
+/* El brillo se mueve con la tarjeta: sin esto el reflejo se quedaría clavado
+   y delataría que lo que gira es una imagen plana. */
+.sacc-carousel.tilting .sacc-plastic-sheen {
+  transform: translateX(calc(var(--tilt, 0deg) / 1deg * -0.7%));
+}
+
+/* ── EL PRESUPUESTO SE LLENA CON PESO ─────────────────────────────────
+ *
+ * Las barras ya estaban en su posición final al abrir la pantalla, así que no
+ * se leían como una proporción sino como una imagen. Crecen desde cero con
+ * inercia —rápidas al principio, frenando al final— y el ojo va a parar justo
+ * donde se detienen, que es el dato.
+ *
+ * Se anima `transform` y no `width`: el ancho ya lo pone el estilo en línea
+ * con el porcentaje de verdad, y animar `width` obliga al navegador a
+ * recalcular la maquetación en cada fotograma.
+ */
+@keyframes mjuice-llena {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+.mbud-envelope-bar-fill,
+.mbud-global-bar-fill,
+.mbud-row-fill {
+  animation: mjuice-llena 620ms cubic-bezier(.22, 1, .32, 1) both;
+  transform-origin: left center;
+}
+
+/* ── MENOS MOVIMIENTO ─────────────────────────────────────────────────
+ *
+ * Quien pide menos animación en su teléfono no quiere nada de lo de arriba.
+ * Todo sigue funcionando: solo llega puesto en vez de llegar moviéndose.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .mobile-tx-swipe.landed,
+  .mobile-tx-swipe.landed .mobile-tx-row,
+  .mclose-card,
+  .mbud-envelope-bar-fill,
+  .mbud-global-bar-fill,
+  .mbud-row-fill,
+  .mobile-content[data-ptr="busy"] .mobile-ptr-inner svg {
+    animation: none;
+  }
+  .sacc-carousel.tilting .sacc-plastic,
+  .sacc-carousel.tilting .sacc-plastic-sheen {
+    transform: none;
+    will-change: auto;
+  }
+  .sacc-carousel.tilting .sacc-plastic:active { transform: scale(.985); }
+}
+
+/* ── BUSCAR POR MONTO APROXIMADO ──────────────────────────────────────
+ *
+ * El aviso de que la búsqueda pasó a ser por rango, con los dos extremos a la
+ * vista. Sin esto, el buscador devuelve de pronto cifras que no coinciden con
+ * lo tecleado y parece roto.
+ */
+.msearch-near {
+  align-items: center;
+  background: color-mix(in oklab, var(--m-primary, #35d0a2) 12%, transparent);
+  border-radius: 10px;
+  color: var(--m-primary, #35d0a2);
+  display: flex;
+  font-size: 12px;
+  font-weight: 700;
+  gap: 7px;
+  margin: 8px 16px 0;
+  padding: 7px 11px;
+}
+.msearch-near small {
+  color: var(--m-muted);
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  margin-left: auto;
+}
+
+/* ── PAPELERA DE 30 DIAS ──────────────────────────────────────────────
+ *
+ * Una lista sobria: esto no es una pantalla donde nadie quiera estar, es un
+ * sitio al que se entra una vez, se rescata algo y se sale.
+ */
+.mtrash-row {
+  align-items: center;
+  border-bottom: 1px solid var(--m-border);
+  display: flex;
+  gap: 10px;
+  padding: 10px 2px;
+}
+.mtrash-row:last-of-type { border-bottom: 0; }
+.mtrash-id { flex: 1; min-width: 0; }
+.mtrash-id b {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mtrash-id small { color: var(--m-muted); display: block; font-size: 11.5px; }
+.mtrash-amt {
+  flex: none;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+.mtrash-amt.expense { color: var(--m-expense); }
+.mtrash-amt.income  { color: var(--m-income); }
+.mtrash-restore {
+  background: color-mix(in oklab, var(--m-primary, #35d0a2) 16%, transparent);
+  border: 0;
+  border-radius: 9px;
+  color: var(--m-primary, #35d0a2);
+  flex: none;
+  font-size: 12px;
+  font-weight: 800;
+  min-height: 34px;
+  padding: 0 12px;
+}
+.mtrash-empty {
+  align-items: center;
+  color: var(--m-muted);
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  padding: 28px 12px;
+  text-align: center;
+}
+.mtrash-empty strong { color: var(--m-text); font-size: 14px; }
+.mtrash-empty span { font-size: 12.5px; }
+/* Prefijo propio (`mtrash-`) y no `mset-`: una clase generica tipo
+   `.mset-note` es justo como nacio el choque de `.sacc-util`, que aplasto un
+   bloque ajeno por compartir nombre. Ver css-clashes.test.ts. */
+.mtrash-note {
+  color: var(--m-muted);
+  font-size: 12.5px;
+  line-height: 1.45;
+  margin: 0 0 12px;
+}
+
+/* ── EL FALLO QUE NO SE VA HASTA QUE LO LEES ──────────────────────────
+ *
+ * Rojo y sin boton de cerrar en la esquina: las dos salidas son reintentar o
+ * descartar, las dos explicitas. Un fallo que se quita con un toque al vuelo
+ * es un fallo que se pierde otra vez, que es justo lo que esto viene a
+ * arreglar.
+ */
+.minc-card {
+  align-items: flex-start;
+  background: color-mix(in oklab, var(--m-expense, #ff6b8a) 10%, var(--m-surface));
+  border: 1px solid color-mix(in oklab, var(--m-expense, #ff6b8a) 45%, var(--m-border));
+  border-radius: 16px;
+  display: flex;
+  gap: 10px;
+  padding: 12px 14px;
+}
+.minc-ico {
+  align-items: center;
+  background: color-mix(in oklab, var(--m-expense, #ff6b8a) 20%, transparent);
+  border-radius: 10px;
+  color: var(--m-expense, #ff6b8a);
+  display: grid;
+  flex: none;
+  height: 32px;
+  place-items: center;
+  width: 32px;
+}
+.minc-body { flex: 1; min-width: 0; }
+.minc-body strong { color: var(--m-expense, #ff6b8a); display: block; font-size: 13.5px; font-weight: 800; }
+.minc-body p { color: var(--m-muted); font-size: 12px; line-height: 1.4; margin: 2px 0 0; }
+/* El motivo, tal cual lo dio el error: adornarlo le quita lo unico util. */
+.minc-why {
+  background: color-mix(in oklab, var(--m-text) 6%, transparent);
+  border-radius: 7px;
+  font-family: ui-monospace, monospace;
+  font-size: 11px !important;
+  margin-top: 6px !important;
+  padding: 6px 8px;
+  word-break: break-word;
+}
+.minc-actions { display: flex; gap: 7px; margin-top: 9px; }
+.minc-actions button {
+  background: var(--m-expense, #ff6b8a);
+  border: 0;
+  border-radius: 9px;
+  color: #2a0a12;
+  font-size: 12.5px;
+  font-weight: 800;
+  min-height: 34px;
+  padding: 0 14px;
+}
+.minc-actions button.ghost {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--m-border);
+  color: var(--m-muted);
+}
+.minc-more {
+  background: color-mix(in oklab, var(--m-expense, #ff6b8a) 22%, transparent);
+  border-radius: 999px;
+  color: var(--m-expense, #ff6b8a);
+  flex: none;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 8px;
+}
+
+/* ── TECLEAR EL MONTO PRIMERO ─────────────────────────────────────────
+ *
+ * Lo que cambia es la JERARQUIA, no el funcionamiento: el teclado ya estaba
+ * abajo y ya respondia al abrir. Lo que pasaba es que la rejilla de
+ * categorias llenaba la pantalla y la cifra era una linea pequeña abajo, o
+ * sea el orden inverso al que se usa.
+ *
+ * Mientras no hay monto, la cifra crece y el marcador parpadea; la rejilla se
+ * retira un poco sin desaparecer, porque esconderla haria que la pantalla
+ * pareciera otra cada vez. En cuanto hay monto, todo vuelve a su sitio.
+ */
+.mobile-create-flow.amount-first .mobile-create-amount-value {
+  font-size: clamp(34px, 10.5vw, 50px);
+  transition: font-size 180ms cubic-bezier(.2, .8, .2, 1);
+}
+.mobile-create-flow.amount-first .mobile-create-amount-label {
+  color: var(--m-primary, #35d0a2);
+}
+/* El cursor que dice «aqui». Sin el, una cifra en cero se lee como un dato y
+   no como un hueco esperando. */
+@keyframes mjuice-cursor { 0%, 45% { opacity: 1 } 55%, 100% { opacity: .15 } }
+.mobile-create-flow.amount-first .mobile-create-amount-value::after {
+  animation: mjuice-cursor 1.05s steps(1, end) infinite;
+  content: '';
+  border-right: 2px solid var(--m-primary, #35d0a2);
+  display: inline-block;
+  height: .78em;
+  margin-left: .06em;
+  vertical-align: -.06em;
+  width: 0;
+}
+.mobile-create-flow.amount-first .mobile-create-scroll {
+  opacity: .62;
+  transition: opacity 180ms ease-out;
+}
+/* La cuenta NO se atenua: es lo unico de arriba que importa antes de teclear,
+   porque decide en que bolsillo cae el gasto. */
+.mobile-create-flow.amount-first .mobile-create-account-card { opacity: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .mobile-create-flow.amount-first .mobile-create-amount-value,
+  .mobile-create-flow.amount-first .mobile-create-scroll { transition: none; }
+  .mobile-create-flow.amount-first .mobile-create-amount-value::after { animation: none; }
+}
+
+/* ── LOS BOTONES AL ALCANCE DEL PULGAR ────────────────────────────────
+ *
+ * Un telefono de hoy mide seis pulgadas y media: la mitad de arriba de la
+ * pantalla no se alcanza con una mano. Lo que se PULSA baja; lo que solo se
+ * LEE —titulos, totales— se queda arriba, que es donde el ojo si llega sin
+ * esfuerzo.
+ *
+ * La pantalla pasa a ser una columna flex para que la barra de acciones se
+ * quede abajo aunque el contenido sea corto; antes era un bloque con scroll
+ * y una barra al final habria flotado a media pantalla en los formularios
+ * cortos.
+ */
+.mobile-editor-screen {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.mobile-editor-screen > header { grid-template-columns: 1fr; }
+.mobile-editor-screen > .mobile-editor-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
+.mobile-editor-actions {
+  background: var(--m-surface);
+  border-top: 1px solid var(--m-border);
+  display: grid;
+  gap: 8px;
+  /* Guardar mas ancho que Cancelar: la accion que se busca debe ser la que
+     mas facil es acertar, no una de dos cajas iguales. */
+  grid-template-columns: 1fr 1.5fr;
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+}
+.mobile-editor-actions button {
+  border: 0;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 800;
+  min-height: 50px;
+}
+.mobile-editor-cancel {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--m-border);
+  color: var(--m-muted);
+}
+.mobile-editor-save {
+  background: var(--m-income);
+  box-shadow: 0 4px 14px rgba(53, 208, 162, .28);
+  color: #0b2b22;
+}
+.mobile-editor-actions button:active { transform: translateY(1px) scale(.99); }
+
+/* ── EL REMATE DE GUARDAR ─────────────────────────────────────────────
+ *
+ * El boton ya se hundia al pulsar (`translateY(1px) scale(.99)`). Lo que le
+ * faltaba era que la sombra bajara con el: una pieza que se hunde y deja su
+ * sombra intacta se lee como un dibujo que se encoge, no como algo que cede
+ * bajo el dedo. Es la mitad del efecto, y la que no estaba.
+ */
+.mobile-done-button:active {
+  box-shadow: 0 1px 4px rgba(53, 208, 162, .22);
+  transition: box-shadow 60ms ease-out;
+}
+
+/* ── LA FOTO DEL RECIBO ───────────────────────────────────────────────
+ *
+ * En el detalle va como una miniatura que se toca; el ticket de verdad se lee
+ * a pantalla completa, porque en una miniatura no se distingue un renglon.
+ */
+.mtx-receipt { display: grid; gap: 5px; margin: 10px 0 2px; }
+.mtx-receipt-label {
+  color: var(--m-muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.mtx-receipt img {
+  background: var(--m-surface-2, var(--m-surface));
+  border: 1px solid var(--m-border);
+  border-radius: 12px;
+  cursor: zoom-in;
+  display: block;
+  /* Se recorta a una tira: un recibo es muy alto y a tamaño completo empujaria
+     la fecha, la cuenta y el monto fuera de la pantalla. */
+  max-height: 190px;
+  object-fit: cover;
+  object-position: top;
+  width: 100%;
+}
+.mtx-receipt-missing {
+  color: var(--m-muted);
+  font-size: 12px;
+  line-height: 1.45;
+  margin: 0;
+}
+.mtx-receipt-full {
+  align-items: center;
+  background: rgba(4, 7, 12, .94);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: max(16px, env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));
+  position: fixed;
+  z-index: 420;
+}
+.mtx-receipt-full img {
+  max-height: 100%;
+  max-width: 100%;
+  object-fit: contain;
+}
+.mtx-receipt-full button {
+  background: rgba(255, 255, 255, .14);
+  border: 0;
+  border-radius: 999px;
+  color: #fff;
+  display: grid;
+  height: 40px;
+  place-items: center;
+  position: absolute;
+  right: 14px;
+  top: calc(14px + env(safe-area-inset-top));
+  width: 40px;
+}
