@@ -1,18 +1,77 @@
-# Notas de versión — Cuadre
+# Notas de version — Cuadre
 
-Las notas que van en Play Console, en «Novedades de esta versión», una por idioma.
+Las notas que van en Play Console, en «Novedades de esta version», una por
+idioma.
 
-**Límite de Play: 500 caracteres por idioma.** Pasarse hace que Console rechace
-el texto al pegarlo, así que cada bloque de aquí está contado y cabe. Si hay que
-recortar, se quitan líneas enteras de abajo hacia arriba: están ordenadas de lo
-que más se nota a lo que menos.
+## Como se escriben
 
-Se escriben **para quien usa la app**, no para el repositorio: lo que cambia en
-su teléfono, no cómo se hizo. El detalle técnico vive en `src/data/release.ts`,
-que es lo que la app enseña en «Novedades» dentro, y en el ROADMAP.
+**Limite de Play: 500 caracteres por idioma.** Pasarse hace que Console
+rechace el texto al pegarlo, asi que cada bloque de aqui esta contado y cabe.
+
+Se escriben **para quien usa la app**: lo que cambia en su telefono, no lo que
+hicimos nosotros. El detalle tecnico vive en `src/data/release.ts`, que es lo
+que la app ensena en «Novedades» dentro, y en el ROADMAP.
+
+Y se escriben con estas reglas, que estan aqui porque se incumplieron tres
+versiones seguidas:
+
+1. **Nada en mayusculas.** Ni titulares ni palabras sueltas. Un «MAS LIMPIO»
+   grita, y las apps que se respetan no gritan en su ficha.
+2. **Nada de «Y ademas:».** Es un cajon de sastre: si algo importa tiene su
+   linea, y si no, se queda fuera. Lo mismo con «Plus:» en ingles.
+3. **Frases normales, en minuscula, declarativas.** «Tus servicios salen con
+   el logo de su marca», no «NUEVO: LOGOS DE MARCA».
+4. **Se abre con lo que el usuario nota al abrir la app**, no con lo que mas
+   trabajo costo. Son cosas distintas y casi nunca coinciden.
+5. **El esqueleto cambia de version a version.** Si la anterior fueron tres
+   bloques con titulo, esta no. Dos versiones con la misma forma ya es una
+   plantilla, y se ve.
+6. **Nada de lo de dentro.** Rendimiento, almacenes, refactores: si el usuario
+   no lo puede sentir, no va aqui.
+7. **Se cuentan los caracteres ANTES de escribir el archivo**, y se comprueba
+   que no se haya caido ninguna de las ideas principales al recortar. El
+   recortador se llevo «MATCH YOUR BANK» en silencio una vez.
+
+Si hay que recortar, se quitan ideas enteras —la menos visible primero— en
+vez de dejar frases a medias.
 
 ---
+## 2.2.0 · versionCode 2001001
 
+### Español (ES)
+
+```
+Negocio y Caprichos cambian bastante en esta versión.
+
+Tus servicios salen con el logo de su marca y cada negocio con su color. Puedes mover un servicio a otro negocio, ordenar la lista y archivar lo que ya no llevas.
+
+Si tienes dos fichas de la misma persona, la app te lo dice y te ofrece unirlas sin perder nada.
+
+Caprichos estrena Antojos: apunta lo que quieres antes de comprarlo y espera siete días. Si se te pasan las ganas, no lo compraste.
+
+La barra de arriba tiene tres botones menos.
+```
+
+### English (EN)
+
+```
+Business and Splurges change a lot in this release.
+
+Your services show their brand logo and each business its own colour. You can move a service to another business, reorder the list and archive what you no longer run.
+
+If you have two cards for the same person, the app tells you and offers to merge them without losing anything.
+
+Splurges now has Wishes: write down what you want before buying it and wait seven days. If the urge passes, you didn't buy it.
+
+The top bar has three buttons fewer.
+```
+
+### Para la ficha de Seguridad de datos
+
+Sin cambios respecto a la 2.1.0. Los antojos y los duplicados viven en el
+dispositivo igual que el resto y no salen de el.
+
+---
 ## 2.1.0 · versionCode pendiente
 
 ### Español (ES)

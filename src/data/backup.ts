@@ -163,6 +163,7 @@ const TransactionSchema = z.object({
   skippedDates: z.array(dateSchema).optional(),
   serviceId: nonEmptyText.optional(),
   resoldAs: nonEmptyText.optional(),
+  paidService: nonEmptyText.optional(),
   generatedFrom: nonEmptyText.optional(),
   tags: z.array(nonEmptyText).optional(),
 })

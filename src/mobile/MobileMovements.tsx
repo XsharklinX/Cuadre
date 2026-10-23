@@ -7,6 +7,7 @@ import { accountBalanceInBase, accountCurrency, availableBalanceInBase, convertT
 import { creditUsed } from '@/data/creditCard'
 import { backupNudge } from '@/data/backupNudge'
 import { lastMonthClose, monthCloseAlertId } from '@/data/monthClose'
+import { useHoldToHide } from '@/hooks/useHoldToHide'
 import { useDetectionHealth } from '@/hooks/useDetectionHealth'
 import { weeklyDigest } from '@/data/weeklyDigest'
 import { proactiveInsights } from '@/data/proactiveInsights'
@@ -174,6 +175,7 @@ export function MobileMovements({
     .reduce((s, a) => s + accountBalanceInBase(a, currency), 0)
   const totalBalance = availableBalanceInBase(accounts, currency) + (hiddenCountInBalance ? hiddenAssets : 0)
   const balancePositive = totalBalance >= 0
+  const holdRef = useHoldToHide<HTMLButtonElement>()
   const fmtMoney = (value: number) => new Intl.NumberFormat(undefined, {
     style: 'currency', currency,
     maximumFractionDigits: compactNumbers ? 0 : 2,
@@ -195,7 +197,15 @@ export function MobileMovements({
             <AnimatedMoney value={summary.expense} compact={compactNumbers} fit />
           </strong>
         </article>
+        {/*
+          MANTENER PULSADO TAPA TODOS LOS MONTOS.
+          El modo privado tenia su icono en una barra que ya llevaba ocho
+          controles. Apuntar a 40px no es la forma mas rapida de tapar la
+          pantalla cuando alguien acaba de sentarse al lado; mantener pulsado
+          el numero que estas mirando si, y el dedo ya esta ahi.
+        */}
         <button
+          ref={holdRef}
           className="mini-stat mini-stat-button"
           aria-expanded={showBalanceBreakdown}
           aria-label={t('accounts')}

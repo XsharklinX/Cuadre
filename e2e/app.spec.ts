@@ -46,7 +46,8 @@ async function bootMobile(page: Page, opts: { finance?: unknown } = {}) {
 test('arranca y recorre las 4 pestañas sin caer en el error boundary', async ({ page }) => {
   await bootMobile(page, { finance: demoFinanceState() })
 
-  for (const tab of ['Movimientos', 'Análisis', 'Cuentas', 'Perfil']) {
+  // Negocio ocupa el sitio que tenia Perfil, que se fue al avatar.
+  for (const tab of ['Movimientos', 'Análisis', 'Cuentas', 'Negocio']) {
     await page.getByRole('button', { name: tab, exact: true }).click()
     // La app no debe romperse en ninguna pestaña.
     await expect(page.getByText(ERROR_BOUNDARY)).toHaveCount(0)
@@ -94,7 +95,7 @@ test('arranca vacío (sin datos) y muestra la app sin romperse', async ({ page }
   // Sin inyectar finance: arranca con los datos demo por defecto del store, pero
   // con el onboarding saltado. Comprueba que el primer arranque real no crashea.
   await bootMobile(page)
-  for (const tab of ['Análisis', 'Cuentas', 'Perfil', 'Movimientos']) {
+  for (const tab of ['Análisis', 'Cuentas', 'Negocio', 'Movimientos']) {
     await page.getByRole('button', { name: tab, exact: true }).click()
     await expect(page.getByText(ERROR_BOUNDARY)).toHaveCount(0)
   }

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatedMoney } from '@/components/ui/AnimatedMoney'
+import { BrandTile } from '@/components/ui/BrandTile'
 import { EmptyArt } from '@/components/ui/EmptyArt'
 import { Icon } from '@/components/ui/Icon'
 import { toast } from '@/components/ui/Toast'
@@ -9,6 +10,7 @@ import { businessInvestment } from '@/data/investment'
 import { chargeState, clientPerMonth, daysLate, nextDueDate, outstanding, type Charge } from '@/data/clients'
 import { collectFocus, groupCharges, marginPct, type ChargeGroup } from '@/data/collectFocus'
 import { exportChargesExcel, exportChargesPdf } from '@/data/businessExport'
+import { findDuplicates } from '@/data/duplicateClients'
 import { clientServices, clientTotalAmount, type Client } from '@/data/clients'
 import { exportElementPng } from '@/data/imageExport'
 import { convertTxAmountsToBase, currentMonthKey, dateLocale, fmt, localToday, monthLabel, shortMonth } from '@/data/helpers'
@@ -22,6 +24,9 @@ import { useSettings } from '@/store/settings'
 import type { CurrencyCode, ViewProps } from '@/types'
 import { ClientSheet } from './business/ClientSheet'
 import { ClientCard } from './business/ClientCard'
+import { MergeSheet } from './business/MergeSheet'
+import { OrganizeSheet } from './business/OrganizeSheet'
+import { SwipeCharge } from './business/SwipeCharge'
 import { BusinessSheet } from './business/BusinessSheet'
 import { ServiceSheet } from './business/ServiceSheet'
 import { CollectSheet } from './business/CollectSheet'
@@ -69,6 +74,7 @@ export function MobileBusiness(_: ViewProps) {
   const [newCharge, setNewCharge] = useState(false)
   const [payServiceId, setPayServiceId] = useState<string | null>(null)
   const [openBizId, setOpenBizId] = useState<string | null>(null)
+  const [organizando, setOrganizando] = useState(false)
   // Generar un papel tarda lo suficiente como para que, sin esto, el usuario
   // pulse dos veces y reciba dos archivos.
   const [exportando, setExportando] = useState(false)
@@ -122,6 +128,34 @@ export function MobileBusiness(_: ViewProps) {
     [charges, clientMap, today],
   )
   const spread = useMemo(() => priceSpread(clients), [clients])
+
+  /*
+   * DOS FICHAS, UNA PERSONA.
+   *
+   * Hasta la 2.1.0 un cliente solo podía tener UN servicio, así que quien te
+   * compraba Netflix y Crunchyroll está apuntado dos veces, con su historial
+   * partido entre dos fichas que no se hablan.
+   *
+   * Los descartados se recuerdan en el dispositivo: decir «no son la misma» y
+   * que el aviso vuelva mañana es peor que no avisar.
+   */
+  const [dupIgnored, setDupIgnored] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('cuadre-dup-ignored') ?? '[]') }
+    catch { return [] }
+  })
+  const duplicados = useMemo(
+    () => findDuplicates(clients).filter(g => !dupIgnored.includes(g.key)),
+    [clients, dupIgnored],
+  )
+  const [mergeKey, setMergeKey] = useState<string | null>(null)
+  const grupoAUnir = duplicados.find(g => g.key === mergeKey) ?? null
+
+  const descartarDup = (key: string) => {
+    const siguiente = [...dupIgnored, key]
+    setDupIgnored(siguiente)
+    try { localStorage.setItem('cuadre-dup-ignored', JSON.stringify(siguiente.slice(-40))) }
+    catch { /* en privado no se recuerda, y no pasa nada */ }
+  }
 
   /*
    * AGRUPAR POR SERVICIO.
@@ -178,7 +212,8 @@ export function MobileBusiness(_: ViewProps) {
    * que no tenía por qué rehacerse al abrirla.
    */
   const anio = Number(mkey.slice(0, 4))
-  const cuentas = useMemo(() => businesses.map(biz => {
+  /* La ganancia de todos los negocios del mes, para el encabezado. */
+  const cuentas = useMemo(() => businesses.filter(b => !b.archivedAt).map(biz => {
     /*
      * Las dos vistas, etiquetadas. La de CAJA es lo que vio el banco;
      * la de AL MES contesta «¿esto me deja algo?», que es la que la
@@ -248,6 +283,11 @@ export function MobileBusiness(_: ViewProps) {
     setElegidos(prev => ({ ...prev, [g]: !(prev[g] ?? porDefecto[g]) }))
   }
 
+  const totalProfit = useMemo(
+    () => Math.round(cuentas.reduce((sum, c) => sum + c.runRate.profit, 0) * 100) / 100,
+    [cuentas],
+  )
+
   const TABS: Array<{ id: Tab; key: LangKey }> = [
     { id: 'collect', key: 'bizTabCollect' },
     { id: 'profit', key: 'bizTabProfit' },
@@ -268,9 +308,16 @@ export function MobileBusiness(_: ViewProps) {
     const atraso = daysLate(charge, today)
     const falta = outstanding(charge)
     const cur = client.currency ?? currency
+    const cobrable = estado !== 'paid' && estado !== 'waived'
     return (
+      /*
+        DESLIZAR PARA COBRAR.
+        Marcar «me pagó» es la acción de veinte veces al mes y pedía abrir una
+        hoja. El gesto abre la hoja con todo listo —no da el cobro por hecho—,
+        porque un cobro parcial es normal y esto crea un movimiento real.
+      */
+      <SwipeCharge key={charge.id} onCollect={() => setCollectId(charge.id)} disabled={!cobrable}>
       <button
-        key={charge.id}
         className={`mbiz-charge ${estado}`}
         onClick={() => setCollectId(charge.id)}
       >
@@ -291,6 +338,7 @@ export function MobileBusiness(_: ViewProps) {
           {estado === 'waived' && <em>{t('bizWaived')}</em>}
         </span>
       </button>
+      </SwipeCharge>
     )
   }
 
@@ -386,7 +434,16 @@ export function MobileBusiness(_: ViewProps) {
           ) : (
             <>
               {/* ── HOY: UNA SOLA CIFRA Y A QUIÉN ───────────── */}
-              <section className={`mbiz-focus ${focus.kind}`}>
+              {/*
+                TRES MATERIALES, NO UNO.
+                El titular, una tarjeta de negocio y la fila de un cliente
+                compartian fondo, borde y radio, asi que la pantalla no decia
+                que importaba y habia que leerla entera. El titular va ahora
+                a sangre —sin caja—, las tarjetas con color propio, y las
+                filas planas. Nada cambia de sitio; cambia el peso con el que
+                cada cosa pide atencion.
+              */}
+              <section className={`mbiz-focus bare ${focus.kind}`}>
                 <small>
                   {focus.kind === 'late' ? t('bizFocusLate')
                     : focus.kind === 'today' ? t('bizFocusToday')
@@ -440,13 +497,34 @@ export function MobileBusiness(_: ViewProps) {
                       <Icon name={abierto ? 'arrowUp' : 'arrowDn'} size={14} />
                     </button>
                     {abierto && (
-                      <div className="mbiz-list">
+                      <div className="mbiz-list m-stagger">
                         {lista.map(filaCobro)}
                       </div>
                     )}
                   </div>
                 )
               })}
+
+              {/* No fusiona nada solo: dos hermanos pueden llamarse igual, y
+                  una app que junta dos personas por su cuenta destruye datos
+                  sin preguntar. Sugiere, y decide el usuario. */}
+              {duplicados.map(g => (
+                <div key={g.key} className="mbiz-dup">
+                  <span className="mbiz-dup-top">
+                    <Icon name="user" size={14} />
+                    <b>
+                      {g.clients.length === 2
+                        ? t('dupFoundOne')
+                        : t('dupFound').replace('{n}', String(g.clients.length))}
+                    </b>
+                  </span>
+                  <small>{g.clients.map(c => c.name).join(' · ')}</small>
+                  <span className="mbiz-dup-acts">
+                    <button onClick={() => setMergeKey(g.key)}>{t('dupSee')}</button>
+                    <button className="ghost" onClick={() => descartarDup(g.key)}>{t('dupNot')}</button>
+                  </span>
+                </div>
+              ))}
 
               <div className="mbiz-section-head">
                 <span>{t('bizClients')}</span>
@@ -478,7 +556,7 @@ export function MobileBusiness(_: ViewProps) {
                   <div className="mbiz-list">{grupo.items.map(filaCliente)}</div>
                 </div>
               )) : (
-                <div className="mbiz-list">{clients.map(filaCliente)}</div>
+                <div className="mbiz-list m-stagger">{clients.map(filaCliente)}</div>
               )}
 
               {/* Exportar: para quien lleva la contabilidad fuera, o para
@@ -522,10 +600,63 @@ export function MobileBusiness(_: ViewProps) {
         <>
           <div className="mbiz-section-head">
             <span>{t('bizBusinesses')}</span>
-            <button onClick={() => setBizSheet('new')}>
-              <Icon name="plus" size={13} /> {t('bizAddBusiness')}
-            </button>
+            <span className="mbiz-head-btns">
+              {/* Ordenar y archivar: solo con dos o mas negocios, porque con
+                  uno no hay orden que cambiar. */}
+              {businesses.length > 1 && (
+                <button onClick={() => setOrganizando(true)}>
+                  <Icon name="dots" size={13} /> {t('bizReorder')}
+                </button>
+              )}
+              <button onClick={() => setBizSheet('new')}>
+                <Icon name="plus" size={13} /> {t('bizAddBusiness')}
+              </button>
+            </span>
           </div>
+
+          {/*
+            TUS NEGOCIOS, TODOS JUNTOS.
+            Con tres o cuatro habia que abrir uno por uno para saber como va
+            el mes. La pregunta «¿como va el mes?» tiene una respuesta, y
+            exigia cuatro toques y una suma mental.
+
+            Solo con dos o mas: con uno, este resumen es la misma cifra que la
+            tarjeta de abajo dicha dos veces.
+          */}
+          {cuentas.length > 1 && (
+            <section className="mbiz-allsum">
+              <small>{t('bizAllBusinesses').replace('{n}', String(cuentas.length))}</small>
+              <strong className={totalProfit < 0 ? 'expense' : 'income'}>
+                {totalProfit < 0 && '−'}
+                <AnimatedMoney value={Math.abs(totalProfit)} decimals={moneyDecimals} fit />
+              </strong>
+              {/* Cada negocio como una barra de SU color: cuatro negocios se
+                  distinguen sin leer ninguna etiqueta. */}
+              {totalProfit > 0 && (
+                <div className="mbiz-allsum-bar">
+                  {cuentas
+                    .filter(c => c.runRate.profit > 0)
+                    .map(c => (
+                      <i
+                        key={c.biz.id}
+                        style={{
+                          background: c.biz.color,
+                          width: `${Math.round(c.runRate.profit / totalProfit * 100)}%`,
+                        }}
+                      />
+                    ))}
+                </div>
+              )}
+              <div className="mbiz-allsum-keys">
+                {cuentas.map(c => (
+                  <span key={c.biz.id}>
+                    <i style={{ background: c.biz.color }} />
+                    {c.biz.name}
+                  </span>
+                ))}
+              </div>
+            </section>
+          )}
 
           {businesses.length === 0 ? (
             <div className="mbiz-empty">
@@ -549,8 +680,11 @@ export function MobileBusiness(_: ViewProps) {
                   una fila, del tamaño de los demás, y había que abrir la tarjeta
                   para saber si era bueno.
                 */}
-                <button className="mbiz-biz-head" onClick={() => setOpenBizId(abierto ? null : biz.id)} aria-expanded={abierto}>
+                <button className="mbiz-biz-head tinted" onClick={() => setOpenBizId(abierto ? null : biz.id)} aria-expanded={abierto}>
                   <span className="mbiz-biz-top">
+                    {/* El color del negocio ya se elegia y solo pintaba un
+                        cuadradito de 34px. Ahora baña su cabecera: cuatro
+                        negocios se distinguen sin leer. */}
                     <span className="mbiz-biz-ico"><Icon name={biz.icon} size={17} /></span>
                     <span className="mbiz-biz-id">
                       <b>{biz.name}</b>
@@ -690,6 +824,13 @@ export function MobileBusiness(_: ViewProps) {
                       return (
                         <div key={svc.id} className="mbiz-svc-wrap">
                         <button className="mbiz-svc" onClick={() => setSvcSheet({ businessId: biz.id, id: svc.id })}>
+                          {/*
+                            EL LOGO DE LA MARCA, si se le reconoce el nombre.
+                            Suscripciones ya los pintaba y aqui los mismos
+                            servicios se dibujaban como texto gris. Los logos
+                            llevan en el repositorio desde antes que Negocio.
+                          */}
+                          <BrandTile name={svc.name} size={34} color={biz.color} icon={biz.icon} />
                           <span className="mbiz-svc-id">
                             <b>{svc.name}</b>
                             <small>
@@ -754,6 +895,10 @@ export function MobileBusiness(_: ViewProps) {
         />
       )}
       {newCharge && <NewChargeSheet onClose={() => setNewCharge(false)} />}
+      {grupoAUnir && (
+        <MergeSheet group={grupoAUnir} onClose={() => setMergeKey(null)} />
+      )}
+      {organizando && <OrganizeSheet onClose={() => setOrganizando(false)} />}
       {bizSheet && (
         <BusinessSheet
           businessId={bizSheet === 'new' ? null : bizSheet}

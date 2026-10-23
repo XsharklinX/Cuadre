@@ -496,7 +496,7 @@ function normalizeTransaction(tx: Transaction): Transaction {
 
   const {
     id, type, amount, date, note, categoryId, accountId, splits,
-    recurring, recurringStart, recurringEnd, recurringNext, skippedDates, serviceId, resoldAs, generatedFrom, tags,
+    recurring, recurringStart, recurringEnd, recurringNext, skippedDates, serviceId, resoldAs, paidService, generatedFrom, tags,
     detectedFrom, originalAmount, originalCurrency, fxRate, onSecondaryBalance, fees, hasReceipt,
   } = tx
   // Los 3 campos FX viajan JUNTOS o no viajan: un `originalAmount` sin su
@@ -513,6 +513,10 @@ function normalizeTransaction(tx: Transaction): Transaction {
     // Igual que `serviceId`: solo tiene sentido en una plantilla recurrente, y
     // sin nombrarlo aquí se perdería al editar el movimiento.
     ...(recurring && resoldAs ? { resoldAs } : {}),
+    // Sin esta linea, editar el monto de un pago de Netflix le borraria la
+    // marca y el gasto dejaria de contar como inversion. Es exactamente lo
+    // que le paso a `description` y casi a `hasReceipt`.
+    ...(type === 'expense' && paidService ? { paidService } : {}),
     ...(!recurring && generatedFrom ? { generatedFrom } : {}),
     ...(tags?.length ? { tags } : {}),
     ...(detectedFrom ? { detectedFrom } : {}),

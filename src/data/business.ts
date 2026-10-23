@@ -81,6 +81,15 @@ export interface Business {
    * Ausente = se sigue diciendo y no se mueve, que es como funcionaba.
    */
   setAsideAccountId?: string
+  /**
+   * Cuando se archivo, en ms. Ausente = en pie.
+   *
+   * Archivar no es borrar: el negocio sale de la lista y deja de generar
+   * cobros, pero sus movimientos siguen en el libro y su año sigue contando
+   * en los informes. Borrarlo haria perder un trimestre de datos reales por
+   * querer limpiar una lista.
+   */
+  archivedAt?: number
   createdAt: number
 }
 

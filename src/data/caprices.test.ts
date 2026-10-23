@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
-  addPayment, capricesSummary, isSettled, matchAmount, progress,
-  recovered, remaining, removePayment, sortCaprices, type Caprice,
+  addPayment, capricesByCategory, capricesSummary, challengeDaysLeft, challengeDone,
+  isSettled, matchAmount, monthsAtCurrentPace, pace, progress,
+  recovered, recoveredInYear, remaining, removePayment, sortCaprices, type Caprice,
 } from './caprices'
 
 const AHORA = Date.UTC(2026, 9, 18, 12)
@@ -168,5 +169,149 @@ describe('sortCaprices', () => {
     const copia = [...lista]
     sortCaprices(lista)
     expect(lista).toEqual(copia)
+  })
+})
+
+/**
+ * EL RITMO Y LOS RETOS.
+ *
+ * «Te faltan 2,400» no dice qué hacer. «Si abonas 600 al mes lo cierras en
+ * cuatro» sí, y es lo que convierte una barra de progreso en algo accionable.
+ */
+describe('pace · cuánto abonar al mes', () => {
+  const base = (over: Partial<Caprice> = {}): Caprice => ({
+    id: 'c1', txId: 't1', amount: 3_000, note: 'Audífonos',
+    createdAt: Date.parse('2026-10-01T12:00:00'), payments: [], ...over,
+  })
+
+  it('reparte lo que falta entre los meses que quedan', () => {
+    const c = base({ amount: 2_400, targetDate: '2027-02-18' })
+    expect(pace(c, '2026-10-18')).toEqual({ perMonth: 600, months: 4 })
+  })
+
+  it('descuenta lo ya abonado', () => {
+    const c = base({
+      amount: 3_000, targetDate: '2027-02-18',
+      payments: [{ txId: 't2', amount: 600, at: 1 }],
+    })
+    expect(pace(c, '2026-10-18')).toEqual({ perMonth: 600, months: 4 })
+  })
+
+  it('SIN FECHA no hay ritmo que calcular', () => {
+    expect(pace(base(), '2026-10-18')).toBeNull()
+  })
+
+  it('con el bote saldado tampoco', () => {
+    const c = base({ amount: 1_000, targetDate: '2027-02-18', payments: [{ txId: 't2', amount: 1_000, at: 1 }] })
+    expect(pace(c, '2026-10-18')).toBeNull()
+  })
+
+  it('con la fecha ya pasada, la app no regaña', () => {
+    // Un plazo vencido no es una meta: es una deuda consigo mismo, y no es
+    // trabajo de la app recordarla con un número.
+    expect(pace(base({ targetDate: '2026-01-01' }), '2026-10-18')).toBeNull()
+  })
+
+  it('nunca propone menos de un mes', () => {
+    // Con diez días por delante, «0,3 meses» no se lee.
+    const r = pace(base({ amount: 900, targetDate: '2026-10-28' }), '2026-10-18')
+    expect(r!.months).toBe(1)
+    expect(r!.perMonth).toBe(900)
+  })
+
+  it('un capricho cerrado no tiene ritmo', () => {
+    expect(pace(base({ targetDate: '2027-02-18', closed: true }), '2026-10-18')).toBeNull()
+  })
+
+  it('una fecha ilegible no revienta', () => {
+    expect(pace(base({ targetDate: 'mañana' }), '2026-10-18')).toBeNull()
+  })
+})
+
+describe('monthsAtCurrentPace · al ritmo que llevas', () => {
+  const DIA = 86_400_000
+  const AHORA = Date.parse('2026-10-22T12:00:00')
+
+  it('proyecta con lo que has abonado de media', () => {
+    const c: Caprice = {
+      id: 'c1', txId: 't1', amount: 3_000, note: 'x',
+      createdAt: AHORA - 60 * DIA,
+      payments: [{ txId: 'p1', amount: 500, at: 1 }, { txId: 'p2', amount: 500, at: 2 }],
+    }
+    // 1,000 en dos meses = 500/mes; faltan 2,000 → 4 meses.
+    expect(monthsAtCurrentPace(c, AHORA)).toBe(4)
+  })
+
+  it('SIN APORTES no hay ritmo del que partir', () => {
+    // Suponer uno sería inventarse justo el dato que se pregunta.
+    const c: Caprice = { id: 'c1', txId: 't1', amount: 3_000, note: 'x', createdAt: AHORA - 60 * DIA, payments: [] }
+    expect(monthsAtCurrentPace(c, AHORA)).toBeNull()
+  })
+
+  it('saldado no proyecta nada', () => {
+    const c: Caprice = {
+      id: 'c1', txId: 't1', amount: 1_000, note: 'x', createdAt: AHORA - 30 * DIA,
+      payments: [{ txId: 'p1', amount: 1_000, at: 1 }],
+    }
+    expect(monthsAtCurrentPace(c, AHORA)).toBeNull()
+  })
+})
+
+describe('los retos', () => {
+  const AHORA = Date.parse('2026-10-22T12:00:00')
+  const conReto = (endsAt: number): Caprice => ({
+    id: 'c1', txId: 't1', amount: 3_000, note: 'x', createdAt: 0, payments: [],
+    challenge: { what: 'comida a domicilio', amount: 1_200, endsAt },
+  })
+
+  it('termina cuando llega su día', () => {
+    expect(challengeDone(conReto(AHORA - 1), AHORA)).toBe(true)
+    expect(challengeDone(conReto(AHORA + 86_400_000), AHORA)).toBe(false)
+  })
+
+  it('sin reto, nada que terminar', () => {
+    const c: Caprice = { id: 'c1', txId: 't1', amount: 1, note: 'x', createdAt: 0, payments: [] }
+    expect(challengeDone(c, AHORA)).toBe(false)
+    expect(challengeDaysLeft(c, AHORA)).toBe(0)
+  })
+
+  it('cuenta los días que faltan, sin bajar de cero', () => {
+    expect(challengeDaysLeft(conReto(AHORA + 3 * 86_400_000), AHORA)).toBe(3)
+    expect(challengeDaysLeft(conReto(AHORA - 9 * 86_400_000), AHORA)).toBe(0)
+  })
+})
+
+describe('el año y las categorías', () => {
+  it('lo recuperado va por fecha del APORTE, no del capricho', () => {
+    // Un capricho de diciembre que se termina de pagar en marzo recuperó ese
+    // dinero en marzo.
+    const c: Caprice = {
+      id: 'c1', txId: 't1', amount: 3_000, note: 'x',
+      createdAt: Date.parse('2025-12-01T12:00:00'),
+      payments: [
+        { txId: 'p1', amount: 500, at: Date.parse('2025-12-20T12:00:00') },
+        { txId: 'p2', amount: 900, at: Date.parse('2026-03-10T12:00:00') },
+      ],
+    }
+    expect(recoveredInYear([c], 2026)).toBe(900)
+    expect(recoveredInYear([c], 2025)).toBe(500)
+  })
+
+  it('agrupa por la categoría del gasto que lo abrió', () => {
+    const caprichos: Caprice[] = [
+      { id: 'a', txId: 't1', amount: 3_500, note: 'x', createdAt: 0, payments: [] },
+      { id: 'b', txId: 't2', amount: 1_200, note: 'y', createdAt: 0, payments: [] },
+      { id: 'c', txId: 't3', amount: 800, note: 'z', createdAt: 0, payments: [] },
+    ]
+    const cat = (txId: string) => ({ t1: 'tec', t2: 'comida', t3: 'comida' } as Record<string, string>)[txId]
+    expect(capricesByCategory(caprichos, cat)).toEqual([
+      { categoryId: 'tec', amount: 3_500, count: 1 },
+      { categoryId: 'comida', amount: 2_000, count: 2 },
+    ])
+  })
+
+  it('un capricho cuyo gasto perdió la categoría no inventa un grupo', () => {
+    const caprichos: Caprice[] = [{ id: 'a', txId: 't1', amount: 500, note: 'x', createdAt: 0, payments: [] }]
+    expect(capricesByCategory(caprichos, () => undefined)).toEqual([])
   })
 })

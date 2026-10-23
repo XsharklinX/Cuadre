@@ -378,3 +378,166 @@ describe('sanitizeBusinessData · los campos nuevos', () => {
     expect(clients[0].priceLog).toEqual([{ at: 5, amount: 200 }])
   })
 })
+
+/**
+ * UNIR DOS FICHAS EN UNA.
+ *
+ * Hasta la 2.1.0 un cliente solo podía tener un servicio, así que quien te
+ * compraba Netflix y Crunchyroll estaba apuntado dos veces, con su historial
+ * partido entre dos fichas que no se hablan.
+ */
+describe('mergeClients', () => {
+  beforeEach(limpiar)
+
+  function dosFichas() {
+    const a = nuevoCliente({ name: 'Carlos Méndez', serviceId: 'svc_netflix', amount: 250 })
+    const b = nuevoCliente({ name: 'Carlos Mendez', serviceId: 'svc_crunchy', amount: 150 })
+    useBusiness.getState().addCharge(a, '2026-09-05', 250)
+    useBusiness.getState().addCharge(b, '2026-09-05', 150)
+    useBusiness.getState().addCharge(b, '2026-10-05', 150)
+    return { a, b }
+  }
+
+  const porId = <T extends { id: string }>(xs: T[]) =>
+    [...xs].sort((x, y) => x.id.localeCompare(y.id))
+
+  it('queda una sola ficha, con los dos servicios', () => {
+    const { a, b } = dosFichas()
+    useBusiness.getState().mergeClients(a, [b])
+    const clients = useBusiness.getState().clients
+    expect(clients).toHaveLength(1)
+    expect(clients[0].id).toBe(a)
+    expect(clients[0].serviceShares?.map(s => s.serviceId).sort()).toEqual(['svc_crunchy', 'svc_netflix'])
+    expect(clients[0].amount).toBe(400)
+  })
+
+  it('LOS COBROS CAMBIAN DE DUEÑO, no se borran', () => {
+    // Son dinero que esa persona te debió o te pagó de verdad.
+    const { a, b } = dosFichas()
+    useBusiness.getState().mergeClients(a, [b])
+    const charges = useBusiness.getState().charges
+    expect(charges).toHaveLength(3)
+    expect(charges.every(c => c.clientId === a)).toBe(true)
+  })
+
+  it('se puede DESHACER y queda exactamente como estaba', () => {
+    const { a, b } = dosFichas()
+    const antesClientes = porId(useBusiness.getState().clients)
+    const antesCobros = porId(useBusiness.getState().charges)
+
+    const undo = useBusiness.getState().mergeClients(a, [b])!
+    expect(undo).toBeTruthy()
+    useBusiness.getState().unmergeClients(undo)
+
+    expect(porId(useBusiness.getState().clients)).toEqual(antesClientes)
+    expect(porId(useBusiness.getState().charges)).toEqual(antesCobros)
+  })
+
+  it('unir con un id que no existe no hace nada', () => {
+    const a = nuevoCliente()
+    expect(useBusiness.getState().mergeClients(a, ['fantasma'])).toBeNull()
+    expect(useBusiness.getState().clients).toHaveLength(1)
+  })
+
+  it('no se absorbe a sí mismo', () => {
+    const a = nuevoCliente()
+    expect(useBusiness.getState().mergeClients(a, [a])).toBeNull()
+    expect(useBusiness.getState().clients).toHaveLength(1)
+  })
+})
+
+describe('moveService · el servicio se lleva sus clientes', () => {
+  beforeEach(limpiar)
+
+  it('cambia de negocio y arrastra a quien lo consume', () => {
+    // Un cliente pertenece a un negocio a través del servicio que consume;
+    // dejarlo atrás lo haría cliente de un negocio que no le vende nada.
+    const svc = useBusiness.getState().addService({ businessId: 'b1', name: 'Netflix', cost: 600, costCycle: 'monthly' })
+    const cli = nuevoCliente({ businessId: 'b1', serviceId: svc })
+    const otro = nuevoCliente({ businessId: 'b1', serviceId: 'svc_otro' })
+
+    useBusiness.getState().moveService(svc, 'b2')
+
+    expect(useBusiness.getState().services[0].businessId).toBe('b2')
+    expect(useBusiness.getState().clients.find(c => c.id === cli)!.businessId).toBe('b2')
+    // El que no lo consume se queda donde estaba.
+    expect(useBusiness.getState().clients.find(c => c.id === otro)!.businessId).toBe('b1')
+  })
+
+  it('arrastra también a quien lo tiene en un reparto', () => {
+    const svc = useBusiness.getState().addService({ businessId: 'b1', name: 'Netflix', cost: 600, costCycle: 'monthly' })
+    const cli = nuevoCliente({
+      businessId: 'b1',
+      serviceShares: [{ serviceId: svc, amount: 250 }, { serviceId: 'otro', amount: 150 }],
+    })
+    useBusiness.getState().moveService(svc, 'b2')
+    expect(useBusiness.getState().clients.find(c => c.id === cli)!.businessId).toBe('b2')
+  })
+})
+
+describe('moveClientToService', () => {
+  beforeEach(limpiar)
+
+  it('lo cambia de servicio y de negocio en un paso', () => {
+    const svc = useBusiness.getState().addService({ businessId: 'bizX', name: 'Disney', cost: 450, costCycle: 'monthly' })
+    const cli = nuevoCliente({ businessId: 'bizY', serviceId: 'viejo', serviceAccountId: 'cuenta1' })
+    useBusiness.getState().moveClientToService(cli, svc)
+    const c = useBusiness.getState().clients[0]
+    expect(c.serviceId).toBe(svc)
+    expect(c.businessId).toBe('bizX')
+    // La plaza que ocupaba era de la cuenta vieja: conservarla lo pondría en
+    // una cuenta del servicio nuevo que puede no existir.
+    expect(c.serviceAccountId).toBeUndefined()
+  })
+})
+
+describe('ordenar y archivar', () => {
+  beforeEach(limpiar)
+
+  const nuevoNegocio = (name: string) => useBusiness.getState().addBusiness({
+    name, color: '#35d0a2', icon: 'play', incomeCategoryIds: [], expenseCategoryIds: [],
+  })
+
+  it('los negocios quedan en el orden que des', () => {
+    const a = nuevoNegocio('A')
+    const b = nuevoNegocio('B')
+    const c = nuevoNegocio('C')
+    useBusiness.getState().reorderBusinesses([c, a, b])
+    expect(useBusiness.getState().businesses.map(x => x.name)).toEqual(['C', 'A', 'B'])
+  })
+
+  it('LO QUE NO VENGA EN LA LISTA NO SE PIERDE', () => {
+    // Una lista de orden incompleta —por una copia vieja, por un filtro—
+    // borraría negocios enteros si esto fuera un `map`.
+    nuevoNegocio('A')
+    const b = nuevoNegocio('B')
+    useBusiness.getState().reorderBusinesses([b])
+    expect(useBusiness.getState().businesses.map(x => x.name)).toEqual(['B', 'A'])
+  })
+
+  it('archivar saca de la lista y pausa a sus clientes', () => {
+    const b = nuevoNegocio('Reventa')
+    const cli = nuevoCliente({ businessId: b, active: true })
+    useBusiness.getState().archiveBusiness(b, true)
+    expect(useBusiness.getState().businesses[0].archivedAt).toBeGreaterThan(0)
+    expect(useBusiness.getState().clients.find(c => c.id === cli)!.active).toBe(false)
+  })
+
+  it('ARCHIVAR NO BORRA NADA', () => {
+    // Su historial sigue contando en los informes del año.
+    const b = nuevoNegocio('Reventa')
+    const cli = nuevoCliente({ businessId: b })
+    useBusiness.getState().addCharge(cli, '2026-05-05', 250)
+    useBusiness.getState().archiveBusiness(b, true)
+    expect(useBusiness.getState().businesses).toHaveLength(1)
+    expect(useBusiness.getState().clients).toHaveLength(1)
+    expect(useBusiness.getState().charges).toHaveLength(1)
+  })
+
+  it('desarchivar quita la marca', () => {
+    const b = nuevoNegocio('X')
+    useBusiness.getState().archiveBusiness(b, true)
+    useBusiness.getState().archiveBusiness(b, false)
+    expect(useBusiness.getState().businesses[0].archivedAt).toBeUndefined()
+  })
+})

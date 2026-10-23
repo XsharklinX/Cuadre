@@ -5,6 +5,7 @@ import { applyPayment, pendingCharges, revokePayment } from '@/data/receivables'
 import type { Business, Service } from '@/data/business'
 import type { Charge, Client } from '@/data/clients'
 import { localToday } from '@/data/helpers'
+import { mergePlan } from '@/data/duplicateClients'
 import { newId } from '@/data/seed'
 
 /**
@@ -22,6 +23,16 @@ import { newId } from '@/data/seed'
  * movimiento de verdad por `addTx` y guarda su id. Una sola puerta es una sola
  * cosa que puede fallar.
  */
+
+/** Todo lo necesario para que una fusión se pueda deshacer de verdad. */
+export interface MergeUndo {
+  /** Los clientes absorbidos, enteros y tal como estaban. */
+  absorbed: Client[]
+  /** El cliente que sobrevivió, tal como estaba ANTES de absorber. */
+  survivorBefore: Client
+  /** Cada cobro movido, con el dueño que tenía. */
+  charges: Array<{ chargeId: string; clientId: string }>
+}
 
 interface BusinessState {
   clients: Client[]
@@ -44,6 +55,26 @@ interface BusinessState {
    * inventado.
    */
   duplicateClient: (id: string) => string | null
+  /**
+   * UNE DOS FICHAS EN UNA. Devuelve lo necesario para deshacerlo.
+   *
+   * Lo que se guarda para deshacer son los clientes absorbidos ENTEROS y a
+   * qué cliente apuntaba cada cobro movido. Con eso se vuelve exactamente al
+   * estado anterior; con menos, deshacer sería una aproximación.
+   */
+  mergeClients: (survivorId: string, absorbedIds: string[]) => MergeUndo | null
+  /** Deshace una fusión, con lo que ella misma devolvió. */
+  unmergeClients: (undo: MergeUndo) => void
+
+  /** Mueve un servicio a otro negocio. Sus clientes van con él. */
+  moveService: (serviceId: string, businessId: string) => void
+  /** Cambia a un cliente de servicio sin pasar por su formulario. */
+  moveClientToService: (clientId: string, serviceId: string) => void
+  /** El orden en que se enseñan, puesto a mano. */
+  reorderBusinesses: (ids: string[]) => void
+  reorderServices: (ids: string[]) => void
+  /** Archivar NO es borrar: sale de la lista y su historial sigue contando. */
+  archiveBusiness: (id: string, archived: boolean) => void
 
   // ── Negocios y servicios ───────────────────────────────
   addBusiness: (b: Omit<Business, 'id' | 'createdAt'>) => string
@@ -76,6 +107,23 @@ interface BusinessState {
 /** Un ciclo que no reconocemos se trae de una versión futura o está corrupto. */
 function safeCycle(value: unknown): BillingCycle {
   return CYCLE_ORDER.includes(value as BillingCycle) ? (value as BillingCycle) : 'monthly'
+}
+
+/**
+ * Reordena una lista según los ids dados, dejando al final lo que no venga.
+ *
+ * Lo que no esté en `ids` no se pierde: una lista de orden que llegara
+ * incompleta —por una copia vieja, por un filtro en la pantalla— borraría
+ * negocios enteros si esto se escribiera como un `map`.
+ */
+function ordenarPor<T extends { id: string }>(lista: T[], ids: string[]): T[] {
+  const porId = new Map(lista.map(x => [x.id, x]))
+  const fuera: T[] = []
+  for (const id of ids) {
+    const x = porId.get(id)
+    if (x) { fuera.push(x); porId.delete(id) }
+  }
+  return [...fuera, ...porId.values()]
 }
 
 function num(value: unknown, fallback = 0): number {
@@ -164,6 +212,7 @@ export function sanitizeBusinessData(raw: unknown): Pick<BusinessState, 'clients
       expenseCategoryIds: (Array.isArray(b.expenseCategoryIds) ? b.expenseCategoryIds : []).filter(x => typeof x === 'string'),
       setAsidePct: num(b.setAsidePct) > 0 ? Math.min(100, num(b.setAsidePct)) : undefined,
       setAsideAccountId: str(b.setAsideAccountId) || undefined,
+      archivedAt: num(b.archivedAt) > 0 ? num(b.archivedAt) : undefined,
       createdAt: num(b.createdAt, Date.now()),
     }))
 
@@ -273,6 +322,109 @@ export const useBusiness = create<BusinessState>()(
        * ortografía en el nombre no es una subida de precio, y un historial
        * lleno de entradas idénticas no se puede leer.
        */
+      mergeClients: (survivorId, absorbedIds) => {
+        const estado = get()
+        const survivor = estado.clients.find(c => c.id === survivorId)
+        const absorbed = estado.clients.filter(c => absorbedIds.includes(c.id) && c.id !== survivorId)
+        if (!survivor || !absorbed.length) return null
+
+        const plan = mergePlan(survivor, absorbed, estado.charges)
+        const idsAbsorbidos = new Set(absorbed.map(c => c.id))
+
+        const undo: MergeUndo = {
+          absorbed: absorbed.map(c => ({ ...c })),
+          survivorBefore: { ...survivor },
+          charges: estado.charges
+            .filter(ch => idsAbsorbidos.has(ch.clientId))
+            .map(ch => ({ chargeId: ch.id, clientId: ch.clientId })),
+        }
+
+        set(st => ({
+          clients: st.clients
+            .filter(c => !idsAbsorbidos.has(c.id))
+            .map(c => c.id === survivorId ? plan.result : c),
+          // Los cobros cambian de dueño, no se borran: son dinero que esa
+          // persona te debió o te pagó de verdad.
+          charges: st.charges.map(ch => idsAbsorbidos.has(ch.clientId)
+            ? { ...ch, clientId: survivorId }
+            : ch),
+        }))
+        return undo
+      },
+
+      unmergeClients: (undo) => set(st => {
+        const vuelven = new Map(undo.charges.map(c => [c.chargeId, c.clientId]))
+        return {
+          clients: [
+            ...st.clients.map(c => c.id === undo.survivorBefore.id ? undo.survivorBefore : c),
+            ...undo.absorbed,
+          ],
+          charges: st.charges.map(ch => vuelven.has(ch.id)
+            ? { ...ch, clientId: vuelven.get(ch.id)! }
+            : ch),
+        }
+      }),
+
+      /*
+       * MOVER UN SERVICIO: sus clientes van con él.
+       *
+       * Un cliente pertenece a un negocio a través del servicio que consume;
+       * dejarlo atrás lo convertiría en un cliente de un negocio que ya no le
+       * vende nada.
+       */
+      moveService: (serviceId, businessId) => set(st => ({
+        services: st.services.map(v => v.id === serviceId ? { ...v, businessId } : v),
+        clients: st.clients.map(c => {
+          const suyos = c.serviceShares?.some(x => x.serviceId === serviceId) || c.serviceId === serviceId
+          return suyos ? { ...c, businessId } : c
+        }),
+      })),
+
+      moveClientToService: (clientId, serviceId) => set(st => {
+        const servicio = st.services.find(v => v.id === serviceId)
+        return {
+          clients: st.clients.map(c => c.id === clientId
+            /* Se mueve TODO el cliente, no uno de sus repartos: cambiar de
+               servicio a quien tiene dos es otra operación, y hacerla aquí en
+               silencio le borraría el otro. */
+            ? {
+              ...c,
+              serviceId,
+              serviceShares: undefined,
+              businessId: servicio?.businessId ?? c.businessId,
+              serviceAccountId: undefined,
+            }
+            : c),
+        }
+      }),
+
+      reorderBusinesses: (ids) => set(st => ({
+        businesses: ordenarPor(st.businesses, ids),
+      })),
+
+      reorderServices: (ids) => set(st => ({
+        services: ordenarPor(st.services, ids),
+      })),
+
+      /*
+       * ARCHIVAR NO ES BORRAR.
+       *
+       * Un negocio terminado sale de la lista y deja de generar cobros, pero
+       * sus movimientos siguen en el libro y su año sigue contando en los
+       * informes. Borrarlo haría perder un trimestre de datos reales por
+       * querer limpiar una lista.
+       */
+      archiveBusiness: (id, archived) => set(st => ({
+        businesses: st.businesses.map(b => b.id === id
+          ? { ...b, archivedAt: archived ? Date.now() : undefined }
+          : b),
+        // Sus clientes dejan de generar cobros nuevos, por lo mismo que un
+        // cliente pausado: el negocio ya no vende.
+        clients: archived
+          ? st.clients.map(c => c.businessId === id ? { ...c, active: false } : c)
+          : st.clients,
+      })),
+
       updateClient: (id, fields) => set(s => ({
         clients: s.clients.map(c => {
           if (c.id !== id) return c

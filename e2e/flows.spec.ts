@@ -44,7 +44,18 @@ const nav = (page: Page, name: string) => page.getByLabel(/Navegaci/).getByRole(
  * es una pantalla de ajustes a la que se entra de vez en cuando, y tenia uno de
  * los cuatro sitios fijos.
  */
-const goProfile = (page: Page) => page.getByRole('button', { name: 'Perfil' }).first().click()
+/*
+ * Perfil ya no es un boton de la barra: vive en el panel del avatar.
+ *
+ * Perfil, avisos y ajustes eran tres iconos de una barra que llevaba ocho
+ * controles, y los tres se visitan en el mismo momento. Dos toques en vez de
+ * uno, y la barra respira.
+ */
+const goProfile = async (page: Page) => {
+  await page.getByRole('button', { name: 'Mis cosas' }).first().click()
+  await page.locator('.mav').waitFor()
+  await page.locator('.mav-row', { hasText: 'Perfil' }).first().click()
+}
 
 test('crear un gasto de extremo a extremo lo guarda', async ({ page }) => {
   await boot(page)
@@ -270,9 +281,16 @@ test('marcar un gasto como capricho lo lleva al bote', async ({ page }) => {
   await page.locator('.mobile-done-button').click()
   await page.waitForTimeout(400)
 
-  // El bote existe y lleva el monto del gasto.
+  /*
+   * El bote existe y lleva el monto del gasto.
+   *
+   * La herramienta se llama Caprichos desde la 2.2.0 — «El bote» y
+   * «Caprichos» eran dos nombres para una cosa — y el bote es una de sus tres
+   * pestañas, que ahora abren en Antojos.
+   */
   await page.locator('.mobile-topbar-menu').click()
-  await page.locator('.mobile-tools-row', { hasText: /El bote|The jar/ }).first().click()
+  await page.locator('.mobile-tools-row', { hasText: /Caprichos|Splurges/ }).first().click()
+  await page.locator('.mcap-tabs button', { hasText: /El bote|The jar/ }).click()
   await expect(page.locator('.mcap-hero')).toBeVisible()
   await expect(page.locator('.mcap-hero strong')).toContainText('3,200')
 

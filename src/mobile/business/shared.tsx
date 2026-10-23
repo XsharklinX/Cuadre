@@ -3,6 +3,7 @@ import { Icon } from '@/components/ui/Icon'
 import { CYCLE_KEY, CYCLE_ORDER, type BillingCycle } from '@/data/billing'
 import { CURRENCIES } from '@/data/seed'
 import { useT, type LangKey } from '@/i18n'
+import { useSheetDrag } from '@/hooks/useSheetDrag'
 import { useDialogA11y } from '../useDialogA11y'
 import { useMobileBackDismiss } from '../useMobileBackDismiss'
 import { sheetRoot } from '../SheetPortal'
@@ -35,10 +36,13 @@ export function BizSheet({
   const t = useT()
   useMobileBackDismiss(true, onClose)
   const dialogRef = useDialogA11y<HTMLDivElement>(onClose)
+  /* Arrastrar hacia abajo la cierra, que es lo que todo el mundo intenta
+     antes de buscar la X. */
+  const dragRef = useSheetDrag<HTMLElement>(onClose)
 
   return createPortal(
     <div ref={dialogRef} className="mobile-detail-sheet mbizs-root" role="dialog" aria-modal="true" aria-label={title}>
-      <section className="mbizs" onClick={e => e.stopPropagation()}>
+      <section ref={dragRef} className="mbizs" onClick={e => e.stopPropagation()}>
         <header className="mbizs-head">
           <span>{title}</span>
           <button aria-label={t('close')} onClick={onClose}><Icon name="close" size={18} /></button>

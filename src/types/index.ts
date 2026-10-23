@@ -275,6 +275,25 @@ export interface Transaction {
    * es decir que las dos filas hablan de lo mismo.
    */
   resoldAs?:    string
+  /**
+   * EL SERVICIO QUE ESTE GASTO PAGÓ.
+   *
+   * ── EL NÚMERO QUE ARREGLA ───────────────────────────────────────────
+   * «Has puesto» sumaba TODOS los gastos de las categorías del negocio, sin
+   * fecha ni filtro. Como esas categorías son las de siempre —Entretenimiento,
+   * Online— ahí dentro estaba el Claude Pro del usuario y sus juegos: la
+   * pantalla decía que había invertido 13,671 en un Netflix de 14.99 al mes.
+   *
+   * Con esta marca, lo invertido es lo que de verdad se pagó: los gastos que
+   * salieron del botón «Pagar» de cada servicio. Un dato que la app ya tenía
+   * delante y no estaba guardando.
+   *
+   * ── NO ES `resoldAs` NI `serviceId` ─────────────────────────────────
+   * `serviceId` es la marca del catálogo, para el logo. `resoldAs` dice que
+   * una suscripción recurrente ES un servicio que revendes. Esto dice que un
+   * gasto concreto PAGÓ ese servicio, y son tres cosas distintas.
+   */
+  paidService?: string
   tags?:        string[]            // ej. ['trabajo', 'viaje']
   /**
    * FOTO DEL RECIBO: aquí va solo la MARCA de que existe, no la imagen.

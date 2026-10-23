@@ -3,6 +3,7 @@ import { Icon } from '@/components/ui/Icon'
 import { toast } from '@/components/ui/Toast'
 import { cycleMonths } from '@/data/billing'
 import { clientPerMonth, nextDueDate } from '@/data/clients'
+import { nameAlreadyUsed } from '@/data/duplicateClients'
 import { fmt, localToday } from '@/data/helpers'
 import { translateCategoryName, useT } from '@/i18n'
 import { useMoneyDecimals } from '@/hooks/useFmt'
@@ -83,6 +84,15 @@ export function ClientSheet({ clientId, onClose }: { clientId: string | null; on
 
   const serviciosDelNegocio = services.filter(s => s.businessId === businessId)
 
+  /*
+   * MEJOR QUE DETECTARLOS ES NO TENERLOS.
+   *
+   * Avisa mientras escribes. Y enseña de paso que un cliente puede tener
+   * VARIOS servicios — que es justo lo que la gente no sabía que podía hacer,
+   * y la razón por la que hay duplicados.
+   */
+  const yaExiste = existente ? null : nameAlreadyUsed(name, clients)
+
   const save = () => {
     if (!canSave) return
     const fields = {
@@ -149,6 +159,11 @@ export function ClientSheet({ clientId, onClose }: { clientId: string | null; on
           placeholder={t('bizClientNamePlaceholder')}
           onChange={e => setName(e.target.value)}
         />
+        {yaExiste && (
+          <small className="mbizs-dup-warn">
+            {t('bizNameTaken').replace('{name}', yaExiste.name)}
+          </small>
+        )}
       </Field>
 
       <Field label={t('bizConcept')} hint={t('bizConceptHint')}>

@@ -33,6 +33,8 @@ const MobileGlobalSearch = lazy(() => import('./MobileGlobalSearch').then(m => (
 const MobileCSVImport = lazy(() => import('./MobileCSVImport').then(m => ({ default: m.MobileCSVImport })))
 const MobileReceiptBatch = lazy(() => import('./MobileReceiptBatch').then(m => ({ default: m.MobileReceiptBatch })))
 const MobileNotificationCenter = lazy(() => import('./MobileNotificationCenter').then(m => ({ default: m.MobileNotificationCenter })))
+import { useSwipeRoute } from '@/hooks/useSwipeRoute'
+import { MobileAvatarSheet } from './MobileAvatarSheet'
 import { MobileTopBar } from './MobileTopBar'
 import { useNotificationFeed } from '@/hooks/useNotificationFeed'
 import { usePullToRefresh } from '@/hooks/usePullToRefresh'
@@ -146,6 +148,7 @@ export function MobileShell({
   const [currencyOpen, setCurrencyOpen] = useState(false)
   const [converterOpen, setConverterOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
+  const [avatarOpen, setAvatarOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
   const [toolsOpen, setToolsOpen] = useState(false)
   const [csvOpen, setCsvOpen] = useState(false)
@@ -602,6 +605,44 @@ export function MobileShell({
     scrollPositions.current[activeScrollKey.current] = scroller.scrollTop
   }
 
+  /*
+   * LA ACCION DE CADA PANTALLA.
+   *
+   * El calendario solo sirve en Movimientos, pero la barra cargaba los mismos
+   * iconos en todas partes: ninguna pantalla tenia el suyo y todas llevaban
+   * los de las demas. Un hueco, no un cajon.
+   *
+   * Negocio no pone ninguna a proposito: exportar ya vive al pie de su lista,
+   * junto a los cobros que exporta, y repetirlo arriba seria ofrecer dos
+   * puertas a lo mismo.
+   */
+  const topAction = route === 'home'
+    ? { icon: 'calendar' as const, label: t('calendarLabel'), onPress: () => gotoView('calendar') }
+    : null
+
+  /*
+   * PASAR DE PESTAÑA CON EL DEDO.
+   *
+   * La transicion ya existia pero solo se disparaba tocando la barra de
+   * abajo. Deslizar es como la gente espera moverse entre pestañas vecinas.
+   *
+   * Solo entre las cuatro de la barra, y solo en su pantalla principal: dentro
+   * de una herramienta del menu ☰ no hay «pestaña siguiente», y deslizar ahi
+   * sacaria al usuario de donde estaba sin que lo haya pedido.
+   */
+  const swipeActivo = !isInProfileSub && route !== 'add'
+  const irRelativo = (paso: number) => {
+    const i = ROUTE_ORDER.indexOf(route)
+    if (i < 0) return
+    const siguiente = ROUTE_ORDER[i + paso]
+    if (siguiente) goRoute(siguiente)
+  }
+  const swipeRef = useSwipeRoute<HTMLDivElement>(
+    () => irRelativo(1),
+    () => irRelativo(-1),
+    swipeActivo,
+  )
+
   const mainContent = (
     <ViewErrorBoundary resetKey={routeResetKey}>
       {renderMain()}
@@ -614,6 +655,15 @@ export function MobileShell({
         <Suspense fallback={<div className="mobile-loading-overlay mobile-loading-skeleton" aria-live="polite"><MobileSkeletonScreen /></div>}>
           <MobileCSVImport onClose={() => setCsvOpen(false)} />
         </Suspense>
+      )}
+      {avatarOpen && (
+        <MobileAvatarSheet
+          onClose={() => setAvatarOpen(false)}
+          onProfile={() => goRoute('profile')}
+          onNotifications={openNotifications}
+          onSettings={() => onSettings()}
+          notifCount={notifFeed.unseenCount}
+        />
       )}
       {currencyOpen && (
         <Suspense fallback={null}>
@@ -736,13 +786,11 @@ export function MobileShell({
         onBack={topBarBack}
         onMenu={route === 'home' ? (() => setToolsOpen(true)) : undefined}
         onSelectMonth={onMonth}
-        onSettings={() => onSettings()}
-        onProfile={() => goRoute('profile')}
+        onAvatar={() => setAvatarOpen(true)}
         onCurrency={() => setCurrencyOpen(true)}
-        onCalendar={route === 'home' ? () => gotoView('calendar') : undefined}
         onSearch={() => setSearchOpen(true)}
-        onBell={openNotifications}
         notifCount={notifFeed.unseenCount}
+        action={topAction}
       />
       {route === 'add' ? (
         mainContent
@@ -758,7 +806,7 @@ export function MobileShell({
                 {pullPhase === 'armed' ? t('releaseToRefreshHint') : t('pullToRefreshHint')}
               </span>
             </div>
-            <div className={`mobile-route mobile-route-${routeDir}`} key={routeResetKey}>
+            <div ref={swipeRef} className={`mobile-route mobile-route-${routeDir}`} key={routeResetKey}>
               {mainContent}
             </div>
           </div>

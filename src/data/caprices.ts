@@ -48,6 +48,33 @@ export interface Caprice {
   payments: CapricePayment[]
   /** Cerrado a mano. No es un fracaso: deja de contar y se puede olvidar. */
   closed?: boolean
+  /**
+   * Para cuándo quieres tenerlo recuperado, `YYYY-MM-DD`.
+   *
+   * No es una promesa ni un plazo que la app vigile: es lo que permite
+   * calcular el RITMO —«si abonas 600 al mes lo cierras en cuatro»—, que es
+   * lo que convierte una barra de progreso en algo que se puede accionar.
+   * Sin fecha, la barra solo dice cuánto falta.
+   */
+  targetDate?: string
+  /**
+   * UN RETO ABIERTO: una semana sin algo, y lo que te ahorres lo abonas.
+   *
+   * Solo uno a la vez. Dos retos simultáneos compiten por el mismo dinero
+   * ahorrado y el usuario acaba abonando dos veces lo que ahorró una.
+   *
+   * Lo importante: terminar un reto NO abona nada por su cuenta. Propone la
+   * transferencia, y el abono lo respalda un movimiento real — la misma regla
+   * que el resto del bote.
+   */
+  challenge?: {
+    /** Lo que te propones no hacer: «comida a domicilio». */
+    what: string
+    /** Lo que calculas que te ahorras. */
+    amount: number
+    /** Cuándo termina, en ms. */
+    endsAt: number
+  }
 }
 
 function cents(n: number): number {
@@ -138,4 +165,120 @@ export function sortCaprices(caprices: Caprice[]): Caprice[] {
     if (cerradoA !== cerradoB) return cerradoA - cerradoB
     return remaining(b) - remaining(a)
   })
+}
+
+/**
+ * EL RITMO: cuánto hay que abonar al mes para llegar a la fecha.
+ *
+ * Es lo que convierte una barra de progreso en algo accionable. «Te faltan
+ * 2,400» no dice qué hacer; «si abonas 600 al mes lo cierras en cuatro» sí.
+ *
+ * Devuelve `null` cuando no hay nada que calcular: sin fecha objetivo, con el
+ * bote ya saldado, o con la fecha ya pasada —ahí el plazo no es una meta, es
+ * una deuda consigo mismo y la app no va a regañar por ella—.
+ */
+export function pace(caprice: Caprice, today: string): { perMonth: number; months: number } | null {
+  if (!caprice.targetDate || caprice.closed) return null
+  const falta = remaining(caprice)
+  if (falta <= 0) return null
+
+  const hoy = Date.parse(`${today}T00:00:00`)
+  const meta = Date.parse(`${caprice.targetDate}T00:00:00`)
+  if (!Number.isFinite(hoy) || !Number.isFinite(meta) || meta <= hoy) return null
+
+  // Al menos un mes: con diez días por delante, «0,3 meses» no se lee.
+  const months = Math.max(1, Math.round((meta - hoy) / (30 * 86_400_000)))
+  return { perMonth: cents(falta / months), months }
+}
+
+/**
+ * A este ritmo, ¿cuándo se cierra?
+ *
+ * La otra mitad de la pregunta: con lo que ya has abonado de media al mes,
+ * cuántos meses quedan. Sin aportes no hay ritmo del que partir, y suponer
+ * uno sería inventarse justo el dato que se está preguntando.
+ */
+export function monthsAtCurrentPace(caprice: Caprice, now: number): number | null {
+  const falta = remaining(caprice)
+  if (falta <= 0 || !caprice.payments.length) return null
+
+  const meses = Math.max(1, (now - caprice.createdAt) / (30 * 86_400_000))
+  const porMes = recovered(caprice) / meses
+  if (porMes <= 0) return null
+  return Math.ceil(falta / porMes)
+}
+
+/** Si el reto de un capricho ya terminó y toca cobrarlo. */
+export function challengeDone(caprice: Caprice, now: number): boolean {
+  return !!caprice.challenge && now >= caprice.challenge.endsAt
+}
+
+/** Días que le quedan al reto. `0` si ya terminó o no hay. */
+export function challengeDaysLeft(caprice: Caprice, now: number): number {
+  if (!caprice.challenge) return 0
+  return Math.max(0, Math.ceil((caprice.challenge.endsAt - now) / 86_400_000))
+}
+
+/**
+ * Lo recuperado dentro de un año, por si se quiere mirar el año.
+ *
+ * Por fecha del APORTE, no del capricho: un capricho de diciembre que se
+ * termina de pagar en marzo recuperó ese dinero en marzo.
+ */
+export function recoveredInYear(caprices: Caprice[], year: number): number {
+  let total = 0
+  for (const c of caprices) {
+    for (const p of c.payments) {
+      if (new Date(p.at).getFullYear() === year) total += p.amount
+    }
+  }
+  return cents(total)
+}
+
+/**
+ * EN QUÉ CAES: lo gastado en caprichos, agrupado por la categoría del gasto.
+ *
+ * La categoría sale del movimiento que abrió el bote, no de un campo nuevo:
+ * es un dato que ya existe, y duplicarlo daría dos respuestas en cuanto
+ * alguien editara el gasto.
+ */
+export function capricesByCategory(
+  caprices: Caprice[],
+  categoryOf: (txId: string) => string | undefined,
+): Array<{ categoryId: string; amount: number; count: number }> {
+  const porCat = new Map<string, { amount: number; count: number }>()
+  for (const c of caprices) {
+    const cat = categoryOf(c.txId)
+    if (!cat) continue
+    const actual = porCat.get(cat) ?? { amount: 0, count: 0 }
+    actual.amount += c.amount
+    actual.count += 1
+    porCat.set(cat, actual)
+  }
+  return [...porCat.entries()]
+    .map(([categoryId, v]) => ({ categoryId, amount: cents(v.amount), count: v.count }))
+    .sort((a, b) => b.amount - a.amount)
+}
+
+/**
+ * ¿SUELES MARCAR LOS DE ESTA CATEGORÍA?
+ *
+ * El momento de sinceridad con uno mismo es cuando estás escribiendo el
+ * monto, no tres días después. Si de los gastos que has marcado como capricho
+ * la mayoría son de una categoría, al crear otro de esa categoría vale la pena
+ * preguntarlo — una vez, sin insistir.
+ *
+ * ── POR QUÉ PIDE TRES ─────────────────────────────────────────────────
+ * Con uno o dos no hay patrón, hay casualidad. Sugerir a partir de ahí
+ * convertiría la función en una app que opina sobre cada compra, que es
+ * exactamente lo que esta función no debe ser.
+ */
+export function looksLikeCaprice(
+  categoryId: string | undefined,
+  caprices: Caprice[],
+  categoryOf: (txId: string) => string | undefined,
+): boolean {
+  if (!categoryId) return false
+  const deEsa = caprices.filter(c => categoryOf(c.txId) === categoryId).length
+  return deEsa >= 3
 }

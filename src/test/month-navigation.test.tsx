@@ -25,7 +25,7 @@ describe('MobileTopBar date navigation', () => {
         mkey="2026-06"
         monthKeys={keys}
         onSelectMonth={vi.fn()}
-        onSettings={vi.fn()}
+        onAvatar={vi.fn()}
         onCurrency={vi.fn()}
         onSearch={vi.fn()}
       />
@@ -46,7 +46,7 @@ describe('MobileTopBar date navigation', () => {
         mkey="2026-06"
         monthKeys={keys}
         onSelectMonth={vi.fn()}
-        onSettings={vi.fn()}
+        onAvatar={vi.fn()}
         onCurrency={vi.fn()}
         onSearch={vi.fn()}
       />
@@ -69,7 +69,7 @@ describe('MobileTopBar date navigation', () => {
         mkey="2026-06"
         monthKeys={keys}
         onSelectMonth={vi.fn()}
-        onSettings={vi.fn()}
+        onAvatar={vi.fn()}
         onCurrency={vi.fn()}
         onSearch={vi.fn()}
       />
@@ -83,7 +83,7 @@ describe('MobileTopBar date navigation', () => {
         mkey="2026-06"
         monthKeys={keys}
         onSelectMonth={vi.fn()}
-        onSettings={vi.fn()}
+        onAvatar={vi.fn()}
         onCurrency={vi.fn()}
         onSearch={vi.fn()}
       />

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { BrandTile } from '@/components/ui/BrandTile'
 import { Icon } from '@/components/ui/Icon'
 import { toast } from '@/components/ui/Toast'
 import { CYCLE_KEY } from '@/data/billing'
@@ -45,7 +46,7 @@ export function ClientCard({ clientId, onClose, onCollect, onDuplicated }: {
   const locale = dateLocale(lang)
   const moneyDecimals = useMoneyDecimals()
   const { currency } = useFinance()
-  const { clients, charges, businesses, services, duplicateClient } = useBusiness()
+  const { clients, charges, businesses, services, duplicateClient, moveClientToService } = useBusiness()
 
   const [editando, setEditando] = useState(false)
   const [cobroNuevo, setCobroNuevo] = useState(false)
@@ -53,6 +54,7 @@ export function ClientCard({ clientId, onClose, onCollect, onDuplicated }: {
   // usuario pulse dos veces y reciba dos archivos.
   const [generando, setGenerando] = useState(false)
   const [verHistorial, setVerHistorial] = useState(false)
+  const [cambiando, setCambiando] = useState(false)
 
   const today = localToday()
   const client = clients.find(c => c.id === clientId)
@@ -85,6 +87,10 @@ export function ClientCard({ clientId, onClose, onCollect, onDuplicated }: {
    * nadie lo note, y la app tenia el dato y no lo ensenaba en ningun sitio.
    */
   const antes = lastPriceChange(client)
+
+  /* El mismo color estable que su fila en la lista: la ficha y la lista
+     hablan de la misma persona y tienen que verse como tal. */
+  const avatarColor = colorDe(client.id)
   const proximo = nextDueDate(client, today)
   const alMes = clientPerMonth(client, currency)
 
@@ -96,6 +102,31 @@ export function ClientCard({ clientId, onClose, onCollect, onDuplicated }: {
   return (
     <BizSheet title={client.name} onClose={onClose}>
       {/* ── LO QUE IMPORTA AHORA ───────────────────────────── */}
+      {/*
+        LA FICHA CON CARA.
+        Tenía los datos y le faltaba identidad. Si parece una ficha de
+        cliente, tratas con un cliente; si parece un formulario, estás
+        administrando una base de datos.
+      */}
+      <header className="mcli-head">
+        <span
+          className="mcli-head-ava"
+          style={{
+            background: `color-mix(in oklab, ${avatarColor} 22%, transparent)`,
+            color: avatarColor,
+          }}
+        >
+          {inicialesDe(client.name)}
+        </span>
+        <span className="mcli-head-id">
+          <b>{client.name}</b>
+          <small>
+            {t('bizClientSince').replace('{date}', new Date(client.createdAt || Date.now())
+              .toLocaleDateString(locale, { month: 'long', year: 'numeric' }))}
+          </small>
+        </span>
+      </header>
+
       <div className="mcli-top">
         <div className={`mcli-owes${hist.owes > 0 ? ' due' : ''}`}>
           <small>{t('bizCliOwes')}</small>
@@ -136,16 +167,10 @@ export function ClientCard({ clientId, onClose, onCollect, onDuplicated }: {
         {/* Sus servicios con lo que paga por cada uno. Con uno solo se dice
             el nombre y ya: repetir el precio que esta dos lineas mas arriba
             no anade nada. */}
+        {/* Con un solo servicio basta el nombre: repetir el precio que está
+            dos líneas más arriba no añade nada. Con varios, van en su propio
+            bloque con el logo de cada uno. */}
         {sus.length === 1 && servicio && <span>{servicio.name}</span>}
-        {sus.length > 1 && sus.map(({ serviceId, amount }) => {
-          const svc = services.find(v => v.id === serviceId)
-          if (!svc) return null
-          return (
-            <span key={serviceId}>
-              {svc.name} {fmt(amount, cur, { decimals: moneyDecimals })}
-            </span>
-          )
-        })}
         {/* La puntualidad en datos y sin juicios: sirve para decidir precios,
             no para acusar a nadie. */}
         {retraso !== null && retraso >= 1 && (
@@ -154,6 +179,28 @@ export function ClientCard({ clientId, onClose, onCollect, onDuplicated }: {
       </div>
 
       {/* ── LO QUE IMPORTA PARA DECIDIR ────────────────────── */}
+      {/*
+        SUS SERVICIOS, con el logo de cada uno y lo que paga por cada uno.
+        Con varios es la pregunta de verdad de su ficha: no «cuánto paga»,
+        sino «qué le estoy dando por ese dinero».
+      */}
+      {sus.length > 1 && (
+        <div className="mcli-svcs">
+          <div className="mbizs-field-label">{t('bizServices')}</div>
+          {sus.map(({ serviceId, amount }) => {
+            const svc = services.find(v => v.id === serviceId)
+            if (!svc) return null
+            return (
+              <div key={serviceId} className="mcli-svc">
+                <BrandTile name={svc.name} size={26} color={negocio?.color} icon={negocio?.icon} />
+                <span>{svc.name}</span>
+                <b>{fmt(amount, cur, { decimals: moneyDecimals })}</b>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
       <div className="mcli-paid">
         <small>{t('bizCliPaidYou')}</small>
         <strong className="income">{fmt(hist.totalPaid, cur, { decimals: moneyDecimals })}</strong>
@@ -267,6 +314,18 @@ export function ClientCard({ clientId, onClose, onCollect, onDuplicated }: {
         <button onClick={() => { playSoftHaptic(); setCobroNuevo(true) }}>
           <Icon name="plus" size={14} /> {t('bizNewCharge')}
         </button>
+        {/*
+          CAMBIAR DE SERVICIO sin pasar por el formulario.
+          Cuando alguien se cambia de Netflix a Disney+, habia que entrar al
+          formulario, buscar el selector y guardar. Y al liberar su plaza, la
+          app lo dice: «¿puedo meter al que me acaba de escribir?» es la
+          pregunta de verdad de quien revende.
+        */}
+        {sus.length === 1 && services.length > 1 && (
+          <button onClick={() => { playSoftHaptic(); setCambiando(true) }}>
+            <Icon name="repeat" size={14} /> {t('bizChangeService')}
+          </button>
+        )}
         <button onClick={() => { playSoftHaptic(); setEditando(true) }}>
           <Icon name="edit" size={14} /> {t('bizCliEdit')}
         </button>
@@ -319,6 +378,55 @@ export function ClientCard({ clientId, onClose, onCollect, onDuplicated }: {
         <ClientSheet clientId={client.id} onClose={() => setEditando(false)} />
       )}
       {cobroNuevo && <NewChargeSheet clientId={client.id} onClose={() => setCobroNuevo(false)} />}
+
+      {cambiando && (
+        <BizSheet title={t('bizChangeService')} onClose={() => setCambiando(false)}>
+          <p className="mbizs-calc">{t('bizChangeServiceHint')}</p>
+          {services.map(svc => {
+            const esSuyo = sus.some(x => x.serviceId === svc.id)
+            const biz = businesses.find(b => b.id === svc.businessId)
+            return (
+              <button
+                key={svc.id}
+                type="button"
+                className={`mmerge-pick${esSuyo ? ' on' : ''}`}
+                disabled={esSuyo}
+                onClick={() => {
+                  moveClientToService(client.id, svc.id)
+                  playSoftHaptic()
+                  toast(t('bizChangeServiceDone')
+                    .replace('{name}', client.name)
+                    .replace('{service}', svc.name), { icon: 'check', type: 'ok' })
+                  setCambiando(false)
+                }}
+              >
+                <BrandTile name={svc.name} size={26} color={biz?.color} icon={biz?.icon} />
+                <span>
+                  <b>{svc.name}</b>
+                  {biz && <small>{biz.name}</small>}
+                </span>
+                {esSuyo && <Icon name="check" size={16} />}
+              </button>
+            )
+          })}
+        </BizSheet>
+      )}
     </BizSheet>
   )
+}
+
+/** El mismo color estable por cliente que usa su fila en la lista. */
+const AVATAR_COLORS = ['#5bc0ff', '#35d0a2', '#ffd166', '#ff6b8a', '#c765ff', '#ff9a3d']
+function colorDe(id: string): string {
+  let h = 0
+  for (let i = 0; i < id.length; i += 1) h = (h * 31 + id.charCodeAt(i)) % 997
+  return AVATAR_COLORS[h % AVATAR_COLORS.length]
+}
+
+/** Las iniciales de un nombre, para el avatar. */
+function inicialesDe(name: string): string {
+  const partes = name.trim().split(/\s+/).filter(Boolean)
+  if (!partes.length) return '?'
+  if (partes.length === 1) return partes[0].slice(0, 2).toUpperCase()
+  return (partes[0][0] + partes[partes.length - 1][0]).toUpperCase()
 }

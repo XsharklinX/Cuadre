@@ -27,6 +27,7 @@ import { translateCategoryName, useT } from '@/i18n'
 import { playBackspaceSound, playDoneSound, playExpenseSound, playIncomeSound, playKeySound, playOperatorSound, playSoftHaptic } from '@/lib/sound'
 import { useJuice } from '@/store/juice'
 import { useIncidents } from '@/store/incidents'
+import { looksLikeCaprice } from '@/data/caprices'
 import { useCaprices } from '@/store/caprices'
 import { compressReceipt, putReceipt } from '@/lib/receiptStore'
 import { deriveQuickAdds, lastMovementQuickAdd, type QuickAdd } from '@/data/quickAdds'
@@ -237,6 +238,18 @@ export function MobileCreateFlow({
   const visibleCategories = showAllCats ? allCategories : allCategories.slice(0, CATS_SHOWN)
   const hiddenCats = allCategories.length - visibleCategories.length
   const activeCategory = allCategories.find(c => c.id === categoryId) ?? null
+
+  /*
+   * ¿Sueles marcar los de esta categoría?
+   *
+   * El momento de sinceridad con uno mismo es cuando estás escribiendo el
+   * monto, no tres días después.
+   */
+  const botes = useCaprices(st => st.items)
+  const sueleSerCapricho = useMemo(
+    () => looksLikeCaprice(categoryId ?? undefined, botes, txId => transactions.find(x => x.id === txId)?.categoryId),
+    [categoryId, botes, transactions],
+  )
   const dividido = cats.length >= 2
 
   /*
@@ -1139,15 +1152,26 @@ export function MobileCreateFlow({
 
             {/* Solo en gastos: un ingreso no es un capricho. */}
             {mode === 'expense' && (
-              <button
-                type="button"
-                className={`mobile-create-caprice${esCapricho ? ' on' : ''}`}
-                aria-pressed={esCapricho}
-                onClick={() => { setEsCapricho(v => !v); playSoftHaptic() }}
-              >
-                <Icon name="piggy" size={14} />
-                {esCapricho ? t('capMarkedChip') : t('capMarkAsSplurge')}
-              </button>
+              <>
+                <button
+                  type="button"
+                  className={`mobile-create-caprice${esCapricho ? ' on' : ''}${sueleSerCapricho && !esCapricho ? ' hint' : ''}`}
+                  aria-pressed={esCapricho}
+                  onClick={() => { setEsCapricho(v => !v); playSoftHaptic() }}
+                >
+                  <Icon name="piggy" size={14} />
+                  {esCapricho ? t('capMarkedChip') : t('capMarkAsSplurge')}
+                </button>
+                {/*
+                  LA SUGERENCIA, una vez y sin insistir.
+                  Si de los gastos que has marcado la mayoria son de esta
+                  categoria, vale la pena preguntarlo donde pasa. Con menos de
+                  tres no hay patron, hay casualidad.
+                */}
+                {sueleSerCapricho && !esCapricho && (
+                  <small className="mobile-create-caprice-hint">{t('capLooksLike')}</small>
+                )}
+              </>
             )}
 
             <div className="mobile-create-section-header mobile-create-account-header">

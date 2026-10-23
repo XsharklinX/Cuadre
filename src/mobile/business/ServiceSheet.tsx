@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { toast } from '@/components/ui/Toast'
 import { prepaySaving, prepaySavingPct } from '@/data/billing'
 import { serviceCostPerMonth, serviceMargin } from '@/data/business'
 import { fmt } from '@/data/helpers'
@@ -34,8 +35,25 @@ export function ServiceSheet({
   const t = useT()
   const { currency } = useFinance()
   const moneyDecimals = useMoneyDecimals()
-  const { services, clients, businesses, addService, updateService, deleteService } = useBusiness()
+  const { services, clients, businesses, addService, updateService, deleteService, moveService } = useBusiness()
   const existente = serviceId ? services.find(s => s.id === serviceId) : null
+  /*
+   * MOVERLO A OTRO NEGOCIO.
+   *
+   * Si lo montaste en el negocio equivocado, la unica salida era borrarlo y
+   * volver a crearlo —perdiendo sus clientes por el camino—.
+   *
+   * Lo delicado es la CATEGORIA: el coste de un servicio cuenta para la
+   * ganancia del negocio que tenga esa categoria declarada. Mover sin avisar
+   * de eso dejaria dos negocios con cifras mal, asi que el aviso es parte de
+   * la funcion y no un extra.
+   */
+  const [moverA, setMoverA] = useState('')
+  const otrosNegocios = businesses.filter(b => b.id !== businessId && !b.archivedAt)
+  const clientesDelServicio = existente
+    ? clients.filter(c => c.serviceId === existente.id
+      || c.serviceShares?.some(x => x.serviceId === existente.id)).length
+    : 0
   const negocio = businesses.find(b => b.id === businessId)
   const slotLabel = negocio?.labels?.slot?.trim() || t('bizSlots')
 
@@ -229,6 +247,53 @@ export function ServiceSheet({
             <p>{t('bizBreakEvenLong').replace('{n}', String(margen.breakEven))}</p>
           )}
         </div>
+      )}
+
+      {/*
+        MOVERLO A OTRO NEGOCIO.
+        Si lo montaste en el equivocado, la única salida era borrarlo y volver
+        a crearlo, perdiendo sus clientes. Solo con un negocio más al que
+        moverlo: con uno solo, el selector no ofrece nada.
+      */}
+      {existente && otrosNegocios.length > 0 && (
+        <Field label={t('bizMoveService')} hint={t('bizMoveServiceHint')}>
+          <select
+            className="mbizs-input"
+            value={moverA}
+            onChange={e => setMoverA(e.target.value)}
+          >
+            <option value="">{negocio?.name ?? '—'}</option>
+            {otrosNegocios.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </select>
+          {moverA && (
+            <>
+              {/*
+                EL AVISO DE LA CATEGORÍA.
+                El coste de un servicio cuenta para la ganancia del negocio
+                que tenga esa categoría declarada. Mover sin decirlo dejaría
+                dos negocios con cifras mal, así que el aviso es parte de la
+                función y no un extra.
+              */}
+              <small className="mbizs-dup-warn">
+                {t('bizMoveServiceWarn').replace('{n}', String(clientesDelServicio))}
+              </small>
+              <button
+                type="button"
+                className="mbizs-move-go"
+                onClick={() => {
+                  const destino = businesses.find(b => b.id === moverA)
+                  moveService(existente.id, moverA)
+                  toast(t('bizMoveDone')
+                    .replace('{name}', existente.name)
+                    .replace('{business}', destino?.name ?? ''), { icon: 'check', type: 'ok' })
+                  onClose()
+                }}
+              >
+                {t('bizMoveService')}
+              </button>
+            </>
+          )}
+        </Field>
       )}
     </BizSheet>
   )

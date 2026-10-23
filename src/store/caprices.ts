@@ -26,6 +26,13 @@ interface CapricesState {
   unpay: (capriceId: string, txId: string) => void
   /** Cierra un bote. No es un fracaso: deja de contar y se puede olvidar. */
   close: (id: string, closed: boolean) => void
+  /**
+   * La fecha para la que quieres tenerlo recuperado.
+   *
+   * No es una promesa que la app vigile: es lo que permite calcular el ritmo,
+   * que es lo que convierte una barra de progreso en algo accionable.
+   */
+  setTarget: (id: string, targetDate: string | undefined) => void
   remove: (id: string) => void
   /** Si un gasto ya tiene bote, para no abrir dos del mismo. */
   byTxId: (txId: string) => Caprice | undefined
@@ -66,6 +73,20 @@ export function sanitizeCaprices(raw: unknown): Caprice[] {
         .filter(p => str(p.txId) && num(p.amount) > 0)
         .map((p): CapricePayment => ({ txId: str(p.txId), amount: num(p.amount), at: num(p.at) })),
       closed: c.closed === true ? true : undefined,
+      // Sin esta linea la fecha objetivo se perderia al reiniciar la app, y
+      // con ella el ritmo: este saneador reconstruye desde una lista blanca,
+      // igual que `normalizeTransaction`.
+      targetDate: /^\d{4}-\d{2}-\d{2}$/.test(str(c.targetDate)) ? str(c.targetDate) : undefined,
+      challenge: (() => {
+        const r = c.challenge
+        if (!r || typeof r !== 'object') return undefined
+        const o = r as Record<string, unknown>
+        const what = str(o.what).trim().slice(0, 120)
+        const amount = Math.max(0, num(o.amount))
+        const endsAt = num(o.endsAt)
+        // Un reto sin lo que te propones, sin monto o sin fecha no es un reto.
+        return what && amount > 0 && endsAt > 0 ? { what, amount, endsAt } : undefined
+      })(),
     }))
 }
 
@@ -95,6 +116,10 @@ export const useCaprices = create<CapricesState>()(
 
       close: (id, closed) => set(s => ({
         items: s.items.map(c => c.id === id ? { ...c, closed: closed || undefined } : c),
+      })),
+
+      setTarget: (id, targetDate) => set(s => ({
+        items: s.items.map(c => c.id === id ? { ...c, targetDate } : c),
       })),
 
       remove: (id) => set(s => ({ items: s.items.filter(c => c.id !== id) })),

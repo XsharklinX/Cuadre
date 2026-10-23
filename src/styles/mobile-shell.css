@@ -410,6 +410,180 @@
        medio: se aprietan un poco antes que dejar que el título se recorte. */
     .mobile-topbar .mobile-icon-btn { height: 40px; width: 38px; }
   }
+
+  /* ══ EL AVATAR: tres botones en uno ══════════════════════════════════
+     Perfil, ajustes y avisos eran tres iconos de una barra que ya llevaba
+     ocho. Un solo avatar los reune, con la insignia encima, y es lo unico
+     de la barra que es TUYO. */
+  /*
+   * El BOTON solo es area tactil y ancla de la insignia: sin fondo y sin
+   * recorte. Pintar el circulo aqui obligaba a `overflow: visible` —para que
+   * la insignia asomara— y eso dejaba la foto sin recortar.
+   */
+  .mobile-avatar-btn {
+    background: transparent;
+    border: 0;
+    display: grid;
+    flex: none;
+    height: 32px;
+    margin-left: 2px;
+    overflow: visible;
+    padding: 0;
+    place-items: center;
+    position: relative;
+    width: 32px;
+  }
+  /* La CARA: el circulo, que si recorta lo que lleve dentro. */
+  .mobile-avatar-face {
+    align-items: center;
+    background: linear-gradient(140deg, var(--m-info), var(--m-primary));
+    border-radius: 999px;
+    color: #fff;
+    display: grid;
+    height: 100%;
+    overflow: hidden;
+    place-items: center;
+    width: 100%;
+  }
+  .mobile-avatar-btn.on .mobile-avatar-face { box-shadow: 0 0 0 2px var(--m-text); }
+  .mobile-avatar-ini {
+    font-size: 14px;
+    font-weight: 900;
+    letter-spacing: .01em;
+  }
+  /* La foto llena el circulo. `display: block` porque una imagen en linea
+     deja un hueco bajo la linea base, y ese hueco se veia como un filo del
+     degradado por abajo. */
+  .mobile-avatar-img {
+    display: block;
+    height: 100%;
+    object-fit: cover;
+    width: 100%;
+  }
+  /* El area tactil llega a 44px sin que el circulo crezca: un avatar de 44
+     dentro de la barra la haria mas alta. */
+  .mobile-avatar-btn::after {
+    content: '';
+    height: var(--m-touch, 44px);
+    left: 50%;
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: var(--m-touch, 44px);
+  }
+  .mobile-avatar-btn:active { transform: scale(.94); }
+
+  /* ── El panel de «mis cosas» ─────────────────────────── */
+  .mav-root { z-index: 320; }
+  .mav {
+    background: var(--m-surface);
+    border-radius: 18px 18px 0 0;
+    bottom: 0;
+    display: grid;
+    gap: 7px;
+    left: 0;
+    padding: 16px 16px calc(18px + env(safe-area-inset-bottom, 0px));
+    position: absolute;
+    right: 0;
+  }
+  .mav-head { align-items: center; display: flex; gap: 12px; margin-bottom: 4px; }
+  .mav-ava {
+    align-items: center;
+    background: linear-gradient(140deg, var(--m-info), var(--m-primary));
+    border-radius: 999px;
+    color: #fff;
+    display: grid;
+    flex: none;
+    font-size: 20px;
+    font-weight: 900;
+    height: 46px;
+    overflow: hidden;
+    place-items: center;
+    width: 46px;
+  }
+  .mav-ava img { height: 100%; object-fit: cover; width: 100%; }
+  .mav-id { min-width: 0; }
+  .mav-id b { display: block; font-size: 17px; font-weight: 800; }
+  .mav-id small { color: var(--m-muted); display: block; font-size: 12.5px; }
+
+  .mav-row {
+    align-items: center;
+    background: var(--m-surface-2);
+    border: 0;
+    border-radius: 13px;
+    color: var(--m-text);
+    display: flex;
+    gap: 12px;
+    min-height: 52px;
+    padding: 0 15px;
+    text-align: left;
+    width: 100%;
+  }
+  .mav-row > span { flex: 1; font-size: 15px; font-weight: 700; min-width: 0; }
+  .mav-row > svg:last-child { color: var(--m-muted); flex: none; }
+  .mav-row:active { transform: scale(.99); }
+  .mav-badge {
+    background: var(--m-expense);
+    border-radius: 999px;
+    color: #fff;
+    flex: none;
+    font-size: 11px;
+    font-style: normal;
+    font-weight: 800;
+    padding: 2px 7px;
+  }
+  /* El interruptor del modo privado, con la forma de los demas de la app. */
+  .mav-row.toggle i {
+    background: var(--m-surface);
+    border-radius: 999px;
+    flex: none;
+    height: 22px;
+    position: relative;
+    transition: background .18s ease;
+    width: 40px;
+  }
+  .mav-row.toggle i::after {
+    background: var(--m-muted);
+    border-radius: 999px;
+    content: '';
+    height: 16px;
+    left: 3px;
+    position: absolute;
+    top: 3px;
+    transition: transform .18s cubic-bezier(.22, 1, .36, 1), background .18s ease;
+    width: 16px;
+  }
+  .mav-row.toggle.on i { background: color-mix(in oklab, var(--m-income) 45%, transparent); }
+  .mav-row.toggle.on i::after { background: var(--m-income); transform: translateX(18px); }
+  .mav-tip { color: var(--m-muted); font-size: 12px; line-height: 1.45; margin: 2px 2px 0; }
+
+  /* ══ F2 · LAS LISTAS ENTRAN UNA DETRAS DE OTRA ═══════════════════════
+     Veinte filas que aparecen de golpe son una pared. Las mismas veinte
+     entrando con 25ms de diferencia se leen de arriba abajo porque el ojo
+     las sigue en orden. Solo las primeras diez: las de mas abajo ya entran
+     antes de que llegues. */
+  @keyframes m-row-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: none; }
+  }
+  .m-stagger > * {
+    animation: m-row-in .28s cubic-bezier(.22, 1, .36, 1) both;
+  }
+  .m-stagger > *:nth-child(1) { animation-delay: 0ms; }
+  .m-stagger > *:nth-child(2) { animation-delay: 25ms; }
+  .m-stagger > *:nth-child(3) { animation-delay: 50ms; }
+  .m-stagger > *:nth-child(4) { animation-delay: 75ms; }
+  .m-stagger > *:nth-child(5) { animation-delay: 100ms; }
+  .m-stagger > *:nth-child(6) { animation-delay: 125ms; }
+  .m-stagger > *:nth-child(7) { animation-delay: 150ms; }
+  .m-stagger > *:nth-child(8) { animation-delay: 175ms; }
+  .m-stagger > *:nth-child(9) { animation-delay: 200ms; }
+  .m-stagger > *:nth-child(n+10) { animation-delay: 225ms; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .m-stagger > * { animation: none; }
+  }
+
   /* ── Currency sheet ── */
   .mcur-sheet {
     background: var(--surface);
@@ -2444,6 +2618,20 @@
     touch-action: pan-y pinch-zoom;
     width: 100%;
   }
+  /*
+   * ARRASTRANDO: la hoja sigue al dedo.
+   *
+   * El `transform` vive SOLO en esta clase y desaparece al soltar. Un
+   * transform permanente en la hoja crearia un bloque contenedor y encogeria
+   * a su caja todo lo que lleve dentro con `position: fixed` — ya le paso a
+   * esta app con el tirar-para-recargar.
+   */
+  .mobile-detail-sheet section.m-dragging {
+    animation: none;
+    transform: translateY(var(--m-drag, 0px));
+    transition: none;
+  }
+
   /*
    * EL ASA, con un pseudo-elemento.
    *

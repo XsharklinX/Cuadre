@@ -62,6 +62,45 @@
 /* ── Listas ─────────────────────────────────────────────── */
 .mbiz-list { display: grid; gap: 7px; }
 
+/*
+ * F5 · DESLIZAR UNA FILA PARA COBRAR.
+ *
+ * El fondo verde vive DEBAJO y asoma conforme la fila se aparta. El
+ * `transform` esta solo en `.m-swiping` y desaparece al soltar: uno
+ * permanente crearia un bloque contenedor y encogeria a su caja lo que lleve
+ * dentro con `position: fixed`.
+ */
+.mbiz-swipe { border-radius: 13px; overflow: hidden; position: relative; }
+.mbiz-swipe-bg {
+  align-items: center;
+  background: color-mix(in oklab, var(--m-income) 85%, transparent);
+  bottom: 0;
+  color: var(--m-bg);
+  display: flex;
+  font-size: 11.5px;
+  font-weight: 900;
+  gap: 6px;
+  left: 0;
+  letter-spacing: .06em;
+  padding-left: 14px;
+  position: absolute;
+  right: 0;
+  top: 0;
+}
+.mbiz-swipe-row { position: relative; touch-action: pan-y; }
+.mbiz-swipe-row.m-swiping {
+  transform: translateX(var(--m-swipe, 0px));
+  transition: none;
+}
+/* Al cruzar el umbral se ve que soltar ahi hace algo, antes de soltar. */
+.mbiz-swipe.has-armed .mbiz-swipe-bg,
+.mbiz-swipe-row.m-swipe-armed ~ .mbiz-swipe-bg { background: var(--m-income); }
+.mbiz-swipe-row:not(.m-swiping) { transition: transform .22s cubic-bezier(.22, 1, .36, 1); }
+
+@media (prefers-reduced-motion: reduce) {
+  .mbiz-swipe-row:not(.m-swiping) { transition: none; }
+}
+
 .mbiz-charge,
 .mbiz-client {
   align-items: center;
@@ -786,6 +825,118 @@
 }
 .mcli-receipt:disabled { opacity: .45; }
 
+/* ══════════════════════════════════════════════════════════════════════
+   LO VISUAL: TRES MATERIALES, Y LAS MARCAS CON SU CARA.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/*
+ * LA BALDOSA DE UNA MARCA.
+ *
+ * Suscripciones pintaba los logos reales y Negocio dibujaba los mismos
+ * servicios como texto gris. El cambio con mejor relacion esfuerzo/resultado
+ * de toda la tanda: el codigo ya estaba.
+ */
+.mbrand-tile {
+  align-items: center;
+  border-radius: 10px;
+  display: grid;
+  flex: none;
+  place-items: center;
+}
+/* Sin marca, la inicial sobre el color del negocio: el respaldo tiene que ser
+   digno y no un hueco. */
+.mbrand-tile.plain { font-weight: 900; letter-spacing: -.01em; }
+
+/*
+ * B3 · EL TITULAR, A SANGRE.
+ *
+ * Compartia fondo, borde y radio con todo lo demas, asi que la pantalla no
+ * decia que importaba. Sin caja, la cifra grande es lo primero que se lee y
+ * las tarjetas de abajo recuperan su papel de tarjetas.
+ */
+.mbiz-focus.bare {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 4px 2px 6px 11px;
+}
+.mbiz-focus.bare::before {
+  border-radius: 99px;
+  bottom: 6px;
+  top: 4px;
+  width: 3px;
+}
+.mbiz-focus.bare > strong { font-size: 34px; }
+
+/*
+ * B2 · LA CABECERA DEL NEGOCIO CON SU COLOR.
+ *
+ * El color ya se elegia y solo pintaba un cuadradito de 34px. Bañando la
+ * cabecera, cuatro negocios en una lista se distinguen sin leer: el streaming
+ * es verde, las tareas moradas, el alquiler ambar.
+ *
+ * Siempre sobre una MEZCLA con el fondo, nunca a pelo: un color elegido a
+ * mano puede dejar el texto ilegible en el tema claro.
+ */
+.mbiz-biz-head.tinted {
+  background: linear-gradient(
+    145deg,
+    color-mix(in oklab, var(--biz, var(--m-primary)) 14%, transparent),
+    transparent 72%
+  );
+}
+.mbiz-biz-head.tinted .mbiz-biz-three { border-top-color: color-mix(in oklab, var(--biz, var(--m-primary)) 28%, transparent); }
+
+/*
+ * B5 · TUS NEGOCIOS, TODOS JUNTOS.
+ *
+ * «¿Como va el mes?» tiene una respuesta, y exigia abrir las tarjetas una
+ * por una y sumar a mano.
+ */
+.mbiz-allsum {
+  background: var(--m-surface);
+  border: 1px solid var(--m-border);
+  border-radius: 16px;
+  display: grid;
+  gap: 3px;
+  padding: 13px 15px 12px;
+}
+.mbiz-allsum > small {
+  color: var(--m-muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+.mbiz-allsum > strong {
+  font-size: 27px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 900;
+  letter-spacing: -.03em;
+  line-height: 1.1;
+  min-width: 0;
+}
+.mbiz-allsum-bar {
+  display: flex;
+  gap: 2px;
+  height: 6px;
+  margin-top: 5px;
+}
+.mbiz-allsum-bar i { border-radius: 99px; display: block; min-width: 3px; }
+.mbiz-allsum-keys {
+  color: var(--m-muted);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 11px;
+  gap: 3px 11px;
+  margin-top: 5px;
+}
+.mbiz-allsum-keys span { align-items: center; display: inline-flex; gap: 5px; }
+.mbiz-allsum-keys i { border-radius: 99px; display: block; height: 7px; width: 7px; }
+
+/* El servicio con su baldosa delante: la fila pasa de dos columnas a tres. */
+.mbiz-svc { gap: 10px; }
+
 .mbizs-shares { display: grid; gap: 6px; }
 .mbizs-share {
   align-items: center;
@@ -1324,6 +1475,17 @@
   min-height: 36px;
   padding: 0 14px;
 }
+/* La pista del patron: tono de DATO, no de aviso. No es un error marcar o no
+   marcar; es una pregunta que vale la pena hacer donde pasa. */
+.mobile-create-caprice.hint { border: 1px solid color-mix(in oklab, var(--m-info) 40%, transparent); }
+.mobile-create-caprice-hint {
+  color: var(--m-info);
+  display: block;
+  font-size: 11.5px;
+  line-height: 1.4;
+  margin: -2px 2px 0;
+}
+
 .mobile-create-caprice.on {
   background: color-mix(in oklab, var(--m-warn) 18%, transparent);
   box-shadow: inset 0 0 0 1px var(--m-warn);
@@ -1519,6 +1681,194 @@
    configuración para contestar «¿quién es y qué me debe?».
    ════════════════════════════════════════════════════════════════════ */
 
+/*
+ * B4 · LA CABECERA DE LA FICHA.
+ *
+ * El avatar en grande con el MISMO color que su fila en la lista: la ficha y
+ * la lista hablan de la misma persona y tienen que verse como tal.
+ */
+.mcli-head { align-items: center; display: flex; gap: 12px; padding: 2px 0 6px; }
+/*
+ * El avatar va con el MISMO tinte que su fila en la lista, no con el color a
+ * pelo. Texto oscuro sobre un fondo saturado se lee en el tema oscuro y
+ * desaparece en el claro, y es justo lo que el guardian de temas vigila: aqui
+ * el color es del usuario y el contraste tiene que salir de los tokens.
+ */
+.mcli-head-ava {
+  align-items: center;
+  border-radius: 999px;
+  display: grid;
+  flex: none;
+  font-size: 17px;
+  font-weight: 900;
+  height: 46px;
+  place-items: center;
+  width: 46px;
+}
+.mcli-head-id { min-width: 0; }
+.mcli-head-id b {
+  display: block;
+  font-size: 19px;
+  font-weight: 900;
+  letter-spacing: -.02em;
+  line-height: 1.2;
+}
+.mcli-head-id small { color: var(--m-muted); display: block; font-size: 12px; }
+
+/* Sus servicios, con el logo de cada uno. Con varios es la pregunta de verdad
+   de su ficha: no «cuanto paga», sino «que le estoy dando por ese dinero». */
+/* ══════════════════════════════════════════════════════════════════════
+   DUPLICADOS Y ORGANIZAR
+   ══════════════════════════════════════════════════════════════════════ */
+
+/*
+ * EL AVISO DE DUPLICADOS.
+ *
+ * Tono de DATO, no de alarma: no es un error del usuario, es una consecuencia
+ * de que hasta la 2.1.0 un cliente solo pudiera tener un servicio. Un rojo
+ * aqui culparia a alguien de algo que hizo bien con lo que habia.
+ */
+.mbiz-dup {
+  background: color-mix(in oklab, var(--m-info) 11%, transparent);
+  border: 1px solid color-mix(in oklab, var(--m-info) 30%, transparent);
+  border-radius: 14px;
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+}
+.mbiz-dup-top { align-items: center; color: var(--m-info); display: flex; gap: 7px; }
+.mbiz-dup-top b { font-size: 13.5px; font-weight: 800; }
+.mbiz-dup > small { color: var(--m-muted); font-size: 12px; line-height: 1.45; }
+.mbiz-dup-acts { display: flex; gap: 7px; margin-top: 4px; }
+.mbiz-dup-acts button {
+  background: color-mix(in oklab, var(--m-info) 22%, transparent);
+  border: 0;
+  border-radius: 10px;
+  color: var(--m-info);
+  flex: 1;
+  font-size: 12.5px;
+  font-weight: 800;
+  min-height: 38px;
+}
+.mbiz-dup-acts button.ghost { background: var(--m-surface-2); color: var(--m-muted); }
+
+/* El aviso de «ya tienes un Carlos» y el de la categoria al mover: los dos son
+   avisos dentro de un formulario, no errores. */
+.mbizs-dup-warn {
+  color: var(--m-warn);
+  display: block;
+  font-size: 11.5px;
+  line-height: 1.45;
+  margin-top: 4px;
+}
+.mbizs-move-go {
+  background: color-mix(in oklab, var(--m-primary) 20%, transparent);
+  border: 0;
+  border-radius: 10px;
+  color: var(--m-primary);
+  font-size: 13px;
+  font-weight: 800;
+  margin-top: 7px;
+  min-height: 40px;
+  width: 100%;
+}
+
+/* La fila de elegir, en unir y en cambiar de servicio: la misma forma, porque
+   son la misma pregunta —cual de estos—. */
+.mmerge-pick {
+  align-items: center;
+  background: var(--m-surface-2);
+  border: 1px solid transparent;
+  border-radius: 12px;
+  color: var(--m-text);
+  display: flex;
+  gap: 10px;
+  min-height: 52px;
+  padding: 0 13px;
+  text-align: left;
+  width: 100%;
+}
+.mmerge-pick.on {
+  background: color-mix(in oklab, var(--m-income) 13%, transparent);
+  border-color: var(--m-income);
+}
+.mmerge-pick > span { flex: 1; min-width: 0; }
+.mmerge-pick b { display: block; font-size: 14px; font-weight: 800; }
+.mmerge-pick small { color: var(--m-muted); display: block; font-size: 11.5px; }
+.mmerge-pick em {
+  color: var(--m-muted);
+  flex: none;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 700;
+}
+.mmerge-pick > svg { color: var(--m-income); flex: none; }
+.mmerge-pick:disabled { opacity: .55; }
+
+/* Ordenar y archivar. Se arrastra por el asa y tambien se pulsa: los dos
+   caminos llevan al mismo sitio y ninguno es el de segunda. */
+.morg-list { display: grid; gap: 6px; }
+.morg-row {
+  align-items: center;
+  background: var(--m-surface-2);
+  border-radius: 12px;
+  display: flex;
+  gap: 7px;
+  min-height: 52px;
+  padding: 0 9px;
+  touch-action: none;
+}
+.morg-row.off { opacity: .5; }
+.morg-grip { color: var(--m-muted); cursor: grab; flex: none; }
+.morg-id { flex: 1; min-width: 0; }
+.morg-id b { display: block; font-size: 14px; font-weight: 800; }
+.morg-id small { color: var(--m-muted); display: block; font-size: 11px; }
+.morg-btn {
+  align-items: center;
+  background: var(--m-surface);
+  border: 0;
+  border-radius: 9px;
+  color: var(--m-text);
+  display: inline-flex;
+  flex: none;
+  height: 34px;
+  justify-content: center;
+  width: 32px;
+}
+.morg-btn:disabled { opacity: .35; }
+.morg-btn.on { background: color-mix(in oklab, var(--m-warn) 22%, transparent); color: var(--m-warn); }
+
+.mmerge-result {
+  background: var(--m-surface-2);
+  border-radius: 12px;
+  display: grid;
+  gap: 6px;
+  padding: 11px;
+}
+.mmerge-result .mcli-svc { background: var(--m-surface); }
+.mmerge-total {
+  align-items: center;
+  border-top: 1px dashed var(--m-border);
+  display: flex;
+  gap: 10px;
+  padding-top: 8px;
+}
+.mmerge-total span { color: var(--m-muted); flex: 1; font-size: 12px; }
+.mmerge-total b { font-size: 15px; font-variant-numeric: tabular-nums; font-weight: 900; }
+
+.mcli-svcs { display: grid; gap: 6px; }
+.mcli-svc {
+  align-items: center;
+  background: var(--m-surface-2);
+  border-radius: 11px;
+  display: flex;
+  gap: 9px;
+  min-height: 42px;
+  padding: 0 11px;
+}
+.mcli-svc > span { flex: 1; font-size: 13.5px; font-weight: 700; min-width: 0; }
+.mcli-svc > b { font-size: 13.5px; font-variant-numeric: tabular-nums; font-weight: 800; }
+
 .mcli-top { display: grid; gap: 8px; grid-template-columns: 1.3fr 1fr; }
 .mcli-top > div {
   background: var(--m-surface-2);
@@ -1662,3 +2012,224 @@
 /* Dos botones en la cabecera de una sección, sin que el título los empuje
    fuera en 320px. */
 .mbiz-head-btns { display: flex; flex-wrap: wrap; gap: 4px 12px; justify-content: flex-end; }
+
+/* ══════════════════════════════════════════════════════════════════════
+   CAPRICHOS: ANTOJOS, EL BOTE Y LOS LOGROS.
+   Tres pestanas porque son tres momentos distintos: lo que viene, lo que
+   falta y lo que paso. Nadie entra a las tres a la vez.
+   ══════════════════════════════════════════════════════════════════════ */
+
+.mcap-tabs {
+  background: var(--m-surface);
+  border: 1px solid var(--m-border);
+  border-radius: 12px;
+  display: grid;
+  gap: 3px;
+  grid-template-columns: repeat(3, 1fr);
+  padding: 3px;
+}
+.mcap-tabs button {
+  background: transparent;
+  border: 0;
+  border-radius: 9px;
+  color: var(--m-muted);
+  font-size: 13px;
+  font-weight: 800;
+  min-height: 36px;
+  padding: 0 4px;
+}
+.mcap-tabs button.on { background: var(--m-surface-2); color: var(--m-text); }
+
+/* ── Antojos ─────────────────────────────────────────────── */
+.mcap-wishes { display: grid; gap: 9px; }
+
+/* Lo ahorrado por no comprar: la prueba de que esperar funciona. */
+.mcap-saved {
+  background: color-mix(in oklab, var(--m-income) 11%, transparent);
+  border-radius: 14px;
+  display: grid;
+  gap: 1px;
+  padding: 12px 14px;
+}
+.mcap-saved small {
+  color: var(--m-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+.mcap-saved strong {
+  font-size: 23px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 900;
+  letter-spacing: -.02em;
+}
+
+.mcap-add {
+  align-items: center;
+  background: color-mix(in oklab, var(--m-primary) 18%, transparent);
+  border: 0;
+  border-radius: 12px;
+  color: var(--m-primary);
+  display: flex;
+  font-size: 14px;
+  font-weight: 800;
+  gap: 7px;
+  justify-content: center;
+  min-height: 46px;
+  width: 100%;
+}
+.mcap-add:active { transform: translateY(1px) scale(.99); }
+
+.mcap-wish {
+  background: var(--m-surface);
+  border: 1px solid var(--m-border);
+  border-radius: 14px;
+  display: grid;
+  gap: 6px;
+  margin-bottom: 7px;
+  padding: 12px 14px;
+}
+/* El dia de decidir se marca: es el unico que pide algo. Los demas dias el
+   antojo solo esta, y una lista que pide una decision cada dia deja de
+   pedirla el dia que importa. */
+.mcap-wish.ready { border-color: var(--m-warn); }
+.mcap-wish-top { align-items: baseline; display: flex; gap: 10px; }
+.mcap-wish-id { flex: 1; min-width: 0; }
+.mcap-wish-id b { display: block; font-size: 15px; font-weight: 800; }
+.mcap-wish-id small { color: var(--m-muted); display: block; font-size: 11.5px; }
+.mcap-wish.ready .mcap-wish-id small { color: var(--m-warn); font-weight: 700; }
+.mcap-wish-amount {
+  flex: none;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 900;
+}
+.mcap-wish-note { color: var(--m-muted); font-size: 12px; line-height: 1.45; margin: 0; }
+.mcap-wish-bar { background: var(--m-surface-2); border-radius: 99px; height: 4px; overflow: hidden; }
+.mcap-wish-bar i { background: var(--m-warn); display: block; height: 100%; }
+.mcap-wish-acts { display: flex; gap: 7px; margin-top: 2px; }
+.mcap-wish-acts button {
+  background: color-mix(in oklab, var(--m-primary) 20%, transparent);
+  border: 0;
+  border-radius: 10px;
+  color: var(--m-primary);
+  flex: 1;
+  font-size: 13px;
+  font-weight: 800;
+  min-height: 40px;
+}
+.mcap-wish-acts button.ghost {
+  background: color-mix(in oklab, var(--m-income) 16%, transparent);
+  color: var(--m-income);
+}
+
+.mcap-done { display: grid; gap: 5px; }
+.mcap-done-row {
+  align-items: center;
+  background: var(--m-surface-2);
+  border-radius: 10px;
+  display: flex;
+  gap: 9px;
+  min-height: 42px;
+  padding: 0 7px 0 11px;
+}
+.mcap-done-row > span { flex: 1; min-width: 0; }
+.mcap-done-row b { font-size: 13px; font-variant-numeric: tabular-nums; font-weight: 800; }
+.mcap-done-row > span b { display: block; }
+.mcap-done-row small { color: var(--m-muted); display: block; font-size: 10.5px; }
+.mcap-done-row em {
+  flex: none;
+  font-size: 10.5px;
+  font-style: normal;
+  font-weight: 800;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+}
+.mcap-done-row.skipped em { color: var(--m-income); }
+.mcap-done-row.bought em { color: var(--m-muted); }
+.mcap-done-row > button {
+  background: transparent;
+  border: 0;
+  color: var(--m-muted);
+  flex: none;
+  height: 34px;
+  width: 30px;
+}
+
+/* ── Logros ──────────────────────────────────────────────── */
+.mcap-wins { display: grid; gap: 10px; }
+.mcap-wins-two { display: grid; gap: 8px; grid-template-columns: 1fr 1fr; }
+.mcap-wins-card {
+  background: var(--m-surface);
+  border: 1px solid var(--m-border);
+  border-radius: 13px;
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 11px 12px;
+}
+.mcap-wins-card small {
+  color: var(--m-muted);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.mcap-wins-card strong {
+  font-size: 19px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 900;
+  letter-spacing: -.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mcap-chart {
+  align-items: end;
+  display: grid;
+  gap: 3px;
+  grid-template-columns: repeat(12, 1fr);
+  height: 62px;
+}
+.mcap-chart-col { display: grid; grid-template-rows: 1fr auto; height: 100%; }
+.mcap-chart-col i {
+  align-self: end;
+  background: color-mix(in oklab, var(--m-income) 55%, transparent);
+  border-radius: 3px;
+  display: block;
+  min-height: 2px;
+  width: 100%;
+}
+.mcap-chart-col.now i { background: var(--m-income); }
+.mcap-chart-col u {
+  color: var(--m-muted);
+  font-size: 9px;
+  font-weight: 700;
+  padding-top: 3px;
+  text-align: center;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+.mcap-chart-col.now u { color: var(--m-text); }
+
+/* En que caes: el patron que ninguna regla automatica podria decir, porque
+   lo marcaste tu, un capricho a la vez. */
+/* El ritmo: la fecha y lo que sale de ella. «Te faltan 2,400» no dice que
+   hacer; «si abonas 600 al mes lo cierras en cuatro» si. */
+.mcap-pace {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 10px;
+}
+.mcap-pace small { color: var(--m-muted); flex: 1; font-size: 11.5px; line-height: 1.4; min-width: 140px; }
+
+.mcap-cats { display: grid; gap: 9px; }
+.mcap-cat { display: grid; gap: 3px; }
+.mcap-cat-row { align-items: baseline; display: flex; gap: 10px; }
+.mcap-cat-row span { flex: 1; font-size: 13.5px; font-weight: 700; min-width: 0; }
+.mcap-cat-row b { font-size: 13.5px; font-variant-numeric: tabular-nums; font-weight: 800; }
+.mcap-cat-bar { background: var(--m-surface-2); border-radius: 99px; height: 5px; overflow: hidden; }
+.mcap-cat-bar i { border-radius: 99px; display: block; height: 100%; }
+.mcap-cat small { color: var(--m-muted); font-size: 11px; }

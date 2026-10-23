@@ -116,7 +116,15 @@ for (const cfg of MATRIX) {
     await check('movimientos')
     // Perfil ya no es una pestaña: vive en la cabecera. Negocio ocupa su sitio.
     for (const tab of ['Análisis', 'Cuentas', 'Negocio']) { if (await navTap(tab)) await check('tab:' + tab) }
-    try { await page.getByRole('button', { name: 'Perfil' }).first().click({ timeout: 2500 }); await page.waitForTimeout(400); await check('perfil') } catch { /* noop */ }
+    // Perfil vive en el panel del avatar desde que la barra adelgazo.
+    try {
+      await page.getByRole('button', { name: 'Mis cosas' }).first().click({ timeout: 2500 })
+      await page.locator('.mav-row').first().waitFor({ timeout: 2500 })
+      await check('mis cosas')
+      await page.locator('.mav-row', { hasText: 'Perfil' }).first().click({ timeout: 2500 })
+      await page.waitForTimeout(400)
+      await check('perfil')
+    } catch { /* noop */ }
 
     /*
      * NEGOCIO Y SUS HOJAS.
