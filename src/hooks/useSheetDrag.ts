@@ -27,6 +27,22 @@ const CLOSE_PX = 110
 /** O soltarla con prisa: un gesto rápido y corto también quiere cerrar. */
 const CLOSE_SPEED = 0.55
 
+/**
+ * Si lo que se desplaza bajo el dedo está arriba del todo.
+ *
+ * Sube desde donde se tocó hasta la hoja buscando el primer elemento que de
+ * verdad se desplaza. Si encuentra uno y no está en su tope, el gesto es
+ * suyo: arrastrar ahí es leer, no cerrar.
+ */
+function scrollerAlTope(desde: HTMLElement | null, limite: HTMLElement): boolean {
+  let nodo: HTMLElement | null = desde
+  while (nodo && nodo !== limite.parentElement) {
+    if (nodo.scrollHeight > nodo.clientHeight + 1) return nodo.scrollTop <= 2
+    nodo = nodo.parentElement
+  }
+  return true
+}
+
 export function useSheetDrag<T extends HTMLElement>(onClose: () => void, active = true) {
   const ref = useRef<T>(null)
   const cerrar = useRef(onClose)
@@ -56,12 +72,15 @@ export function useSheetDrag<T extends HTMLElement>(onClose: () => void, active 
       const destino = e.target as HTMLElement | null
       if (destino?.closest('input, textarea, select')) return
       /*
-       * Y solo si la hoja está arriba de su scroll.
+       * Y solo si LO QUE SE DESPLAZA bajo el dedo está arriba del todo.
        *
-       * Si no, bajar el dedo dentro de una lista larga cerraría la hoja en vez
-       * de desplazarla, que es justo lo contrario de lo que se pide.
+       * Mirar el `scrollTop` de la hoja no bastaba: quien se desplaza es un
+       * div interno —el cuerpo del formulario—, así que la hoja siempre
+       * estaba en cero y el arrastre se enganchaba SIEMPRE. Bajar el dedo
+       * para leer el formulario movía la hoja entera y destapaba la pantalla
+       * de atrás, que es lo que se veía como «se ve el fondo detrás».
        */
-      if (el.scrollTop > 2) return
+      if (scrollerAlTope(destino, el) === false) return
       y0 = e.clientY
       t0 = e.timeStamp
       pid = e.pointerId
@@ -92,6 +111,8 @@ export function useSheetDrag<T extends HTMLElement>(onClose: () => void, active 
       }
     }
 
+    // Marca para que el arrastre global (`lib/sheetMotion`) no se enganche también.
+    el.dataset.sheetDrag = ''
     el.addEventListener('pointerdown', abajo)
     el.addEventListener('pointermove', mueve)
     el.addEventListener('pointerup', suelta)
@@ -102,6 +123,7 @@ export function useSheetDrag<T extends HTMLElement>(onClose: () => void, active 
       el.removeEventListener('pointermove', mueve)
       el.removeEventListener('pointerup', suelta)
       el.removeEventListener('pointercancel', fin)
+      delete el.dataset.sheetDrag
       fin()
     }
   }, [active])

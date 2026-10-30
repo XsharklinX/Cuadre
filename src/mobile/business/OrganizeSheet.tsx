@@ -71,7 +71,8 @@ export function OrganizeSheet({ onClose }: { onClose: () => void }) {
           <div
             key={biz.id}
             className={`morg-row${biz.archivedAt ? ' off' : ''}`}
-            onPointerDown={() => { arrastrando.current = biz.id }}
+            // Solo desde el asa: tocar el resto de la fila es desplazar la lista.
+            onPointerDown={e => { if ((e.target as HTMLElement).closest('.morg-grip')) arrastrando.current = biz.id }}
             onPointerMove={e => alArrastrar(e, biz.id)}
             onPointerUp={() => { arrastrando.current = null }}
             onPointerCancel={() => { arrastrando.current = null }}

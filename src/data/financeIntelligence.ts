@@ -135,7 +135,12 @@ export function detectSubscriptions(txns: Transaction[], mkey: string): Subscrip
     const priorAvg = average(priorAmounts)
     const variance = priorAvg ? standardDeviation(priorAmounts) / priorAvg : 1
     if (distinctMonths.size < 3 && !recurringFlag) return []
-    if (variance > 0.18 && !recurringFlag) return []
+    // Una suscripción se cobra UNA vez por ciclo. El súper, la gasolina o el
+    // colmado salen varias veces al mes, y por azar alguno de sus grupos podía
+    // quedar con montos parecidos: «Supermercado Nacional» salía como
+    // suscripción con un 64 % de confianza.
+    if (!recurringFlag && rows.length > distinctMonths.size * 1.25) return []
+    if (variance > 0.10 && !recurringFlag) return []
     const [merchant, categoryId, accountId] = key.split('|')
     return [{
       merchant,

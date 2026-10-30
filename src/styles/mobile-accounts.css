@@ -1227,7 +1227,11 @@
   /* El overlay NO se desplaza: solo `.saed-body`. */
   overflow: hidden;
   padding: 0;
-  touch-action: none;
+  /* `pan-y` y no `none`: el `touch-action` de un contenedor se suma al de
+     todo lo que lleva dentro, y con `none` el dedo no podía desplazar
+     `.saed-body`. Lo que impide mover la pantalla de atrás es el
+     `overflow: hidden` de arriba. */
+  touch-action: pan-y pinch-zoom;
   z-index: 260;
 }
 

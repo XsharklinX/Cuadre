@@ -2,7 +2,10 @@
     <style name="Theme.sharky" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="android:windowBackground">@drawable/sharky_splash</item>
         <item name="android:fontFamily">sans</item>
-        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+        <!-- Sin `windowLayoutInDisplayCutoutMode`: su valor `shortEdges` es de los
+             parametros obsoletos desde Android 15 que Play Console avisaba.
+             `enableEdgeToEdge()` en MainActivity ya decide el modo del recorte
+             de camara en cada version, y en Android 15+ el sistema lo impone. -->
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowLightNavigationBar">false</item>
         <item name="android:windowNoTitle">true</item>

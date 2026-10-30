@@ -41,7 +41,7 @@ function definedClasses(): Set<string> {
  * Prefijos de pantalla que este test vigila. Se limita a los propios de la
  * app para no perseguir utilidades globales ni clases de librerías.
  */
-const WATCHED = /^(sacc|macc|man|mnc|mnews|mhealth|mbank|mrate|mnum|mob-onboard|txf|mfx|mconv|mcur|mset|mobile|mbiz|mbizs|mcli|mcap|msub|mcash|mbrand|mav)-/
+const WATCHED = /^(sacc|macc|man|mnc|mnews|mhealth|mbank|mrate|mnum|mob-onboard|txf|mfx|mconv|mcur|mset|mobile|mbiz|mbizs|mcli|mcap|msub|mcash|mbrand|mav|msvc|morg|mmerge|mcreate|mcf|mcc|mcl|mcol|mprof|msvs|mpick|mdel|mmenu|mpay)-/
 
 describe('toda clase de pantalla propia tiene CSS', () => {
   it('ninguna clase usada en el código queda sin definir', () => {

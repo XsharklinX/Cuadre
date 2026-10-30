@@ -27,11 +27,15 @@ export function SwipeCharge({
 
   return (
     <div className="mbiz-swipe">
-      {/* El fondo, que se ve conforme la fila se aparta. */}
-      <span className="mbiz-swipe-bg" aria-hidden="true">
-        <Icon name="check" size={15} />
-        {t('bizSwipePaid')}
-      </span>
+      {/* El fondo, que se ve conforme la fila se aparta. Un cobro ya cobrado
+          no se desliza, así que no lleva fondo: si lo llevara, se vería a
+          través de la fila atenuada y su «Me pagó» se encimaría con el texto. */}
+      {!disabled && (
+        <span className="mbiz-swipe-bg" aria-hidden="true">
+          <Icon name="check" size={15} />
+          {t('bizSwipePaid')}
+        </span>
+      )}
       <div ref={ref} className="mbiz-swipe-row">
         {children}
       </div>

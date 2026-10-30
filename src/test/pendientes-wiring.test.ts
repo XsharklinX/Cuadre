@@ -18,7 +18,10 @@ import { join } from 'node:path'
 const SRC = join(__dirname, '..')
 const leer = (rel: string) => readFileSync(join(SRC, rel), 'utf8')
 
-const negocio = leer('mobile/MobileBusiness.tsx')
+// Negocio se partió en un armazón, sus tres pestañas y la pantalla de cada
+// servicio: «la pantalla» es la suma de todos, que es lo que ve el usuario.
+const negocio = ['mobile/MobileBusiness.tsx', 'mobile/business/ClientsTab.tsx', 'mobile/business/CollectTab.tsx',
+  'mobile/business/ProfitTab.tsx', 'mobile/business/ServiceScreen.tsx'].map(leer).join('\n')
 const ficha = leer('mobile/business/ClientCard.tsx')
 const formCliente = leer('mobile/business/ClientSheet.tsx')
 const formNegocio = leer('mobile/business/BusinessSheet.tsx')
@@ -88,7 +91,8 @@ describe('un cliente puede tener varios servicios', () => {
 
   it('el cobro se genera por el TOTAL de sus servicios', () => {
     // Cobrar por `amount` sería cobrarle de menos todos los meses.
-    expect(leer('data/receivables.ts')).toContain('amount: clientTotalAmount(client)')
+    // Con el descuento por estrellas encima, pero sobre el total.
+    expect(leer('data/receivables.ts')).toContain('amount: applyDiscount(clientTotalAmount(client), descuento)')
   })
 })
 
@@ -163,14 +167,17 @@ describe('los informes separan negocio de personal', () => {
   })
 
   it('con un filtro puesto, la pantalla lo dice', () => {
-    expect(analisis).toContain('man-scope-note')
+    // 2.8: la pastilla del filtro se pone en color y dice cuál está puesto.
+    expect(analisis).toContain("scope !== 'all' ? 'on'")
+    expect(analisis).toContain('scopeLabel')
   })
 })
 
 describe('la lista de clientes se puede agrupar, y la pantalla vacía guía', () => {
   it('agrupar por servicio existe y se recuerda', () => {
-    expect(negocio).toContain('cuadre-clients-by-service')
-    expect(negocio).toContain('gruposDeClientes')
+    // Ahora es uno de los órdenes de la lista, y es el de partida.
+    expect(negocio).toContain('cuadre-clients-sort')
+    expect(negocio).toContain("if (sort !== 'service') return null")
   })
 
   it('un cliente con dos servicios sale en los dos grupos', () => {

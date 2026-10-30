@@ -1,40 +1,18 @@
-import { useMemo, useRef, useState, type ChangeEvent } from 'react'
+import { useRef, useState, type ChangeEvent } from 'react'
 import { APP_VERSION } from '@/data/release'
 import { MobileDataHealth } from './MobileDataHealth'
 import { MobileWhatsNew } from './MobileWhatsNew'
 import { Icon } from '@/components/ui/Icon'
 import { toast } from '@/components/ui/Toast'
-import { projectCashflow } from '@/data/cashflowProjection'
-import { accountBalanceInBase, accountCurrency, availableBalanceInBase, localToday, visibleAccounts } from '@/data/helpers'
+import { accountBalanceInBase, accountCurrency, availableBalanceInBase, visibleAccounts } from '@/data/helpers'
 import { useFmt } from '@/hooks/useFmt'
-import { useT, type LangKey } from '@/i18n'
+import { useT } from '@/i18n'
 import { AvatarCropper } from '@/components/AvatarCropper'
 import { canPickImageNative, pickImageNative } from '@/lib/nativeFiles'
-import { monthsLabel, simulatePayoff, useDebt } from '@/store/debt'
 import { useFinance } from '@/store/finance'
 import { useDev } from '@/store/dev'
 import { useSettings } from '@/store/settings'
 import type { Account, IconName, ViewId } from '@/types'
-
-// Mismo horizonte que la pestaña "Mes" de MobileCashflow — último día del mes
-// actual. Se duplica aquí (en vez de importar el componente, que arrastra
-// recharts) porque `projectCashflow` en sí es puro y liviano.
-function endOfMonth(today: string): string {
-  const d = new Date(`${today}T00:00:00`)
-  d.setMonth(d.getMonth() + 1, 0)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-}
-
-// El complemento exacto del menú rápido de Movimientos (☰): ese se quedó con
-// las 4 acciones de uso diario (Presupuestos, Metas, Listas, Conversor). Esta
-// sección se llama "Explorar" (no "Herramientas" — tener el mismo nombre en
-// dos lugares con contenido distinto confundía) y usa mosaicos de color, no
-// filas de texto, para no verse como una copia de ese menú.
-const EXPLORE_CARDS: { view: ViewId; icon: IconName; color: string; labelKey: LangKey }[] = [
-  { view: 'subscriptions', icon: 'repeat',   color: '#5bc0ff', labelKey: 'subscriptions' },
-  { view: 'calendar',     icon: 'calendar',  color: '#f59e0b', labelKey: 'calendarLabel' },
-]
 
 export function MobileProfile({
   userName,
@@ -45,8 +23,7 @@ export function MobileProfile({
 }) {
   const { displayName, setDisplayName, profilePhoto, setProfilePhoto } = useSettings()
   const isVip = useDev(d => d.vip)
-  const { accounts, transactions, goals, currency } = useFinance()
-  const debtStore = useDebt()
+  const { accounts, currency } = useFinance()
   const fmtVal = useFmt()
   const t = useT()
   const photoInputRef = useRef<HTMLInputElement>(null)
@@ -109,23 +86,6 @@ export function MobileProfile({
   const creditAccounts = activeAccounts.filter(account => account.type === 'credit')
   const debtBalance = Math.abs(creditAccounts.reduce((sum, account) => sum + Math.min(0, accountBalanceInBase(account, currency)), 0))
   const topAccounts = [...activeAccounts].sort((a, b) => Math.abs(b.balance) - Math.abs(a.balance)).slice(0, 3)
-
-  // Deudas y Flujo de Caja eran herramientas huérfanas (solo alcanzables desde
-  // el menú de Movimientos, y encima aparecían dentro de "Cuentas" por un bug
-  // de ruteo). Ahora viven aquí como tarjetas con datos reales — se ve de un
-  // vistazo si hay algo que atender, no hay que entrar a averiguarlo.
-  const debtSummary = useMemo(() => {
-    if (debtStore.debts.length === 0) return null
-    const totalDebt = debtStore.debts.reduce((sum, d) => sum + d.balance, 0)
-    const payoff = simulatePayoff(debtStore.debts, debtStore.extraPayment, 'avalanche')
-    return { totalDebt, months: payoff.months }
-  }, [debtStore.debts, debtStore.extraPayment])
-
-  const today = localToday()
-  const cashflow = useMemo(
-    () => projectCashflow(transactions, accounts, goals, endOfMonth(today), today, currency),
-    [transactions, accounts, goals, today, currency],
-  )
 
   return (
     <div className="mpr-root">
@@ -246,22 +206,8 @@ export function MobileProfile({
         </div>
       </div>
 
-      <div className="mpr-kpi-grid">
-        <button className="mpr-kpi-card" style={{ '--kpi-color': '#6366f1' } as React.CSSProperties} onClick={() => goto('debt')}>
-          <span className="mpr-kpi-icon"><Icon name="dollar" size={18} /></span>
-          <span className="mpr-kpi-label">{t('debtsLabel')}</span>
-          <strong className="mpr-kpi-value">{debtSummary ? fmtVal(debtSummary.totalDebt, currency) : '—'}</strong>
-          <small className="mpr-kpi-sub">{debtSummary ? monthsLabel(debtSummary.months, t) : t('debtQuickDesc')}</small>
-        </button>
-        <button className="mpr-kpi-card" style={{ '--kpi-color': '#38bdf8' } as React.CSSProperties} onClick={() => goto('cashflow')}>
-          <span className="mpr-kpi-icon"><Icon name="trend" size={18} /></span>
-          <span className="mpr-kpi-label">{t('cashflowTitle')}</span>
-          <strong className={`mpr-kpi-value${cashflow.endBalance < 0 ? ' text-expense' : ''}`}>
-            {fmtVal(cashflow.endBalance, currency)}
-          </strong>
-          <small className="mpr-kpi-sub">{t('cashflowEndOfMonth')}</small>
-        </button>
-      </div>
+      {/* Deudas y Flujo de caja vivian aqui como tarjetas; desde la 2.5 estan
+          en el menu ☰ (grupo «Compromisos»), con el mismo dato en vivo. */}
 
       {/* Confianza y novedades: dos cosas que el usuario busca en el Perfil,
           no en Ajustes. "Salud de datos" estaba enterrada en Ajustes > Datos y
@@ -332,19 +278,8 @@ export function MobileProfile({
         )}
       </div>
 
-      <div className="mpr-card">
-        <div className="mpr-card-header">
-          <span>{t('exploreSection')}</span>
-        </div>
-        <div className="mpr-explore-grid">
-          {EXPLORE_CARDS.map(card => (
-            <button key={card.view} className="mpr-explore-tile" style={{ '--tile-color': card.color } as React.CSSProperties} onClick={() => goto(card.view)}>
-              <span className="mpr-explore-icon"><Icon name={card.icon} size={20} /></span>
-              <b>{t(card.labelKey)}</b>
-            </button>
-          ))}
-        </div>
-      </div>
+      {/* H5 · Perfil es tu cuenta y nada más: «Explorar» (Calendario) se fue
+          al menú ☰, a Utilidades, junto a lo que salió de aquí en la 2.5. */}
     </div>
   )
 }

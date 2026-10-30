@@ -470,9 +470,21 @@ export function accountMovementsTotal(
     }
   }
   for (const c of contributions) {
-    if (c.fromAccountId === accountId) total -= c.amount
+    if (c.fromAccountId === accountId) total -= contributionDelta(c)
   }
   return total
+}
+
+/**
+ * Lo que un aporte suma a su meta: positivo al aportar, negativo al SACAR.
+ *
+ * Sacar dinero de una meta es un aporte al revés (`withdraw`), con el monto
+ * siempre positivo para que el saneado y el backup lo sigan aceptando. Todo
+ * lo que suma aportes pasa por aquí: si uno sumara `amount` a pelo, un retiro
+ * contaría como ahorro y la meta y la cuenta descuadrarían.
+ */
+export function contributionDelta(c: Pick<GoalContribution, 'amount' | 'withdraw'>): number {
+  return c.withdraw ? -c.amount : c.amount
 }
 
 /**

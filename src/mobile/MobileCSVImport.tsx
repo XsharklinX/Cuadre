@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react'
+import { SheetSelect } from '@/components/ui/SheetSelect'
 import { Icon } from '@/components/ui/Icon'
 import { toast } from '@/components/ui/Toast'
 import { useFinance } from '@/store/finance'
@@ -320,9 +321,8 @@ export function MobileCSVImport({ onClose }: { onClose: () => void }) {
 
             <label className="mcsv-map-row">
               <span>{t('destinationAccount')}</span>
-              <select value={accountId} onChange={e => setAccId(e.target.value)}>
-                {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-              </select>
+              <SheetSelect title={t('destinationAccount')} value={accountId} onChange={setAccId}
+                options={accounts.map(a => ({ value: a.id, label: a.name, color: a.color }))} />
             </label>
 
             <div className="mcsv-preview" style={{ maxHeight: 260 }}>

@@ -202,3 +202,28 @@ export function defaultIconFor(type: NoteType): IconName {
 
 // Reexporta el tipo de moneda para quien consuma este módulo sin importar types.
 export type { CurrencyCode }
+
+/**
+ * L1 · AÑADIR ESCRIBIENDO: «3 leche 95» → { text: 'Leche', qty: 3, price: 95 }.
+ *
+ * Un número al principio es la cantidad (hasta 99) y uno al final, el precio
+ * por unidad («RD$», comas y «$» se toleran). Lo demás es el nombre, con la
+ * primera letra en mayúscula. Sin números, entra tal cual.
+ */
+export function parseQuickItem(raw: string): { text: string; qty?: number; price?: number } {
+  let rest = raw.trim().replace(/\s+/g, ' ')
+  let qty: number | undefined
+  let price: number | undefined
+  const head = rest.match(/^(\d{1,2})\s*(?:x|×)?\s+(.+)$/i)
+  if (head) { qty = Number(head[1]); rest = head[2] }
+  const tail = rest.match(/^(.+?)\s+(?:rd\$|\$)?\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)$/i)
+  if (tail) {
+    const num = tail[2]
+    // «1,250» y «1.250» son miles; «12.50» o «12,5» son decimales.
+    const normal = /^\d{1,3}([.,]\d{3})+$/.test(num) ? num.replace(/[.,]/g, '') : num.replace(',', '.')
+    const value = Number(normal)
+    if (Number.isFinite(value) && value > 0) { price = value; rest = tail[1] }
+  }
+  const text = rest ? rest.charAt(0).toUpperCase() + rest.slice(1) : raw.trim()
+  return { text, ...(qty && qty > 0 ? { qty } : {}), ...(price !== undefined ? { price } : {}) }
+}

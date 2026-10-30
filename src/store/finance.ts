@@ -5,12 +5,13 @@ import { learnCategoryRule } from '@/data/bankCsv'
 import { convertCurrency } from '@/data/currencies'
 import { creditUsedInPrimary } from '@/data/creditCard'
 import { canHaveNetwork } from '@/data/cardNetwork'
-import { accountMovementsTotal, accountSecondaryMovementsTotal, localToday } from '@/data/helpers'
+import { accountMovementsTotal, accountSecondaryMovementsTotal, contributionDelta, localToday } from '@/data/helpers'
 import { validateEnvelopeTransfer } from '@/data/envelopes'
 import { createRecoverySnapshot } from '@/data/recovery'
 import { recordRecalc, type RecalcMove } from '@/data/recalcHistory'
 import { findInflatedIncome, repairInflatedIncome } from '@/data/incomeFeeRepair'
 import { tt } from '@/i18n'
+import { resumeAutoNextDate } from '@/data/goalPlans'
 import { useSettings } from '@/store/settings'
 import type { Account, Category, Transaction, Goal, GoalContribution, CurrencyCode, OverdraftPolicy } from '@/types'
 
@@ -338,7 +339,7 @@ export function recomputeGoalsSaved(goals: Goal[], contributions: GoalContributi
   return goals.map(goal => {
     const total = contributions
       .filter(contribution => contribution.goalId === goal.id)
-      .reduce((sum, contribution) => sum + contribution.amount, 0)
+      .reduce((sum, contribution) => sum + contributionDelta(contribution), 0)
     const opening = goal.openingSaved ?? goal.saved - total
     return { ...goal, openingSaved: opening, saved: opening + total }
   })
@@ -496,7 +497,7 @@ function normalizeTransaction(tx: Transaction): Transaction {
 
   const {
     id, type, amount, date, note, categoryId, accountId, splits,
-    recurring, recurringStart, recurringEnd, recurringNext, skippedDates, serviceId, resoldAs, paidService, generatedFrom, tags,
+    recurring, recurringStart, recurringEnd, recurringNext, skippedDates, serviceId, resoldAs, paidService, paidAccount, autoPaid, generatedFrom, tags,
     detectedFrom, originalAmount, originalCurrency, fxRate, onSecondaryBalance, fees, hasReceipt,
   } = tx
   // Los 3 campos FX viajan JUNTOS o no viajan: un `originalAmount` sin su
@@ -517,6 +518,10 @@ function normalizeTransaction(tx: Transaction): Transaction {
     // marca y el gasto dejaria de contar como inversion. Es exactamente lo
     // que le paso a `description` y casi a `hasReceipt`.
     ...(type === 'expense' && paidService ? { paidService } : {}),
+    // Van con `paidService` o no van: una cuenta de servicio sin servicio no
+    // dice de qué es.
+    ...(type === 'expense' && paidService && paidAccount ? { paidAccount } : {}),
+    ...(autoPaid ? { autoPaid: true } : {}),
     ...(!recurring && generatedFrom ? { generatedFrom } : {}),
     ...(tags?.length ? { tags } : {}),
     ...(detectedFrom ? { detectedFrom } : {}),
@@ -615,6 +620,15 @@ export interface FinanceState {
   addTx:    (tx: Omit<Transaction, 'id'> & { id?: string }) => void
   importTxs: (txs: Array<Omit<Transaction, 'id'> & { id?: string }>) => void
   updateTx: (id: string, fields: Partial<Omit<Transaction, 'id'>>) => void
+  /**
+   * Cambia a qué servicio (y cuenta) pagó cada uno de estos gastos.
+   *
+   * Es solo una etiqueta: ni monto, ni cuenta, ni fecha, así que no pasa por
+   * los saldos. Lo usan unir dos servicios y «estos pagos viejos eran de
+   * Netflix», que pueden tocar decenas de gastos a la vez; hacerlo con
+   * `updateTx` uno por uno revertiría y reaplicaría cada saldo para nada.
+   */
+  retagPayments: (ids: string[], paidService: string | undefined, paidAccount?: string) => void
   deleteTx: (id: string) => void
   transfer: (p: { fromAccount: string; toAccount: string; amount: number; date: string; note?: string; description?: string; toSecondary?: boolean }) => void
 
@@ -636,6 +650,14 @@ export interface FinanceState {
   /** Reinserta una meta borrada junto con sus aportes (mismos ids) — «Deshacer». */
   restoreGoal: (goal: Goal, contributions: GoalContribution[]) => void
   contribute:  (goalId: string, amount: number, fromAccountId: string, note?: string, date?: string) => void
+  /** Saca dinero de una meta hacia una cuenta: un aporte al revés, nunca un saldo escrito a mano. */
+  withdrawFromGoal: (goalId: string, amount: number, toAccountId: string, note?: string) => void
+  /** Reordena las metas; la primera es la meta principal. */
+  reorderGoals: (orderedIds: string[]) => void
+  /** Da una meta por lograda (o la reabre con `false`). */
+  setGoalAchieved: (id: string, achieved: boolean) => void
+  /** Pausa o reanuda el aporte automático sin perder su configuración. */
+  setGoalAutoPaused: (id: string, paused: boolean) => void
 
   // Categorías
   addCategory:    (c: Omit<Category, 'id'>) => void
@@ -754,6 +776,17 @@ export const useFinance = create<FinanceState>()(
         const txns = [...s.transactions]
         txns[idx]  = next
         return { transactions: sortTxns(txns), accounts: accs }
+      }),
+
+      retagPayments: (ids, paidService, paidAccount) => set(s => {
+        if (!ids.length) return s
+        const cuales = new Set(ids)
+        return {
+          transactions: s.transactions.map(tx => {
+            if (!cuales.has(tx.id) || tx.type !== 'expense') return tx
+            return normalizeTransaction({ ...tx, paidService, paidAccount: paidService ? paidAccount : undefined })
+          }),
+        }
       }),
 
       deleteTx: (id) => set(s => {
@@ -937,7 +970,7 @@ export const useFinance = create<FinanceState>()(
           if (fields.saved !== undefined && fields.openingSaved === undefined) {
             const contributed = s.goalContributions
               .filter(contribution => contribution.goalId === id)
-              .reduce((sum, contribution) => sum + contribution.amount, 0)
+              .reduce((sum, contribution) => sum + contributionDelta(contribution), 0)
             next.openingSaved = fields.saved - contributed
           }
           return next
@@ -978,6 +1011,52 @@ export const useFinance = create<FinanceState>()(
           goalContributions: [contribution, ...s.goalContributions],
         }
       }),
+
+      withdrawFromGoal: (goalId, amount, toAccountId, note) => set(s => {
+        const goal = s.goals.find(g => g.id === goalId)
+        if (!goal) throw new Error(tt('errGoalNotExist'))
+        if (!(amount > 0) || amount > goal.saved + 0.005) throw new Error(tt('errWithdrawTooMuch'))
+        if (!s.accounts.some(a => a.id === toAccountId)) throw new Error(tt('errAccountNotExist'))
+        const withdrawal: GoalContribution = {
+          id: newId('contrib_'),
+          goalId,
+          amount,
+          fromAccountId: toAccountId,
+          date: localToday(),
+          note: note?.trim() || undefined,
+          withdraw: true,
+        }
+        return {
+          goals:    s.goals.map(g => g.id === goalId ? { ...g, saved: g.saved - amount } : g),
+          accounts: s.accounts.map(a => a.id === toAccountId ? { ...a, balance: a.balance + amount } : a),
+          goalContributions: [withdrawal, ...s.goalContributions],
+        }
+      }),
+
+      reorderGoals: (orderedIds) => set(s => {
+        const rank = new Map(orderedIds.map((id, i) => [id, i]))
+        // Lo que no venga en la lista conserva su sitio relativo al final.
+        const goals = [...s.goals].sort((a, b) => (rank.get(a.id) ?? 1e9) - (rank.get(b.id) ?? 1e9))
+        return { goals }
+      }),
+
+      setGoalAchieved: (id, achieved) => set(s => ({
+        goals: s.goals.map(g => g.id === id ? { ...g, achievedAt: achieved ? localToday() : undefined } : g),
+      })),
+
+      setGoalAutoPaused: (id, paused) => set(s => ({
+        goals: s.goals.map(g => {
+          if (g.id !== id || !g.autoContribute) return g
+          if (paused) return { ...g, autoPaused: true }
+          /*
+           * Al reanudar, el próximo aporte se mueve a hoy o después. Si se
+           * dejara la fecha vieja, el aporte automático cobraría de golpe
+           * todos los periodos que estuvo en pausa.
+           */
+          const next = resumeAutoNextDate(g.autoContribute, localToday())
+          return { ...g, autoPaused: undefined, autoContribute: { ...g.autoContribute, nextDate: next } }
+        }),
+      })),
 
       // ── Categorías ─────────────────────────────────────
       addCategory: (c) => set(s => {

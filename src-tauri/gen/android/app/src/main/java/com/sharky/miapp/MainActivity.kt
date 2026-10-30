@@ -49,10 +49,14 @@ class MainActivity : TauriActivity() {
      * Pedirlo en ejecucion hace lo mismo donde importa y Play no lo ve, asi
      * que no filtra a nadie.
      *
-     * Sigue en pie que Android 16 ignora la peticion en pantallas grandes
-     * (tablets, plegables abiertos): ahi rotara, por diseño del sistema.
+     * SOLO EN TELEFONOS (ancho minimo < 600dp). Android 16 ignora la peticion
+     * en pantallas grandes —tablets, plegables abiertos— y Play Console avisa
+     * de que se pida ahi. En esas pantallas la app ya gira y se adapta, asi que
+     * pedirlo solo servia para el aviso.
      */
-    requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+    if (resources.configuration.smallestScreenWidthDp < 600) {
+      requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+    }
 
     /*
      * `isNavigationBarContrastEnforced` se quito: es de la misma familia

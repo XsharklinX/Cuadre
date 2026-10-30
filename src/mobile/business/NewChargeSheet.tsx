@@ -1,12 +1,17 @@
 import { useState } from 'react'
+import { SheetSelectList } from '@/components/ui/SheetSelect'
 import { toast } from '@/components/ui/Toast'
-import { fmt, localToday } from '@/data/helpers'
+import { dateLocale, fmt, localToday } from '@/data/helpers'
+import { useSettings } from '@/store/settings'
 import { useT } from '@/i18n'
 import { useMoneyDecimals } from '@/hooks/useFmt'
 import { playSoftHaptic } from '@/lib/sound'
 import { useBusiness } from '@/store/business'
 import { useFinance } from '@/store/finance'
-import { BizSheet, Field } from './shared'
+import { BizSheet } from './shared'
+import { BigAmount, FormRow, FormRows } from './ShortForm'
+import { MobileAmountSheet } from '../MobileAmountSheet'
+import { MobileDatePicker } from '../MobileDatePicker'
 
 /**
  * UN COBRO SUELTO.
@@ -46,6 +51,8 @@ export function NewChargeSheet({
   const [clientId, setClientId] = useState(fijo ?? elegibles[0]?.id ?? '')
   const [amount, setAmount] = useState('')
   const [date, setDate] = useState(localToday())
+  const [hoja, setHoja] = useState<'amount' | 'date' | 'who' | null>(null)
+  const lang = useSettings(s => s.language)
 
   const client = clients.find(c => c.id === clientId)
   const cur = client?.currency ?? currency
@@ -67,6 +74,7 @@ export function NewChargeSheet({
       onSave={crear}
       saveLabel={t('bizChargeCreate')}
       canSave={canSave}
+      missing={!client ? t('bizChargeWho') : !(monto > 0) ? t('fieldAmount') : !date ? t('date') : null}
     >
       <p className="mbizs-calc">{t('bizNewChargeWhy')}</p>
 
@@ -74,39 +82,35 @@ export function NewChargeSheet({
         <p className="mbizs-calc warn">{t('bizChargeNoClients')}</p>
       ) : (
         <>
-          {/* Con el cliente ya decidido no se pregunta, se recuerda. */}
-          {fijo ? (
-            <Field label={t('bizChargeWho')}>
-              <input className="mbizs-input" type="text" value={client?.name ?? ''} readOnly />
-            </Field>
-          ) : (
-            <Field label={t('bizChargeWho')}>
-              <select className="mbizs-input" value={clientId} onChange={e => setClientId(e.target.value)}>
-                {elegibles.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </Field>
-          )}
-
-          <Field
+          {/* La hoja corta (2.8): el monto en grande y dos filas. */}
+          <BigAmount
             label={t('amount')}
-            hint={monto > 0 ? fmt(monto, cur, { decimals: moneyDecimals }) : undefined}
-          >
-            <input
-              className="mbizs-input mbizs-input-sm"
-              type="number"
-              inputMode="decimal"
-              value={amount}
-              onChange={e => setAmount(e.target.value)}
-              placeholder="0"
-            />
-          </Field>
-
-          <Field label={t('bizChargeDue')}>
-            <input className="mbizs-input mbizs-input-sm" type="date" value={date} onChange={e => setDate(e.target.value)} />
-          </Field>
+            value={monto > 0 ? fmt(monto, cur, { decimals: moneyDecimals }) : t('n28TapToWrite')}
+            missing={!!client && !(monto > 0)}
+            empty={!(monto > 0)}
+            onTap={() => setHoja('amount')}
+          />
+          <FormRows>
+            <FormRow label={t('bizChargeWho')} value={client?.name ?? ''} missing={!client} onTap={fijo ? undefined : () => setHoja('who')} />
+            <FormRow label={t('bizChargeDue')} value={date ? new Date(`${date}T00:00:00`).toLocaleDateString(dateLocale(lang), { day: 'numeric', month: 'long' }) : ''} onTap={() => setHoja('date')} />
+          </FormRows>
         </>
+      )}
+
+      {hoja === 'amount' && (
+        <MobileAmountSheet title={t('amount')} value={monto} currency={cur} onDone={v => { setAmount(v > 0 ? String(v) : ''); setHoja(null) }} onClose={() => setHoja(null)} />
+      )}
+      {hoja === 'date' && (
+        <MobileDatePicker value={date} onChange={v => { setDate(v); setHoja(null) }} onClose={() => setHoja(null)} />
+      )}
+      {hoja === 'who' && (
+        <SheetSelectList
+          title={t('bizChargeWho')}
+          value={clientId}
+          options={elegibles.map(c => ({ value: c.id, label: c.name }))}
+          onPick={v => { setClientId(v); setHoja(null) }}
+          onClose={() => setHoja(null)}
+        />
       )}
     </BizSheet>
   )

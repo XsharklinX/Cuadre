@@ -87,7 +87,12 @@ async function updateTauriBackButtonListener() {
   }
 }
 
-export function useMobileBackDismiss(active: boolean, onDismiss: () => void) {
+/**
+ * `onDismiss` puede devolver `false` para decir «no me cerré»: por ejemplo un
+ * formulario con cambios que pregunta antes de descartar. Entonces el overlay
+ * se vuelve a poner arriba de la pila y el siguiente atrás le sigue llegando.
+ */
+export function useMobileBackDismiss(active: boolean, onDismiss: () => void | boolean) {
   const dismissRef = useRef(onDismiss)
   dismissRef.current = onDismiss
 
@@ -95,7 +100,9 @@ export function useMobileBackDismiss(active: boolean, onDismiss: () => void) {
     if (!active) return
 
     if (isTauri()) {
-      const handler = () => dismissRef.current()
+      const handler = () => {
+        if (dismissRef.current() === false) tauriDismissStack.push(handler)
+      }
       tauriDismissStack.push(handler)
       void updateTauriBackButtonListener()
 
@@ -110,7 +117,14 @@ export function useMobileBackDismiss(active: boolean, onDismiss: () => void) {
       // Browser PWA fallback using history state
       ensurePopStateBound()
       const overlayId = ++browserOverlayId
-      const entry: BrowserOverlay = { id: overlayId, dismiss: () => dismissRef.current() }
+      const entry: BrowserOverlay = {
+        id: overlayId,
+        dismiss: () => {
+          if (dismissRef.current() !== false) return
+          browserDismissStack.push(entry)
+          window.history.pushState({ sharkyOverlay: overlayId }, '')
+        },
+      }
       browserDismissStack.push(entry)
       window.history.pushState({ sharkyOverlay: overlayId }, '')
 

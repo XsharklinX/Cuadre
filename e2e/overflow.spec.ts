@@ -151,7 +151,7 @@ for (const cfg of MATRIX) {
     try {
       await navTap('Movimientos')
       await page.locator('.mobile-topbar-menu').click({ timeout: 2000 })
-      await page.locator('.mobile-tools-row', { hasText: /El bote|The jar/ }).first().click({ timeout: 2000 })
+      await page.locator('.mtm-tile-main', { hasText: /El bote|The jar/ }).first().click({ timeout: 2000 })
       await page.waitForTimeout(400)
       await check('bote')
     } catch { /* noop */ }

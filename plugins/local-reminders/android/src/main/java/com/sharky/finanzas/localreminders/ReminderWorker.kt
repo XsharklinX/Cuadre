@@ -45,6 +45,7 @@ private const val CHANNEL_GOALS = "sharky_goal_reminders_v2"
 private const val CHANNEL_WEEKLY = "sharky_weekly_summary_v2"
 private const val CHANNEL_FX = "sharky_fx_alerts_v2"
 private const val CHANNEL_ANOMALY = "sharky_anomaly_alerts_v2"
+private const val CHANNEL_NUDGES = "sharky_nudges_v1"
 
 /** Canales de la v1, borrados al arrancar para no duplicar la lista. */
 private val LEGACY_CHANNELS = listOf(
@@ -187,6 +188,25 @@ class ReminderWorker(appContext: Context, params: WorkerParameters) : CoroutineW
             notifiedChanged = true
         }
 
+        // Avisos ya escritos por la app (2.7): el antojo que ya se puede decidir,
+        // la cuota de una deuda que vence en dos días, el día del mes en que el
+        // flujo se queda en rojo. La app decide QUÉ y CUÁNDO y manda el texto
+        // traducido; aquí solo se muestran, una vez cada uno.
+        val nudges = snapshot.optJSONArray("nudges") ?: JSONArray()
+        for (i in 0 until nudges.length()) {
+            val nudge = nudges.getJSONObject(i)
+            val date = nudge.optString("date")
+            if (date.isEmpty() || date > todayStr) continue
+            val alertId = "nudge:${nudge.optString("id")}"
+            if (alertId in dismissed || alertId in notified) continue
+            val title = nudge.optString("title")
+            val text = nudge.optString("text")
+            if (title.isBlank() || text.isBlank()) continue
+            notify(CHANNEL_NUDGES, alertId, title, text, nudge.optString("type").ifBlank { "activity" })
+            notified.add(alertId)
+            notifiedChanged = true
+        }
+
         // Resumen semanal: los domingos por la tarde/noche.
         val nowCal = Calendar.getInstance()
         if (nowCal.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY && nowCal.get(Calendar.HOUR_OF_DAY) >= EVENING_HOUR) {
@@ -197,12 +217,15 @@ class ReminderWorker(appContext: Context, params: WorkerParameters) : CoroutineW
                 val income = weekly.optString("incomeLabel")
                 val topCat = weekly.optString("topCategory")
                 val topLabel = weekly.optString("topCategoryLabel")
-                val text = buildString {
+                // La app manda el texto ya escrito y traducido (compara con la
+                // semana anterior). El armado de aquí queda para snapshots viejos.
+                val ready = weekly.optString("text")
+                val text = if (ready.isNotBlank()) ready else buildString {
                     append("Gastaste $expense e ingresaste $income")
                     if (topCat.isNotBlank()) append(". Lo que más pesó: $topCat ($topLabel)")
                     append(". Toca para ver el detalle.")
                 }
-                notify(CHANNEL_WEEKLY, alertId, s("weeklyTitle", "Tu semana en Sharky"), text, "weekly")
+                notify(CHANNEL_WEEKLY, alertId, s("weeklyTitle", "Tu semana en Cuadre"), text, "weekly")
                 notified.add(alertId)
                 notifiedChanged = true
             }
@@ -234,23 +257,36 @@ class ReminderWorker(appContext: Context, params: WorkerParameters) : CoroutineW
                  * usuario en ingles recibia su aviso en español — justo lo que
                  * el resto de este worker evita leyendo `strings`.
                  */
-                val title = s("fxTitle", "1 {code} = {rate}")
-                    .replace("{code}", currencyCode)
-                    .replace("{rate}", rateLabel)
                 val verb = if (fx.optString("direction") == "above") {
                     s("fxUp", "subió sobre")
                 } else {
                     s("fxDown", "bajó de")
                 }
-                var body = s("fxText", "{verb} tu límite de {threshold}.")
+                /*
+                 * TODOS LOS MARCADORES, EN TITULO Y CUERPO.
+                 *
+                 * Cada texto se rellenaba solo con los marcadores que su
+                 * plantilla ACTUAL lleva. Pero las plantillas viajan en el
+                 * snapshot, y un snapshot viejo traia las de antes —«El {code}
+                 * {verb} tu limite» como titulo y «1 {code} = {rate}» como
+                 * cuerpo—: el aviso salia con las llaves a la vista. Rellenar
+                 * todos en los dos sitios hace que ninguna version de las
+                 * plantillas pueda dejar una llave sin sustituir.
+                 */
+                fun rellena(texto: String): String = texto
+                    .replace("{code}", currencyCode)
+                    .replace("{currency}", currencyCode)
+                    .replace("{rate}", rateLabel)
                     .replace("{verb}", verb)
                     .replace("{threshold}", thresholdLabel)
+                val title = rellena(s("fxTitle", "1 {code} = {rate}"))
+                var body = rellena(s("fxText", "{verb} tu límite de {threshold}."))
                 // El movimiento solo se añade si hay con que compararlo.
                 if (changeLabel.isNotEmpty()) {
                     val dir = if (changeUp) s("fxUp", "subió") else s("fxDown", "bajó")
-                    body += " " + s("fxTextChange", "{dir} {amount} en el último mes.")
+                    body += " " + rellena(s("fxTextChange", "{dir} {amount} en el último mes.")
                         .replace("{dir}", dir)
-                        .replace("{amount}", changeLabel)
+                        .replace("{amount}", changeLabel))
                 }
                 notify(CHANNEL_FX, alertId, "$flag $title", body, "fx")
                 notified.add(alertId)
@@ -413,6 +449,8 @@ class ReminderWorker(appContext: Context, params: WorkerParameters) : CoroutineW
         // Informativo: bandeja, sin sonido ni banner.
         channel(CHANNEL_GOALS, "Aportes de metas", NotificationManager.IMPORTANCE_LOW,
             "Recordatorio suave para aportar a una meta.")
+        channel(CHANNEL_NUDGES, "Recordatorios puntuales", NotificationManager.IMPORTANCE_DEFAULT,
+            "Antojos que ya puedes decidir, cuotas que vencen y dias del mes en rojo.")
         channel(CHANNEL_WEEKLY, "Resumen semanal", NotificationManager.IMPORTANCE_LOW,
             "Tu resumen de la semana.")
         channel(CHANNEL_FX, "Alertas de tasa de cambio", NotificationManager.IMPORTANCE_LOW,

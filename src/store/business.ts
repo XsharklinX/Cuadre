@@ -2,8 +2,10 @@ import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import { CYCLE_ORDER, type BillingCycle } from '@/data/billing'
 import { applyPayment, pendingCharges, revokePayment } from '@/data/receivables'
-import type { Business, Service } from '@/data/business'
-import type { Charge, Client } from '@/data/clients'
+import { serviceAccounts, type Business, type PayMode, type Service, type ServiceAccount } from '@/data/business'
+import type { Charge, Client, ClientStar } from '@/data/clients'
+import { referralDiscount, referralRules } from '@/data/referrals'
+import { trimHandled } from '@/data/autopay'
 import { localToday } from '@/data/helpers'
 import { mergePlan } from '@/data/duplicateClients'
 import { newId } from '@/data/seed'
@@ -44,6 +46,39 @@ interface BusinessState {
   addClient: (c: Omit<Client, 'id' | 'createdAt'>) => string
   updateClient: (id: string, fields: Partial<Omit<Client, 'id'>>) => void
   deleteClient: (id: string) => void
+  /**
+   * L1 · BORRAR CONSERVANDO SU HISTORIAL.
+   *
+   * Sale de todas las listas y no genera cobros, pero sus cobros pagados
+   * siguen sumando en Ganancia. No puede ser un borrado de verdad: al cargar,
+   * los cobros sin cliente se descartan.
+   */
+  softDeleteClient: (id: string) => void
+  restoreClient: (id: string) => void
+  /** L1 · BORRAR TODO: el cliente y todos sus cobros. El libro no se toca. */
+  purgeClient: (id: string) => void
+  /** L2 · Los mismos campos a varios clientes a la vez. */
+  updateClients: (ids: string[], fields: Partial<Omit<Client, 'id'>>) => void
+  /** Una estrella más: alguien que te trajo. */
+  addStar: (clientId: string, star: ClientStar) => void
+  removeStar: (clientId: string, at: number) => void
+
+  // ── Cuentas de un servicio ─────────────────────────────
+  /** Cambia una cuenta. Si el servicio tenía la implícita, la materializa. */
+  updateAccount: (serviceId: string, accountId: string, fields: Partial<Omit<ServiceAccount, 'id'>>) => void
+  /** Cierra una cuenta y pasa sus clientes a otra. */
+  closeAccount: (serviceId: string, accountId: string, moveTo: string | null) => void
+  /** S2 · Deja guardado en qué cuenta está cada cliente. */
+  assignAccounts: (assignments: Map<string, string>) => void
+
+  // ── Pagos de servicios ─────────────────────────────────
+  /** Apunta pagos como resueltos: registrados, pagados a mano o descartados. */
+  markPayHandled: (serviceId: string, keys: string[], today: string) => void
+  /** «Mañana»: no vuelve a preguntar por ese pago hasta esa fecha. */
+  snoozePay: (serviceId: string, key: string, until: string) => void
+  /** Deshace un «resuelto», para el deshacer del aviso. */
+  unmarkPayHandled: (serviceId: string, keys: string[]) => void
+  archiveService: (id: string, archived: boolean) => void
   /**
    * Otro cliente con el mismo trato: mismo servicio, mismo precio, mismo día.
    *
@@ -157,6 +192,19 @@ function str(value: unknown): string {
  */
 const PRICE_LOG_MAX = 12
 
+const PAY_MODES: PayMode[] = ['auto', 'ask', 'manual']
+
+/**
+ * Las cuentas de un servicio como lista propia.
+ *
+ * Un servicio sin cuentas tiene una implícita (`id:single`). Para cambiarla o
+ * añadir otra hay que hacerla real con ESE mismo id: si no, los clientes que
+ * estaban en ella quedarían apuntando a una cuenta que ya no existe.
+ */
+function materializar(service: Service): ServiceAccount[] {
+  return service.accounts?.length ? service.accounts : serviceAccounts(service)
+}
+
 export function sanitizeBusinessData(raw: unknown): Pick<BusinessState, 'clients' | 'businesses' | 'services' | 'charges'> {
   const data = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
 
@@ -195,7 +243,22 @@ export function sanitizeBusinessData(raw: unknown): Pick<BusinessState, 'clients
       active: c.active !== false,
       createdAt: num(c.createdAt, Date.now()),
       notes: str(c.notes) || undefined,
+      deletedAt: num(c.deletedAt) > 0 ? num(c.deletedAt) : undefined,
+      // Una estrella sin fecha no puede caducar ni ordenarse: no sirve.
+      stars: (Array.isArray(c.stars) ? c.stars : [])
+        .filter((v): v is Record<string, unknown> => !!v && typeof v === 'object')
+        .map(v => ({
+          at: num(v.at),
+          referredId: str(v.referredId) || undefined,
+          note: str(v.note).trim().slice(0, 140) || undefined,
+        }))
+        .filter(v => v.at > 0)
+        .slice(-60) || undefined,
+      referredBy: str(c.referredBy) || undefined,
+      autoCollect: c.autoCollect === true ? true : undefined,
     }))
+    // Vacía es como no tenerla: así una copia no se llena de `stars: []`.
+    .map(c => (c.stars?.length ? c : { ...c, stars: undefined }))
 
   const clientIds = new Set(clients.map(c => c.id))
 
@@ -214,6 +277,17 @@ export function sanitizeBusinessData(raw: unknown): Pick<BusinessState, 'clients
       setAsideAccountId: str(b.setAsideAccountId) || undefined,
       archivedAt: num(b.archivedAt) > 0 ? num(b.archivedAt) : undefined,
       createdAt: num(b.createdAt, Date.now()),
+      monthlyGoal: num(b.monthlyGoal) > 0 ? num(b.monthlyGoal) : undefined,
+      referral: b.referral && typeof b.referral === 'object'
+        ? (() => {
+            const r = b.referral as Record<string, unknown>
+            return {
+              pctPerStar: Math.min(100, Math.max(0, num(r.pctPerStar))),
+              maxPct: Math.min(100, Math.max(0, num(r.maxPct))),
+              expiresMonths: num(r.expiresMonths) > 0 ? Math.round(num(r.expiresMonths)) : undefined,
+            }
+          })()
+        : undefined,
     }))
 
   const businessIds = new Set(businesses.map(b => b.id))
@@ -245,9 +319,31 @@ export function sanitizeBusinessData(raw: unknown): Pick<BusinessState, 'clients
               cost: Math.max(0, num(a.cost)),
               capacity: num(a.capacity) > 0 ? Math.round(num(a.capacity)) : undefined,
               closedAt: num(a.closedAt) > 0 ? num(a.closedAt) : undefined,
+              payDay: num(a.payDay) > 0 ? Math.round(num(a.payDay)) : undefined,
             }))
         : undefined,
       createdAt: num(s.createdAt, Date.now()),
+      payMode: PAY_MODES.includes(str(s.payMode) as PayMode) ? str(s.payMode) as PayMode : undefined,
+      // El 0 es domingo en el semanal: se acepta, a diferencia del resto.
+      payDay: typeof s.payDay === 'number' && Number.isFinite(s.payDay) && s.payDay >= 0 ? Math.round(s.payDay) : undefined,
+      payAnchor: /^\d{4}-\d{2}-\d{2}$/.test(str(s.payAnchor)) ? str(s.payAnchor) : undefined,
+      payFrom: /^\d{4}-\d{2}-\d{2}$/.test(str(s.payFrom)) ? str(s.payFrom) : undefined,
+      payAccountId: str(s.payAccountId) || undefined,
+      payCategoryId: str(s.payCategoryId) || undefined,
+      payHandled: (Array.isArray(s.payHandled) ? s.payHandled : [])
+        .filter((k): k is string => typeof k === 'string' && k.includes('|'))
+        .slice(-120),
+      paySnooze: s.paySnooze && typeof s.paySnooze === 'object'
+        ? Object.fromEntries(Object.entries(s.paySnooze as Record<string, unknown>)
+            .filter(([, v]) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)) as Array<[string, string]>)
+        : undefined,
+      slotPrice: num(s.slotPrice) > 0 ? num(s.slotPrice) : undefined,
+      archivedAt: num(s.archivedAt) > 0 ? num(s.archivedAt) : undefined,
+    }))
+    .map(v => ({
+      ...v,
+      payHandled: v.payHandled?.length ? v.payHandled : undefined,
+      paySnooze: v.paySnooze && Object.keys(v.paySnooze).length ? v.paySnooze : undefined,
     }))
 
   const charges: Charge[] = (Array.isArray(data.charges) ? data.charges : [])
@@ -267,6 +363,7 @@ export function sanitizeBusinessData(raw: unknown): Pick<BusinessState, 'clients
       // Recortada: la nota de un cobro es una frase, no un diario, y en una
       // copia de seguridad un campo libre sin tope es lo que la hace crecer.
       note: str(c.note).trim().slice(0, 280) || undefined,
+      discountPct: num(c.discountPct) > 0 ? Math.min(100, num(c.discountPct)) : undefined,
     }))
 
   return { clients, businesses, services, charges }
@@ -282,9 +379,110 @@ export const useBusiness = create<BusinessState>()(
 
       addClient: (c) => {
         const id = newId('cli_')
-        set(s => ({ clients: [...s.clients, { ...c, id, createdAt: Date.now() }] }))
+        const ahora = Date.now()
+        set(s => ({
+          clients: [
+            // Quien lo recomendó gana su estrella en el acto: el programa
+            // funciona sin que haya que acordarse de ponerla.
+            ...(c.referredBy
+              ? s.clients.map(x => x.id === c.referredBy
+                ? { ...x, stars: [...(x.stars ?? []), { at: ahora, referredId: id }] }
+                : x)
+              : s.clients),
+            { ...c, id, createdAt: ahora },
+          ],
+        }))
         return id
       },
+
+      softDeleteClient: (id) => set(s => ({
+        clients: s.clients.map(c => c.id === id ? { ...c, deletedAt: Date.now(), active: false } : c),
+        // Lo pendiente era solo una expectativa y ya no espera nada.
+        charges: s.charges.filter(c => c.clientId !== id || c.paid > 0),
+      })),
+
+      restoreClient: (id) => set(s => ({
+        clients: s.clients.map(c => c.id === id ? { ...c, deletedAt: undefined, active: true } : c),
+      })),
+
+      purgeClient: (id) => set(s => ({
+        clients: s.clients
+          .filter(c => c.id !== id)
+          // Nadie queda «recomendado por» alguien que ya no existe.
+          .map(c => c.referredBy === id ? { ...c, referredBy: undefined } : c),
+        charges: s.charges.filter(c => c.clientId !== id),
+      })),
+
+      updateClients: (ids, fields) => {
+        const cuales = new Set(ids)
+        for (const c of get().clients) if (cuales.has(c.id)) get().updateClient(c.id, fields)
+      },
+
+      addStar: (clientId, star) => set(s => ({
+        clients: s.clients.map(c => c.id === clientId ? { ...c, stars: [...(c.stars ?? []), star] } : c),
+      })),
+
+      removeStar: (clientId, at) => set(s => ({
+        clients: s.clients.map(c => {
+          if (c.id !== clientId) return c
+          const quedan = (c.stars ?? []).filter(x => x.at !== at)
+          return { ...c, stars: quedan.length ? quedan : undefined }
+        }),
+      })),
+
+      updateAccount: (serviceId, accountId, fields) => set(s => ({
+        services: s.services.map(v => v.id !== serviceId ? v : {
+          ...v,
+          accounts: materializar(v).map(a => a.id === accountId ? { ...a, ...fields } : a),
+        }),
+      })),
+
+      closeAccount: (serviceId, accountId, moveTo) => set(s => ({
+        services: s.services.map(v => v.id !== serviceId ? v : {
+          ...v,
+          accounts: materializar(v).map(a => a.id === accountId ? { ...a, closedAt: Date.now() } : a),
+        }),
+        clients: s.clients.map(c => c.serviceAccountId === accountId
+          ? { ...c, serviceAccountId: moveTo ?? undefined }
+          : c),
+      })),
+
+      assignAccounts: (assignments) => set(s => ({
+        clients: s.clients.map(c => assignments.has(c.id) && c.serviceAccountId !== assignments.get(c.id)
+          ? { ...c, serviceAccountId: assignments.get(c.id) }
+          : c),
+      })),
+
+      markPayHandled: (serviceId, keys, today) => set(s => ({
+        services: s.services.map(v => {
+          if (v.id !== serviceId) return v
+          const resto = { ...(v.paySnooze ?? {}) }
+          for (const k of keys) delete resto[k]
+          return {
+            ...v,
+            payHandled: trimHandled([...new Set([...(v.payHandled ?? []), ...keys])], today),
+            paySnooze: Object.keys(resto).length ? resto : undefined,
+          }
+        }),
+      })),
+
+      unmarkPayHandled: (serviceId, keys) => set(s => ({
+        services: s.services.map(v => v.id !== serviceId ? v : {
+          ...v,
+          payHandled: (v.payHandled ?? []).filter(k => !keys.includes(k)),
+        }),
+      })),
+
+      snoozePay: (serviceId, key, until) => set(s => ({
+        services: s.services.map(v => v.id !== serviceId ? v : {
+          ...v,
+          paySnooze: { ...(v.paySnooze ?? {}), [key]: until },
+        }),
+      })),
+
+      archiveService: (id, archived) => set(s => ({
+        services: s.services.map(v => v.id === id ? { ...v, archivedAt: archived ? Date.now() : undefined } : v),
+      })),
 
       duplicateClient: (id) => {
         const original = get().clients.find(c => c.id === id)
@@ -492,8 +690,12 @@ export const useBusiness = create<BusinessState>()(
       })),
 
       syncCharges: (today) => {
-        const { clients, charges } = get()
-        const nuevos = pendingCharges(clients, charges, today)
+        const { clients, charges, businesses } = get()
+        const negocio = new Map(businesses.map(b => [b.id, b]))
+        // El descuento por estrellas de cada uno, con las reglas de SU
+        // negocio. Se guarda en el cobro al crearlo y ahí se queda.
+        const nuevos = pendingCharges(clients, charges, today, client =>
+          referralDiscount(client, referralRules(client.businessId ? negocio.get(client.businessId) : null)))
         if (!nuevos.length) return 0
         set(s => ({
           charges: [...s.charges, ...nuevos.map(c => ({ ...c, id: newId('chg_') }))],

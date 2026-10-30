@@ -12,10 +12,15 @@ import { chargesToRemind } from '@/data/chargeReminders'
 import { daysLate, outstanding } from '@/data/clients'
 import { useBusiness } from '@/store/business'
 import { getCurrencyMeta } from '@/data/currencies'
+import { duePayments, isLongCycle, upcomingPayments } from '@/data/autopay'
 import { detectSpendingAnomalies } from '@/data/financeIntelligence'
 import { useNotificationHistory, type NotificationHistoryEntry } from '@/store/notificationHistory'
 import type { NotificationTargetType } from '@/hooks/useNotificationTarget'
 import type { CurrencyCode } from '@/types'
+import { buildNudges } from '@/data/nudges'
+import { projectCashflow } from '@/data/cashflowProjection'
+import { isOwed, useDebt } from '@/store/debt'
+import { useWishes } from '@/store/wishes'
 
 function isAndroidTauri(): boolean {
   return isTauri() && /android/i.test(navigator.userAgent)
@@ -32,12 +37,24 @@ function lacksFunds(account: { type: string; balance: number; limit?: number }, 
   return account.balance < amount
 }
 
-function buildReminderSnapshot(): string {
+export function buildReminderSnapshot(): string {
   const { transactions, accounts, categories, currency, goals } = useFinance.getState()
   const {
     language, dismissedAlerts, silencedRecurring, fxAlertEnabled, fxAlertCurrency, fxAlertThreshold, fxAlertDirection,
     anomalyAlertsEnabled, anomalySensitivity, reminderKinds,
   } = useSettings.getState()
+
+  /*
+   * ARRIBA DEL TODO, antes de cualquier lista que lo use.
+   *
+   * Estaba declarado más abajo, después de los recurrentes, que ya lo
+   * llamaban al construirse: con un solo movimiento recurrente, `on` se leía
+   * antes de existir, saltaba un ReferenceError, el `catch` de
+   * `syncReminderSnapshot` lo callaba y el teléfono se quedaba con el
+   * snapshot viejo para siempre. Los avisos nativos dejaban de actualizarse
+   * sin que nada lo dijera.
+   */
+  const on = (kind: ReminderKind) => isReminderKindOn(reminderKinds, kind)
 
   const mkey = currentMonthKey()
   const monthTx = txForMonth(transactions, mkey)
@@ -84,12 +101,52 @@ function buildReminderSnapshot(): string {
       }
     })
 
+  /*
+   * P2 · P3 · LOS PAGOS DE SERVICIOS, en la misma lista que los recurrentes.
+   *
+   * El trabajador de Android ya sabe avisar de «hoy se cobra» y de «saldo
+   * bajo» a partir de esa lista, así que no hace falta tocar Kotlin: basta con
+   * mandarle estos pagos con la misma forma.
+   *
+   *  · HOY, los que preguntan (`ask`): «Hoy se cobra Netflix».
+   *  · MAÑANA, solo si no alcanza o si es un pago de ciclo largo —el anual
+   *    es el que pilla desprevenido—. Un aviso que llega siempre se acaba
+   *    ignorando; uno que llega cuando hay un problema se lee.
+   */
+  const servicePaySnapshot = (() => {
+    const { services } = useBusiness.getState()
+    const fila = (p: ReturnType<typeof upcomingPayments>[number], lowFunds: boolean) => {
+      const account = accounts.find(a => a.id === p.service.payAccountId)
+      return {
+        id: `svcpay:${p.key}`,
+        note: p.service.name,
+        nextDate: p.date,
+        dateLabel: new Date(`${p.date}T00:00:00`).toLocaleDateString(locale, { day: 'numeric', month: 'short' }),
+        amountLabel: fmtCompact(p.amount, p.service.currency ?? currency),
+        recurringEnd: null,
+        lowFunds: on('lowfunds') ? lowFunds : false,
+        accountName: account?.name ?? '',
+      }
+    }
+    const sinSaldo = (p: ReturnType<typeof upcomingPayments>[number]) => {
+      const account = accounts.find(a => a.id === p.service.payAccountId)
+      return !!account && lacksFunds(account, p.amount)
+    }
+    const hoy = duePayments(services, today, { modes: ['ask'] })
+      .filter(p => p.date === today)
+      .map(p => fila(p, sinSaldo(p)))
+    const manana = upcomingPayments(services, today, 1)
+      .filter(p => sinSaldo(p) || isLongCycle(p.service))
+      .map(p => fila(p, sinSaldo(p)))
+    return [...hoy, ...manana]
+  })()
+
   const lastTransactionDate = transactions.reduce<string | null>(
     (latest, tx) => (latest === null || tx.date > latest ? tx.date : latest), null)
 
   // Metas con aporte automático: recordatorio el día en que toca aportar.
   const goalsSnapshot = goals
-    .filter(g => g.autoContribute && g.saved < g.target)
+    .filter(g => g.autoContribute && !g.autoPaused && !g.achievedAt && g.saved < g.target)
     .map(g => ({
       id: g.id,
       name: g.name,
@@ -114,11 +171,33 @@ function buildReminderSnapshot(): string {
   }
   const topEntry = Object.entries(byCategory).sort((a, b) => b[1] - a[1])[0]
   const topCat = topEntry ? categories.find(c => c.id === topEntry[0]) : undefined
+  /*
+   * A10 · CONTRA LA SEMANA ANTERIOR. «Gastaste RD$8,240» solo no dice si fue
+   * mucho. Se compara con los siete días de antes y el texto sale ya escrito
+   * y traducido desde aquí: el worker nativo solo tiene que mostrarlo.
+   */
+  const prevStartD = new Date(`${weekStart}T00:00:00`)
+  prevStartD.setDate(prevStartD.getDate() - 7)
+  const prevEndD = new Date(`${weekStart}T00:00:00`)
+  prevEndD.setDate(prevEndD.getDate() - 1)
+  const prevStart = localToday(prevStartD), prevEnd = localToday(prevEndD)
+  const prevWeekExpense = transactions
+    .filter(tx => tx.type === 'expense' && tx.date >= prevStart && tx.date <= prevEnd)
+    .reduce((sum, tx) => sum + tx.amount, 0)
+  const weekChangePct = prevWeekExpense > 0 ? Math.round((weekExpense / prevWeekExpense - 1) * 100) : null
+  const weeklyText = [
+    tt('notifWeeklySpent', { amount: fmtCompact(weekExpense, currency) }),
+    weekChangePct === null || weekChangePct === 0 ? '' : weekChangePct > 0
+      ? tt('notifWeeklyMore', { pct: weekChangePct })
+      : tt('notifWeeklyLess', { pct: Math.abs(weekChangePct) }),
+    topCat ? tt('notifWeeklyTop', { name: topCat.name }) : '',
+  ].filter(Boolean).join(' ')
   const weekly = weekTx.length > 0 ? {
     incomeLabel: fmtCompact(weekIncome, currency),
     expenseLabel: fmtCompact(weekExpense, currency),
     topCategory: topCat?.name ?? '',
     topCategoryLabel: topEntry ? fmtCompact(topEntry[1], currency) : '',
+    text: weeklyText,
   } : null
 
   // Alerta de tasa de cambio: la condición se evalúa aquí (con las tasas ya
@@ -174,7 +253,6 @@ function buildReminderSnapshot(): string {
         }))
     : []
 
-  const on = (kind: ReminderKind) => isReminderKindOn(reminderKinds, kind)
 
   /*
    * Los cobros que TOCA recordar hoy, con su nombre para el aviso.
@@ -203,7 +281,42 @@ function buildReminderSnapshot(): string {
       .filter(c => !!c.name)
   })()
 
+  // Avisos puntuales de la 2.7 (antojos, cuotas, flujo en rojo).
+  const nudges = (() => {
+    const horizon = new Date(`${today}T00:00:00`)
+    horizon.setDate(horizon.getDate() + 35)
+    const debts = useDebt.getState().debts
+    const installments = debts
+      .filter(d => isOwed(d) && d.balance > 0 && d.dueDay)
+      .map(d => ({ id: d.id, name: d.name, amount: Math.min(d.minPayment || d.balance, d.balance), dueDay: d.dueDay }))
+    const cashflow = projectCashflow(transactions, accounts, goals, localToday(horizon), today, currency, undefined, installments)
+    return buildNudges({
+      today,
+      now: Date.now(),
+      wishes: useWishes.getState().items,
+      debts: debts.map(d => ({ id: d.id, name: d.name, balance: d.balance, minPayment: d.minPayment, dueDay: d.dueDay, owed: isOwed(d) })),
+      cashflow,
+      subs: (() => {
+        try {
+          const ids = JSON.parse(localStorage.getItem('cuadre-sub-remind') ?? '[]') as string[]
+          return transactions
+            .filter(tx => tx.recurring && ids.includes(tx.id) && !tx.recurringEnd)
+            .map(tx => ({ id: tx.id, name: tx.note, amount: tx.amount, next: tx.recurringNext ?? tx.date }))
+        } catch { return [] }
+      })(),
+      money: n => fmtCompact(n, currency),
+      dayLabel: d => new Date(`${d}T00:00:00`).toLocaleDateString(locale, { weekday: 'long', day: 'numeric' }),
+      t: {
+        wishTitle: tt('nudgeWishTitle'), wishText: tt('nudgeWishText'),
+        debtTitle: tt('nudgeDebtTitle'), debtText: tt('nudgeDebtText'),
+        cashTitle: tt('nudgeCashTitle'), cashText: tt('nudgeCashText'),
+        subTitle: tt('nudgeSubTitle'), subText: tt('nudgeSubText'),
+      },
+    })
+  })()
+
   return JSON.stringify({
+    nudges,
     dismissedAlerts,
     lastTransactionDate,
     // Los TEXTOS viajan ya traducidos al worker. Antes estaban escritos en
@@ -242,7 +355,7 @@ function buildReminderSnapshot(): string {
      * Lo que no existe en el snapshot no se puede notificar.
      */
     categories: on('budget') ? categoriesSnapshot : [],
-    recurring:  on('recurring') ? recurringSnapshot : [],
+    recurring:  on('recurring') ? [...recurringSnapshot, ...servicePaySnapshot] : [],
     goals:      on('goal') ? goalsSnapshot : [],
     weekly:     on('weekly') ? weekly : null,
     fx:         on('fx') ? fx : null,
@@ -313,7 +426,7 @@ interface NativeHistoryRecord {
 
 function isNotificationTargetType(v: unknown): v is NotificationTargetType {
   return typeof v === 'string' &&
-    ['budget', 'recurring', 'lowfunds', 'goal', 'weekly', 'fx', 'anomaly', 'activity', 'charge'].includes(v)
+    ['budget', 'recurring', 'lowfunds', 'goal', 'weekly', 'fx', 'anomaly', 'activity', 'charge', 'caprice', 'debt', 'cashflow', 'subscription'].includes(v)
 }
 
 /**

@@ -22,7 +22,8 @@ export function useGoalAutoContributions(): void {
     let created = 0
     let skipped = 0
 
-    goals.filter(g => g.autoContribute).forEach(goal => {
+    // Pausadas y logradas no aportan: la configuración se guarda, pero no corre.
+    goals.filter(g => g.autoContribute && !g.autoPaused && !g.achievedAt).forEach(goal => {
       const auto = goal.autoContribute!
       let next = auto.nextDate
       let amount = auto.amount

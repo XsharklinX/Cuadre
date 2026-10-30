@@ -28,6 +28,9 @@ const HISTORY_ICONS: Record<NotificationTargetType, IconName> = {
   fx: 'coins',
   anomaly: 'trend',
   activity: 'edit',
+  caprice: 'piggy',
+  debt: 'dollar',
+  cashflow: 'trend', subscription: 'repeat',
 }
 
 function relativeTime(createdAt: number, t: ReturnType<typeof useT>): string {

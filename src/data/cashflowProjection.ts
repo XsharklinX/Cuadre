@@ -17,10 +17,13 @@ export interface CashflowEvent {
    * un compromiso TUYO y va a pasar; que te paguen depende de otra persona. En
    * la pantalla se distinguen, y en «¿cuánto puedo gastar?» no cuentan.
    */
-  kind: 'income' | 'expense' | 'goal' | 'charge'
+  kind: 'income' | 'expense' | 'goal' | 'charge' | 'debt'
   sourceId: string           // tx template id o goal id
   categoryId?: string
 }
+
+/** Una cuota de deuda para el flujo: cuánto y qué día del mes. */
+export interface DebtInstallment { id: string; name: string; amount: number; dueDay?: number }
 
 export interface CashflowDay {
   date: string
@@ -133,6 +136,8 @@ export function projectCashflow(
   today = localToday(),
   base?: CurrencyCode,
   receivables?: CashflowReceivables,
+  /** Cuotas de deudas con día de pago (2.7): salen el día que vencen. */
+  debts?: DebtInstallment[],
 ): CashflowProjection {
   const startBalance = currentTotalBalance(accounts, base)
   const events: CashflowEvent[] = []
@@ -220,7 +225,7 @@ export function projectCashflow(
   // Aportes automáticos a metas: salen del saldo líquido hacia la meta.
   for (const goal of goals) {
     const auto = goal.autoContribute
-    if (!auto || auto.amount <= 0) continue
+    if (!auto || auto.amount <= 0 || goal.autoPaused || goal.achievedAt) continue
     let next = auto.nextDate
     let guard = 0
     while (next <= horizon && guard < 120) {
@@ -235,6 +240,23 @@ export function projectCashflow(
       }
       next = advanceRecurrenceDate(next, auto.frequency)
       guard++
+    }
+  }
+
+  // Cuotas de deudas: el mínimo, cada mes, el día de pago. Hoy no se
+  // contaban, y un flujo que no ve la cuota del carro miente justo el día
+  // que más importa.
+  for (const debt of debts ?? []) {
+    if (!(debt.amount > 0) || !debt.dueDay) continue
+    let cursor = today.slice(0, 7)
+    for (let guard = 0; guard < 14; guard++) {
+      const [y, m] = cursor.split('-').map(Number)
+      const last = new Date(y, m, 0).getDate()
+      const date = `${cursor}-${String(Math.min(debt.dueDay, last)).padStart(2, '0')}`
+      if (date > horizon) break
+      if (date > today) events.push({ date, note: debt.name, amount: -debt.amount, kind: 'debt', sourceId: debt.id })
+      const d = new Date(y, m, 1)
+      cursor = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
     }
   }
 

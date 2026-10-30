@@ -218,7 +218,8 @@ export function clientHistory(
     paidCount: suyos.filter(c => c.paidAt > 0).length,
     streak,
     byMonth,
-    owes: cents(suyos.filter(c => !c.waived).reduce((sum, c) => sum + outstanding(c), 0)),
+    // Lo VENCIDO: un cobro generado por adelantado todavía no se debe.
+    owes: cents(suyos.filter(c => !c.waived && c.dueDate <= today).reduce((sum, c) => sum + outstanding(c), 0)),
   }
 }
 

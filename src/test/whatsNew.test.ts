@@ -29,7 +29,9 @@ describe('cuándo se abren las Novedades solas', () => {
     expect(shouldShowWhatsNew()).toBe(false)
     // Y deja marcada la versión, para no preguntarlo otra vez.
     expect(store.get('sharky-seen-version-v1')).toBe(APP_VERSION)
-  })
+  // La primera importación del módulo arrastra media app; con la suite entera
+  // en paralelo puede pasar de los 5 s por defecto sin que nada esté mal.
+  }, 20_000)
 
   it('SÍ se abren tras actualizar desde una versión anterior', async () => {
     installMemoryStorage({ 'sharky-seen-version-v1': '1.8.17' })

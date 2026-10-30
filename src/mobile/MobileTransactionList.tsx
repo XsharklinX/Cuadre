@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { SheetSelect } from '@/components/ui/SheetSelect'
 import { createPortal } from 'react-dom'
 import { sheetRoot } from './SheetPortal'
 import { useVirtualizer } from '@tanstack/react-virtual'
@@ -13,13 +14,13 @@ import { toast } from '@/components/ui/Toast'
 import { useFinance } from '@/store/finance'
 import { useJuice } from '@/store/juice'
 import { getReceipt } from '@/lib/receiptStore'
-import { useCaprices } from '@/store/caprices'
-import { remaining } from '@/data/caprices'
 import { useSettings } from '@/store/settings'
 import type { Transaction } from '@/types'
 import { CatBadge } from '@/views/shared'
 import { useDialogA11y } from './useDialogA11y'
 import { useMobileBackDismiss } from './useMobileBackDismiss'
+import { MobileTxQuickMenu } from './MobileTxQuickMenu'
+import { MobileTxReceipt } from './MobileTxReceipt'
 
 type TxFilter = 'all' | 'expense' | 'income' | 'transfer'
 
@@ -87,9 +88,6 @@ export function MobileTransactionList({
 }) {
   const { accounts, categories, currency, addTx } = useFinance()
   const landedTxId = useJuice(s => s.landedTxId)
-  const caprices = useCaprices(s => s.items)
-  const openCaprice = useCaprices(s => s.open)
-  const removeCaprice = useCaprices(s => s.remove)
   const updateTx = useFinance(s => s.updateTx)
   const storeDeleteTx = useFinance(s => s.deleteTx)
   const allTransactions = useFinance(s => s.transactions)
@@ -124,13 +122,16 @@ export function MobileTransactionList({
   const [selectMode, setSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkCatOpen, setBulkCatOpen] = useState(false)
+  // Pulsación larga: menú rápido (cambiar fecha, categoría o cuenta sin abrir nada).
+  const [quickTx, setQuickTx] = useState<Transaction | null>(null)
+  const quickTxRef = useRef<string | null>(null)
+  const pressStart = useRef<{ x: number; y: number } | null>(null)
   const longPressTimer = useRef(0)
   const containerRef = useRef<HTMLElement>(null)
   const [scrollElement, setScrollElement] = useState<HTMLElement | null>(null)
   const [scrollMargin, setScrollMargin] = useState(0)
   const startX = useRef(0)
   const overlayStartY = useRef(0)
-  const detailStartY = useRef(0)
   const accountMap = useMemo(() => new Map(accounts.map(account => [account.id, account])), [accounts])
   const categoryMap = useMemo(() => new Map(categories.map(category => [category.id, category])), [categories])
   const closeSwipe = () => { setOpenActionId(null) }
@@ -150,10 +151,8 @@ export function MobileTransactionList({
     !!tx.recurring || recurringSignatures.has(`${tx.type}|${tx.note}|${tx.categoryId ?? ''}|${tx.accountId ?? ''}`)
 
   useMobileBackDismiss(searchOpen, () => setSearchOpen(false))
-  useMobileBackDismiss(!!selected, () => setSelected(null))
   useMobileBackDismiss(openActionId !== null, closeSwipe)
   const searchRef = useDialogA11y<HTMLDivElement>(() => setSearchOpen(false), searchOpen)
-  const selectedRef = useDialogA11y<HTMLDivElement>(() => setSelected(null), !!selected)
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -350,14 +349,28 @@ export function MobileTransactionList({
           className="mobile-tx-row"
           onClick={() => {
             if (selectMode) { toggleSelected(tx.id); return }
+            // El toque que suelta una pulsación larga no debe abrir además el detalle.
+            if (quickTxRef.current === tx.id) { quickTxRef.current = null; return }
             closeSwipe(); setSelected(tx)
           }}
-          onPointerDown={() => {
-            if (selectMode || compact) return
-            longPressTimer.current = window.setTimeout(() => enterSelectMode(tx.id), 500)
+          onContextMenu={event => event.preventDefault()}
+          onPointerDown={event => {
+            if (selectMode) return
+            quickTxRef.current = null
+            pressStart.current = { x: event.clientX, y: event.clientY }
+            longPressTimer.current = window.setTimeout(() => {
+              closeSwipe()
+              playSoftHaptic()
+              quickTxRef.current = tx.id
+              setQuickTx(tx)
+            }, 450)
           }}
           onPointerUp={() => window.clearTimeout(longPressTimer.current)}
-          onPointerMove={() => window.clearTimeout(longPressTimer.current)}
+          onPointerMove={event => {
+            // Un temblor del dedo no cancela la pulsación; desplazarse sí.
+            const p = pressStart.current
+            if (!p || Math.abs(event.clientX - p.x) > 8 || Math.abs(event.clientY - p.y) > 8) window.clearTimeout(longPressTimer.current)
+          }}
           onPointerCancel={() => window.clearTimeout(longPressTimer.current)}
         >
           {selectMode ? (
@@ -546,18 +559,22 @@ export function MobileTransactionList({
           <div className="mobile-filter-panel">
             <div className="mobile-filter-field">
               <label>{t('account')}</label>
-              <select value={fAccount} onChange={event => setFAccount(event.target.value)}>
-                <option value="all">{t('allAccountsOption')}</option>
-                {accounts.map(account => <option key={account.id} value={account.id}>{account.name}</option>)}
-              </select>
+              <SheetSelect
+                title={t('account')}
+                value={fAccount}
+                onChange={setFAccount}
+                options={[{ value: 'all', label: t('allAccountsOption') }, ...accounts.map(account => ({ value: account.id, label: account.name, color: account.color }))]}
+              />
             </div>
 
             <div className="mobile-filter-field">
               <label>{t('category')}</label>
-              <select value={fCategory} onChange={event => setFCategory(event.target.value)}>
-                <option value="all">{t('allCategoriesOption')}</option>
-                {categories.map(category => <option key={category.id} value={category.id}>{translateCategoryName(category, lang)}</option>)}
-              </select>
+              <SheetSelect
+                title={t('category')}
+                value={fCategory}
+                onChange={setFCategory}
+                options={[{ value: 'all', label: t('allCategoriesOption') }, ...categories.map(category => ({ value: category.id, label: translateCategoryName(category, lang), color: category.color }))]}
+              />
             </div>
 
             <div className="mobile-filter-dates">
@@ -577,158 +594,17 @@ export function MobileTransactionList({
         </div>
       )}
 
-      {selected && createPortal(
-        <div
-          ref={selectedRef}
-          className="mobile-detail-sheet mobile-transaction-sheet"
-          role="dialog"
-          aria-modal="true"
-          onClick={() => setSelected(null)}
-          onTouchStart={event => { detailStartY.current = event.touches[0]?.clientY ?? 0 }}
-          onTouchEnd={event => {
-            const delta = (event.changedTouches[0]?.clientY ?? 0) - detailStartY.current
-            if (delta > 88) setSelected(null)
-          }}
-        >
-          <section onClick={event => event.stopPropagation()}>
-            <header>
-              <span className="sheet-icon">
-                {selected.type === 'transfer'
-                  ? <Icon name="repeat" size={28} />
-                  : <CatBadge category={mapGet(categoryMap, selected.categoryId)} size={56} />}
-              </span>
-              <button aria-label={t('close')} onClick={() => setSelected(null)}><Icon name="close" size={18} /></button>
-            </header>
-
-            <h2>{selected.type === 'transfer' ? t('transfer') : selected.note}</h2>
-            <strong className={selected.type === 'income' ? 'income' : ''}>{signedAmount(selected, currency, compactNumbers)}</strong>
-
-            {/* LA DESCRIPCIÓN, arriba y con su propio espacio.
-                No es una fila más de la tabla: es texto que alguien se tomó la
-                molestia de escribir, y a los tres meses suele ser lo único que
-                explica un gasto. Enterrarla entre "Fecha" y "Cuenta" sería
-                tratarla como un dato de sistema. */}
-            {selected.description && (
-              <p className="mobile-tx-description">{selected.description}</p>
-            )}
-
-            {/*
-              MARCAR COMO CAPRICHO, DESPUES.
-              Muchas veces uno se da cuenta al dia siguiente, asi que no basta
-              con poder marcarlo al crearlo. Solo en gastos.
-            */}
-            {selected.type === 'expense' && (() => {
-              const bote = caprices.find(c => c.txId === selected.id)
-              return (
-                <div className="mtx-caprice">
-                  <button
-                    className={bote ? 'on' : ''}
-                    aria-pressed={!!bote}
-                    onClick={() => {
-                      if (bote) {
-                        removeCaprice(bote.id)
-                        toast(t('capUnmarked'), { icon: 'check' })
-                      } else {
-                        openCaprice(selected.id, selected.amount, selected.note)
-                        playSoftHaptic()
-                        toast(t('capOpened'), { icon: 'piggy', type: 'ok' })
-                      }
-                    }}
-                  >
-                    <Icon name="piggy" size={15} />
-                    {bote ? t('capUnmark') : t('capMarkAsSplurge')}
-                  </button>
-                  {bote && (
-                    <small>
-                      {remaining(bote) > 0
-                        ? t('capRemaining').replace('{amount}', fmt(remaining(bote), currency))
-                        : t('capSettled')}
-                    </small>
-                  )}
-                </div>
-              )
-            })()}
-
-            {/* EL RECIBO.
-                Antes la foto se usaba para leer el monto y se tiraba. Ahora
-                está aquí, que es donde sirve: el mes que haya que reclamar
-                una garantía o justificar un gasto.
-                Si el movimiento dice tener recibo y la imagen no aparece, se
-                DICE por qué en vez de dejar un hueco roto: casi siempre es
-                que el libro se restauró de una copia, y las copias son JSON
-                y no llevan imágenes. */}
-            {selected.hasReceipt && (
-              <div className="mtx-receipt">
-                <span className="mtx-receipt-label">{t('receiptLabel')}</span>
-                {receiptUrl
-                  ? <img src={receiptUrl} alt={t('receiptLabel')} onClick={() => setReceiptFull(true)} />
-                  : receiptLoading
-                    ? <p className="mtx-receipt-missing">{t('receiptLoading')}</p>
-                    : <p className="mtx-receipt-missing">{t('receiptMissing')}</p>}
-              </div>
-            )}
-
-            <dl>
-              <div><dt>{t('date')}</dt><dd>{dateLabel(selected.date, locale)}</dd></div>
-              <div><dt>{t('category')}</dt><dd>{(() => {
-                if (selected.splits && selected.splits.length >= 2) {
-                  return selected.splits.map(split => {
-                    const cat = mapGet(categoryMap, split.categoryId)
-                    return `${cat ? translateCategoryName(cat, lang) : '?'} ${fmt(split.amount, currency)}`
-                  }).join(' · ')
-                }
-                const cat = mapGet(categoryMap, selected.categoryId)
-                return cat ? translateCategoryName(cat, lang) : t('notApplicableShort')
-              })()}</dd></div>
-              <div><dt>{t('account')}</dt><dd>{selected.type === 'transfer'
-                ? `${mapGet(accountMap, selected.fromAccount)?.name ?? t('origin')} -> ${mapGet(accountMap, selected.toAccount)?.name ?? t('destination')}`
-                : mapGet(accountMap, selected.accountId)?.name ?? t('noAccountLabel')}</dd></div>
-              <div><dt>{t('exactAmountLabel')}</dt><dd>{fmt(selected.amount, currency)}</dd></div>
-              {selected.originalCurrency && selected.originalAmount !== undefined && (
-                <>
-                  <div><dt>{t('originalAmountLabel')}</dt><dd>
-                    {getCurrencyMeta(selected.originalCurrency).flag} {fmt(selected.originalAmount, selected.originalCurrency)}
-                  </dd></div>
-                  {/* La tasa usada se muestra explícita: es la que se congeló al
-                      guardar, no la de hoy, y el usuario tiene derecho a verla. */}
-                  <div><dt>{t('fxRateLabel')}</dt><dd>
-                    1 {selected.originalCurrency} = {selected.fxRate?.toLocaleString('en-US', { maximumFractionDigits: 4 })}
-                  </dd></div>
-                </>
-              )}
-              {/* Cargos del banco: el monto guardado YA los incluye, así que
-                  sin desglosarlos el usuario ve un número que no cuadra con el
-                  precio que vio en la tienda. */}
-              {selected.fees?.length ? (
-                <div><dt>{t('bankFeesLabel')}</dt><dd>
-                  {selected.fees.map(fee => fmt(fee.amount, currency)).join(' + ')}
-                </dd></div>
-              ) : null}
-              {selected.recurring && (
-                <div><dt>{t('repeatsLabel')}</dt><dd>
-                  {t(selected.recurring === 'weekly' ? 'weekly' : 'monthly')}
-                </dd></div>
-              )}
-              {selected.tags?.length ? (
-                <div><dt>{t('tagsLabel')}</dt><dd>{selected.tags.join(' · ')}</dd></div>
-              ) : null}
-            </dl>
-
-            <div className="mobile-detail-actions">
-              <button onClick={() => { onEdit(selected); setSelected(null) }}><Icon name="edit" size={18} />{t('edit')}</button>
-              {selected.type !== 'transfer' && (
-                <button onClick={() => { duplicateTx(selected); setSelected(null) }}><Icon name="repeat" size={18} />{t('duplicate')}</button>
-              )}
-              {onDelete && <button className="danger" onClick={() => {
-                const id = selected.id
-                setSelected(null)
-                playDeleteHaptic()
-                requestAnimationFrame(() => onDelete(id))
-              }}><Icon name="trash" size={18} />{t('delete')}</button>}
-            </div>
-          </section>
-        </div>,
-        sheetRoot(),
+      {selected && (
+        <MobileTxReceipt
+          tx={allTransactions.find(x => x.id === selected.id) ?? selected}
+          receiptUrl={receiptUrl}
+          receiptLoading={receiptLoading}
+          onOpenReceipt={() => setReceiptFull(true)}
+          onClose={() => setSelected(null)}
+          onEdit={onEdit}
+          onDuplicate={duplicateTx}
+          onDelete={onDelete}
+        />
       )}
 
       {/* El recibo a pantalla completa: un ticket de supermercado no se lee
@@ -773,6 +649,17 @@ export function MobileTransactionList({
           </button>
         </div>,
         sheetRoot(),
+      )}
+
+      {quickTx && (
+        <MobileTxQuickMenu
+          tx={allTransactions.find(x => x.id === quickTx.id) ?? quickTx}
+          onClose={() => setQuickTx(null)}
+          onEdit={onEdit}
+          onDuplicate={duplicateTx}
+          onDelete={onDelete ? id => { playDeleteHaptic(); onDelete(id) } : undefined}
+          onSelectMany={compact ? undefined : enterSelectMode}
+        />
       )}
 
       {bulkCatOpen && createPortal(

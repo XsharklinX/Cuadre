@@ -1,5 +1,5 @@
 import { listRecoverySnapshots } from './recovery'
-import { accountMovementsTotal, accountSecondaryMovementsTotal } from './helpers'
+import { accountMovementsTotal, accountSecondaryMovementsTotal, contributionDelta } from './helpers'
 import type { FinanceState } from '@/store/finance'
 
 export interface DataHealthStatus {
@@ -49,7 +49,7 @@ export function getDataHealthStatus(state: FinanceState): DataHealthStatus {
     if (goal.openingSaved === undefined) return n
     const contributed = state.goalContributions
       .filter(contribution => contribution.goalId === goal.id)
-      .reduce((sum, contribution) => sum + contribution.amount, 0)
+      .reduce((sum, contribution) => sum + contributionDelta(contribution), 0)
     const expected = goal.openingSaved + contributed
     return Math.abs(expected - goal.saved) > 0.005 ? n + 1 : n
   }, 0)

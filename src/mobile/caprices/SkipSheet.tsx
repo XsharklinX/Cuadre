@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { SheetSelect } from '@/components/ui/SheetSelect'
 import { toast } from '@/components/ui/Toast'
 import { remaining, sortCaprices } from '@/data/caprices'
 import { convertCurrency } from '@/data/currencies'
@@ -125,26 +126,26 @@ export function SkipSheet({ wish, onClose }: { wish: Wish; onClose: () => void }
       {puedeMover && (
         <>
           <Field label={t('from')}>
-            <select className="mbizs-input" value={fromId} onChange={e => setFromId(e.target.value)}>
-              {liquidas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-            </select>
+            <SheetSelect className="mbizs-input" title={t('from')} value={fromId} onChange={setFromId}
+              options={liquidas.map(a => ({ value: a.id, label: a.name, color: a.color }))} />
           </Field>
           <Field label={t('to')}>
-            <select className="mbizs-input" value={toId} onChange={e => setToId(e.target.value)}>
-              {ahorros.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-            </select>
+            <SheetSelect className="mbizs-input" title={t('to')} value={toId} onChange={setToId}
+              options={ahorros.map(a => ({ value: a.id, label: a.name, color: a.color }))} />
           </Field>
 
           {abiertos.length > 0 && (
             <Field label={t('wishAbonaTo')} hint={t('wishAbonaToHint')}>
-              <select className="mbizs-input" value={capriceId} onChange={e => setCapriceId(e.target.value)}>
-                <option value="">{t('wishAbonaNone')}</option>
-                {abiertos.map(c => (
-                  <option key={c.id} value={c.id}>
-                    {c.note} · {fmt(remaining(c), currency, { decimals: moneyDecimals })}
-                  </option>
-                ))}
-              </select>
+              <SheetSelect
+                className="mbizs-input"
+                title={t('wishAbonaTo')}
+                value={capriceId}
+                onChange={setCapriceId}
+                options={[
+                  { value: '', label: t('wishAbonaNone') },
+                  ...abiertos.map(c => ({ value: c.id, label: c.note, hint: fmt(remaining(c), currency, { decimals: moneyDecimals }) })),
+                ]}
+              />
             </Field>
           )}
         </>

@@ -1857,11 +1857,11 @@
   .mobile-route-next { animation-name: mobile-route-next; }
   .mobile-route-prev { animation-name: mobile-route-prev; }
   @keyframes mobile-route-next {
-    from { opacity: .4; transform: translate3d(18px, 0, 0); }
+    from { opacity: .35; transform: translate3d(32px, 0, 0); }
     to { opacity: 1; transform: translate3d(0, 0, 0); }
   }
   @keyframes mobile-route-prev {
-    from { opacity: .4; transform: translate3d(-18px, 0, 0); }
+    from { opacity: .35; transform: translate3d(-32px, 0, 0); }
     to { opacity: 1; transform: translate3d(0, 0, 0); }
   }
   @keyframes mobile-route-in {
@@ -2580,11 +2580,17 @@
   .mobile-detail-sheet {
     align-items: flex-end;
     animation: mobile-overlay-in var(--m-duration-fast) var(--m-ease) both;
-    /* El desenfoque es lo que separa la hoja del fondo. Sin el, el velo oscuro
-       solo apaga la pantalla y la hoja parece pegada encima. */
-    backdrop-filter: blur(5px);
-    -webkit-backdrop-filter: blur(5px);
-    background: rgba(0,0,0,.52);
+    /*
+     * El desenfoque es lo que separa la hoja del fondo. Sin el, el velo
+     * oscuro solo apaga la pantalla y la hoja parece pegada encima.
+     *
+     * A 0.52 y 5px los montos de atras se seguian leyendo, y con el modo
+     * privado encendido eso es justo lo contrario de lo que se pidio. El
+     * velo tapa de verdad; la hoja es lo unico que se lee.
+     */
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    background: rgba(0,0,0,.72);
     bottom: 0;
     display: flex;
     left: 0;
@@ -2592,7 +2598,21 @@
     right: 0;
     top: 0;
     overscroll-behavior: contain;
-    touch-action: none;
+    /*
+     * PAN VERTICAL, NUNCA `none`.
+     *
+     * Estaba en `none`, y el navegador combina el `touch-action` de un
+     * elemento con el de TODOS sus contenedores: ese `none` llegaba a cualquier
+     * zona con scroll que hubiera DENTRO de la hoja. Las hojas que se desplazan
+     * en su propia `section` se salvaban; las de Negocio, que se desplazan en
+     * un cuerpo interior, se quedaban clavadas —editar un cliente, elegir el
+     * día de pago, la pantalla de un servicio—, sin poder bajar con el dedo.
+     *
+     * El fondo no tiene nada que desplazar y `overscroll-behavior: contain`
+     * impide que el gesto llegue a la pantalla de atrás, así que permitir el
+     * pan aquí no mueve nada que no deba moverse.
+     */
+    touch-action: pan-y pinch-zoom;
     z-index: 125;
   }
   .mobile-detail-sheet section {

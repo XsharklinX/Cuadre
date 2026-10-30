@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Icon } from '@/components/ui/Icon'
 import { EmptyArt } from '@/components/ui/EmptyArt'
 import { toast } from '@/components/ui/Toast'
 import { AnimatedMoney } from '@/components/ui/AnimatedMoney'
-import { categoryRollover, fmt, fmtCompact, prevMonthKey, transactionsForTotals, txForMonth } from '@/data/helpers'
+import { amountForCategory, categoryRollover, fmt, fmtCompact, prevMonthKey, transactionsForTotals, txForMonth } from '@/data/helpers'
 import { computeEnvelopeSummary } from '@/data/envelopes'
 import { CAT_COLORS } from '@/constants'
 import { useFinance } from '@/store/finance'
@@ -13,6 +13,8 @@ import { useMobileBackDismiss } from './useMobileBackDismiss'
 import { useDialogA11y } from './useDialogA11y'
 import { MobileAmountSheet } from './MobileAmountSheet'
 import { SheetPortal } from './SheetPortal'
+import { MobileTextSheet } from './MobileTextSheet'
+import { IconTile, NxRow, NxSheet, Phrase } from '@/components/ui/Phrase'
 import type { Category, CurrencyCode, IconName, ViewProps } from '@/types'
 
 const COLORS = CAT_COLORS
@@ -30,7 +32,6 @@ export function MobileBudgets({ txns, mkey }: ViewProps) {
   const t = useT()
   const settings = useSettings()
   const lang = (settings.language ?? 'es') as 'en' | 'es'
-  const budgetAlertThresholds = settings.budgetAlertThresholds
   const [editing, setEditing] = useState<Category | 'new' | null>(null)
   const [transferOpen, setTransferOpen] = useState(false)
 
@@ -55,7 +56,6 @@ export function MobileBudgets({ txns, mkey }: ViewProps) {
   const totalBudget = cats.reduce((s, c) => s + effectiveBudget[c.id], 0)
   const totalSpent  = cats.reduce((s, c) => s + (spent[c.id] ?? 0), 0)
   const totalLeft   = totalBudget - totalSpent
-  const globalPct   = totalBudget > 0 ? Math.min(100, totalSpent / totalBudget * 100) : 0
   const overCount   = cats.filter(c => (spent[c.id] ?? 0) > effectiveBudget[c.id] && c.budget > 0).length
 
   // Orden por "más ajustado primero": las categorías con presupuesto se ordenan
@@ -72,9 +72,6 @@ export function MobileBudgets({ txns, mkey }: ViewProps) {
 
   const envelopes = cats.filter(c => c.budget > 0)
   const envelopeSummary = computeEnvelopeSummary(cats, monthTx)
-  const assignedPct = envelopeSummary.income > 0
-    ? Math.min(100, Math.max(0, Math.round(envelopeSummary.assigned / envelopeSummary.income * 100)))
-    : 0
 
   const save = (fields: { name: string; budget: number; color: string; icon: IconName; rolloverEnabled: boolean }) => {
     if (!fields.name.trim()) { toast(t('enterCategoryName'), { icon: 'alert' }); return }
@@ -111,206 +108,137 @@ export function MobileBudgets({ txns, mkey }: ViewProps) {
   useMobileBackDismiss(!!editing, () => setEditing(null))
   useMobileBackDismiss(transferOpen, () => setTransferOpen(false))
 
-  return (
-    <div className="mbud-root">
-      <div className="mbud-envelope-card">
-        <div className="mbud-envelope-top">
-          <div className="mbud-envelope-col">
-            <span>{t('envelopeIncomeLabel')}</span>
-            <strong><AnimatedMoney value={envelopeSummary.income} compact /></strong>
-          </div>
-          <div className="mbud-envelope-col">
-            <span>{t('envelopeAssignedLabel')}</span>
-            <strong><AnimatedMoney value={envelopeSummary.assigned} compact /></strong>
-          </div>
-          <div className="mbud-envelope-col unassigned">
-            <span>{t('envelopeUnassignedLabel')}</span>
-            <strong className={envelopeSummary.unassigned < 0 ? 'over' : envelopeSummary.unassigned === 0 ? 'zero' : ''}>
-              <AnimatedMoney value={envelopeSummary.unassigned} compact />
-            </strong>
-          </div>
-        </div>
-        <div className="mbud-envelope-bar-track">
-          <div className="mbud-envelope-bar-fill" style={{
-            width: `${assignedPct}%`,
-            background: envelopeSummary.unassigned < 0 ? '#ff6b8a' : 'var(--accent, #ffdd3d)',
-          }} />
-        </div>
-        <div className="mbud-envelope-foot">
-          {envelopeSummary.unassigned < 0 ? (
-            <span className="over"><Icon name="alert" size={12} /> {t('envelopeOverAssignedHint')}</span>
-          ) : envelopeSummary.unassigned === 0 && envelopeSummary.income > 0 ? (
-            <span className="zero"><Icon name="check" size={12} /> {t('envelopeAllAssignedHint')}</span>
-          ) : <span />}
-          <button
-            className="mbud-move-btn"
-            onClick={() => envelopes.length < 2
-              ? toast(t('envelopeTransferEmptyHint'), { icon: 'alert' })
-              : setTransferOpen(true)}
-          >
-            <Icon name="refresh" size={13} /> {t('moveMoneyLabel')}
-          </button>
-        </div>
-      </div>
+  /*
+   * P1 · UNA CIFRA, UNA LISTA Y CUÁNTO PUEDES GASTAR AL DÍA.
+   *
+   * Antes: seis cajitas de resumen, tarjetas con icono en un cuadro, barra
+   * gruesa y debajo una frase roja que repetía la barra («Alerta del 100 %:
+   * llevas…»). Ahora arriba va lo único que importa —lo que te queda y cuánto
+   * toca al día hasta fin de mes— y debajo las categorías en filas de línea
+   * fina, primero las que se pasaron.
+   */
+  const now = new Date()
+  const esteMes = mkey === `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const [yy, mm] = mkey.split('-').map(Number)
+  const diasMes = new Date(yy, mm, 0).getDate()
+  const diasQuedan = esteMes ? diasMes - now.getDate() + 1 : 0
+  const alDia = (left: number) => (diasQuedan > 0 && left > 0 ? left / diasQuedan : 0)
+  const conLimite = orderedCats.filter(c => effectiveBudget[c.id] > 0)
+  const pasados = conLimite.filter(c => (spent[c.id] ?? 0) > effectiveBudget[c.id])
+  const enMarcha = conLimite.filter(c => (spent[c.id] ?? 0) <= effectiveBudget[c.id])
+  const sinLimite = orderedCats.filter(c => !(effectiveBudget[c.id] > 0))
+  const money = (n: number) => fmtCompact(n, currency)
 
-      <div className="mbud-summary">
-        <div className="mbud-summary-top">
-          <div>
-            <span className="mbud-summary-label">{t('totalBudgetLabel')}</span>
-            <strong className="mbud-summary-total">
-              <AnimatedMoney value={totalBudget} compact />
-            </strong>
-          </div>
-          <button className="mbud-add-btn" onClick={() => setEditing('new')}>
-            <Icon name="plus" size={18} /> {t('new')}
-          </button>
-        </div>
-
-        <div className="mbud-global-bar-wrap">
-          <div className="mbud-global-bar-track">
-            <div className="mbud-global-bar-fill" style={{
-              width: `${globalPct}%`,
-              background: globalPct >= 100 ? '#ff6b8a' : globalPct >= 80 ? '#f59e0b' : 'var(--accent, #ffdd3d)',
-            }} />
-          </div>
-          <span className={`mbud-global-pct${globalPct >= 100 ? ' over' : globalPct >= 80 ? ' warn' : ''}`}>
-            {Math.round(globalPct)}%
+  const fila = (cat: Category) => {
+    const s = spent[cat.id] ?? 0
+    const budget = effectiveBudget[cat.id]
+    const roll = rollover[cat.id]
+    const left = budget - s
+    const over = budget > 0 && s > budget
+    const pct = budget > 0 ? Math.min(100, (s / budget) * 100) : 0
+    return (
+      <button key={cat.id} className="nxb-row" onClick={() => setEditing(cat)}>
+        <IconTile icon={cat.icon} color={cat.color} />
+        <span className="nxb-main">
+        <span className="nxb-top">
+          <b>{translateCategoryName(cat, lang)}</b>
+          <span className={over ? 'bad' : budget > 0 && pct < 80 ? 'ok' : ''}>
+            {budget > 0 ? (over ? `−${money(-left)}` : money(left)) : money(s)}
           </span>
-        </div>
+        </span>
+        {budget > 0 && <span className="nx-thin"><i className={over ? 'bad' : ''} style={{ width: `${pct}%`, ...(over ? {} : { background: cat.color }) }} /></span>}
+        <span className="nxb-sub">
+          <span>
+            {budget > 0
+              ? t('nxbSpentOf').replace('{spent}', money(s)).replace('{budget}', money(budget))
+              : t('nxbNoLimitSpent')}
+            {(cat.rolloverEnabled || settings.budgetRollover) && roll !== 0 && (
+              ` · ${roll > 0 ? t('rolloverAddedLabel').replace('{amount}', money(roll)) : t('rolloverDeductedLabel').replace('{amount}', money(Math.abs(roll)))}`
+            )}
+          </span>
+          {over ? <span className="bad">{t('nxbOver')}</span>
+            : alDia(left) > 0 ? <span>{t('nxbPerDay').replace('{amount}', money(alDia(left)))}</span> : null}
+        </span>
+        </span>
+      </button>
+    )
+  }
 
-        <div className="mbud-summary-pills">
-          <div className="mbud-pill">
-            <Icon name="arrowUp" size={13} style={{ color: '#ff6b8a' }} />
-            <div>
-              <strong><AnimatedMoney value={totalSpent} compact /></strong>
-              <small>{t('spentLabel')}</small>
-            </div>
+  return (
+    <div className="mbud-root nx">
+      {cats.length === 0 ? (
+        <div className="mbud-empty">
+          <EmptyArt kind="budgets" />
+          <strong>{t('noBudgetsYet')}</strong>
+          <p>{t('createExpenseCategoriesHint')}</p>
+          <button onClick={() => setEditing('new')}>
+            <Icon name="plus" size={16} /> {t('createFirstCategory')}
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="nx-hero">
+            <small>{totalLeft < 0 ? t('nxbOverTitle') : esteMes ? t('nxbLeftTitle') : t('nxbLeftPastTitle')}</small>
+            <span className={`nx-big${totalLeft < 0 ? ' bad' : ''}`}><AnimatedMoney value={Math.abs(totalLeft)} compact /></span>
+            {esteMes && totalLeft > 0 && (
+              <small>
+                <b>{t('nxbPerDay').replace('{amount}', money(alDia(totalLeft)))}</b>
+                {' '}{t('nxbUntil').replace('{n}', String(diasMes))}
+              </small>
+            )}
+            {overCount > 0 && <small className="nxb-overcount">{t('nxbOverCount').replace('{n}', String(overCount))}</small>}
           </div>
-          <div className="mbud-pill-sep" />
-          <div className="mbud-pill">
-            <Icon name="target" size={13} style={{ color: '#35d0a2' }} />
-            <div>
-              <strong className={totalLeft < 0 ? 'over' : ''}><AnimatedMoney value={Math.abs(totalLeft)} compact /></strong>
-              <small>{totalLeft < 0 ? t('overBudgetLabel') : t('availableLabel')}</small>
+
+          {envelopeSummary.income > 0 && (
+            <div className="nxb-env">
+              <span className="nx-split" aria-hidden="true">
+                <i style={{ flexGrow: Math.max(0, Math.min(envelopeSummary.assigned, envelopeSummary.income)), background: 'var(--m-text)' }} />
+                <i style={{ flexGrow: Math.max(0, envelopeSummary.unassigned), background: 'color-mix(in oklab, var(--m-text) 14%, transparent)' }} />
+              </span>
+              <span className="nxb-env-txt">
+                <span>{t('nxbAssigned').replace('{amount}', money(envelopeSummary.assigned))}</span>
+                <span className={envelopeSummary.unassigned < 0 ? 'bad' : ''}>
+                  {envelopeSummary.unassigned < 0
+                    ? t('envelopeOverAssignedHint')
+                    : t('nxbUnassigned').replace('{amount}', money(envelopeSummary.unassigned))}
+                </span>
+              </span>
+              {envelopes.length >= 2 && <button className="nx-link" onClick={() => setTransferOpen(true)}>{t('moveMoneyLabel')}</button>}
             </div>
-          </div>
-          {overCount > 0 && (
+          )}
+
+          {pasados.length > 0 && (
             <>
-              <div className="mbud-pill-sep" />
-              <div className="mbud-pill">
-                <Icon name="alert" size={13} style={{ color: '#f59e0b' }} />
-                <div>
-                  <strong style={{ color: '#f59e0b' }}>{overCount}</strong>
-                  <small>{t('overLimitLabel')}</small>
-                </div>
-              </div>
+              <p className="nx-label">{t('nxbGroupOver')}</p>
+              <div className="nx-list">{pasados.map(fila)}</div>
             </>
           )}
-        </div>
-      </div>
-
-      {cats.length > 0 && (
-        <div className="mbud-list-head">
-          <div>
-            <span>{t('categoriesTitle')}</span>
-            <small>{t('monthlyBudget')}</small>
-          </div>
-          <strong>{cats.length}</strong>
-        </div>
+          {enMarcha.length > 0 && (
+            <>
+              <p className="nx-label">{t('nxbGroupActive')}<button onClick={() => setEditing('new')}>+ {t('new')}</button></p>
+              <div className="nx-list">{enMarcha.map(fila)}</div>
+            </>
+          )}
+          {sinLimite.length > 0 && (
+            <>
+              <p className="nx-label">{t('nxbGroupNoLimit')}{enMarcha.length === 0 && <button onClick={() => setEditing('new')}>+ {t('new')}</button>}</p>
+              <div className="nx-list">{sinLimite.map(fila)}</div>
+            </>
+          )}
+        </>
       )}
 
-      <div className="mbud-list">
-        {cats.length === 0 ? (
-          <div className="mbud-empty">
-            <EmptyArt kind="budgets" />
-            <strong>{t('noBudgetsYet')}</strong>
-            <p>{t('createExpenseCategoriesHint')}</p>
-            <button onClick={() => setEditing('new')}>
-              <Icon name="plus" size={16} /> {t('createFirstCategory')}
-            </button>
-          </div>
-        ) : (
-          orderedCats.map(cat => {
-            const s = spent[cat.id] ?? 0
-            const budget = effectiveBudget[cat.id]
-            const roll = rollover[cat.id]
-            const pct = budget > 0 ? Math.min(100, s / budget * 100) : 0
-            const rawPct = budget > 0 ? Math.round(s / budget * 100) : 0
-            const over = budget > 0 && s > budget
-            const left = budget - s
-            // El color de la barra ES el estado: verde va bien, ámbar cerca del
-            // límite (≥80%), rojo excedido. La categoría ya la identifica el chip
-            // de icono a color, así que la barra queda libre para comunicar salud.
-            const statusColor = over ? '#ff6b8a' : pct >= 80 ? '#f59e0b' : '#35d0a2'
-            const reachedThreshold = budget > 0
-              ? [...budgetAlertThresholds].sort((a, b) => a - b).filter(threshold => pct >= threshold).pop()
-              : undefined
-            return (
-              <button key={cat.id} className="mbud-row" onClick={() => setEditing(cat)}>
-                <span className="mbud-row-icon" style={{
-                  color: cat.color,
-                  background: `color-mix(in oklab, ${cat.color} 16%, transparent)`,
-                }}>
-                  <Icon name={cat.icon} size={20} />
-                </span>
-                <div className="mbud-row-body">
-                  <div className="mbud-row-top">
-                    <span className="mbud-row-name">{translateCategoryName(cat, lang)}</span>
-                    {budget > 0 ? (
-                      <span className={`mbud-row-status${over ? ' over' : pct >= 80 ? ' warn' : ' ok'}`}>
-                        {over
-                          ? t('budgetOverShort')
-                          : t('budgetLeftShort').replace('{amount}', fmtCompact(left, currency))}
-                      </span>
-                    ) : (
-                      <span className="mbud-row-status muted">{t('noLimitLabel')}</span>
-                    )}
-                  </div>
-                  {budget > 0 && (
-                    <div className="mbud-row-bar">
-                      <div className="mbud-row-fill" style={{ width: `${pct}%`, background: statusColor }} />
-                    </div>
-                  )}
-                  <div className="mbud-row-meta">
-                    <span>
-                      {budget > 0
-                        ? `${fmtCompact(s, currency)} / ${fmtCompact(budget, currency)} · ${rawPct}%`
-                        : t('spentAmount').replace('{amount}', fmtCompact(s, currency))}
-                    </span>
-                  </div>
-                  {(cat.rolloverEnabled || settings.budgetRollover) && roll !== 0 && (
-                    <div className="mbud-row-rollover">
-                      <Icon name="repeat" size={11} />
-                      {roll > 0
-                        ? t('rolloverAddedLabel').replace('{amount}', fmtCompact(roll, currency))
-                        : t('rolloverDeductedLabel').replace('{amount}', fmtCompact(Math.abs(roll), currency))}
-                    </div>
-                  )}
-                  {reachedThreshold !== undefined && (
-                    <div className={`mbud-row-rollover${over ? ' over' : pct >= 80 ? ' warn' : ''}`}>
-                      <Icon name={over ? 'alert' : 'bell'} size={11} />
-                      {t('budgetThresholdBody')
-                        .replace('{threshold}', String(reachedThreshold))
-                        .replace('{spent}', fmtCompact(s, currency))
-                        .replace('{budget}', fmtCompact(budget, currency))
-                        .replace('{pct}', String(Math.round(pct)))}
-                    </div>
-                  )}
-                </div>
-                <Icon name="arrowUp" size={14} style={{ transform: 'rotate(90deg)', color: 'var(--m-muted)', flexShrink: 0 }} />
-              </button>
-            )
-          })
-        )}
-      </div>
-
       {editing !== null && (
-        <BudgetEditor
-          category={editing === 'new' ? undefined : editing}
-          onClose={() => setEditing(null)}
-          onSave={save}
-          onDelete={editing !== 'new' ? remove : undefined}
-        />
+        editing === 'new'
+          ? <NewBudgetSheet onClose={() => setEditing(null)} onSave={save} />
+          : (
+            <BudgetSheet
+              category={editing}
+              onClose={() => setEditing(null)}
+              onSave={save}
+              onDelete={remove}
+            />
+          )
       )}
 
       {transferOpen && (
@@ -438,167 +366,175 @@ function EnvelopeTransferSheet({
   )
 }
 
-function BudgetEditor({
-  category,
-  onClose,
-  onSave,
-  onDelete,
-}: {
-  category?: Category
+type BudgetFields = { name: string; budget: number; color: string; icon: IconName; rolloverEnabled: boolean }
+
+/** Lo que se gastó de media en una categoría en los 3 meses enteros anteriores. */
+function useAverageSpend(categoryId: string): number {
+  const transactions = useFinance(s => s.transactions)
+  return useMemo(() => {
+    const now = new Date()
+    const keys = [1, 2, 3].map(k => {
+      const d = new Date(now.getFullYear(), now.getMonth() - k, 1)
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    })
+    const total = transactions
+      .filter(tx => tx.type === 'expense' && keys.includes(tx.date.slice(0, 7)))
+      .reduce((sum, tx) => sum + amountForCategory(tx, categoryId), 0)
+    return Math.round(total / 3 / 100) * 100
+  }, [transactions, categoryId])
+}
+
+/*
+ * P2 · CAMBIAR UN PRESUPUESTO SABIENDO LO QUE GASTAS.
+ *
+ * Tocar una categoría abría «Editar categoría»: nombre, monto, color, doce
+ * iconos y un interruptor, para cambiar un número. Ahora: el monto en grande,
+ * un deslizador con una marca en lo que sueles gastar y un botón para usar
+ * esa cifra. Nombre, color e icono siguen ahí, plegados.
+ */
+function BudgetSheet({ category, onClose, onSave, onDelete }: {
+  category: Category
   onClose: () => void
-  onSave: (f: { name: string; budget: number; color: string; icon: IconName; rolloverEnabled: boolean }) => void
-  onDelete?: (c: Category) => void
+  onSave: (f: BudgetFields) => void
+  onDelete: (c: Category) => void
 }) {
   const { currency } = useFinance()
   const t = useT()
-  const initialName = useCategoryName(category ?? { id: '', name: '' })
-  const [name,       setName]       = useState(category ? initialName : '')
-  const [budget,     setBudget]     = useState(category?.budget ?? 0)
-  const [color,      setColor]      = useState(category?.color ?? COLORS[0])
-  const [icon,       setIcon]       = useState<IconName>(category?.icon ?? 'cart')
-  const [rolloverEnabled, setRolloverEnabled] = useState(category?.rolloverEnabled ?? false)
+  const initialName = useCategoryName(category)
+  const avg = useAverageSpend(category.id)
+  const [name, setName] = useState(initialName)
+  const [budget, setBudget] = useState(category.budget)
+  const [color, setColor] = useState(category.color)
+  const [icon, setIcon] = useState<IconName>(category.icon)
+  const [rolloverEnabled, setRolloverEnabled] = useState(category.rolloverEnabled ?? false)
+  const [amountSheet, setAmountSheet] = useState(false)
+  const [look, setLook] = useState(false)
   const [confirmDel, setConfirmDel] = useState(false)
-  const [budgetSheet, setBudgetSheet] = useState(false)
-
-  useMobileBackDismiss(budgetSheet, () => setBudgetSheet(false))
-  useMobileBackDismiss(!budgetSheet, onClose)
-  const dialogRef = useDialogA11y<HTMLDivElement>(onClose, !budgetSheet)
+  const step = Math.max(100, Math.round(Math.max(avg, budget, 1000) / 50 / 100) * 100)
+  const max = Math.max(step * 10, Math.ceil((Math.max(avg, budget) * 1.8) / step) * step)
+  const save = () => onSave({ name, budget, color, icon, rolloverEnabled })
 
   return (
     <>
-    <SheetPortal>
-    <div ref={dialogRef} className="mobile-detail-sheet mbud-editor-overlay" role="dialog" aria-modal="true" aria-label={category ? t('editCategory') : t('newCategory')} onClick={onClose}>
-      <section className="mbud-editor-sheet" onClick={e => e.stopPropagation()}>
-        <header>
-          <span>{category ? t('editCategory') : t('newCategory')}</span>
-          <button aria-label={t('close')} onClick={onClose}><Icon name="close" size={18} /></button>
-        </header>
-
-        <div className="mbud-editor-body">
-          <label className="mbud-field">
-            <span>{t('name')}</span>
-            <input
-              className="mbud-input"
-              type="text"
-              value={name}
-              placeholder={t('egCategoryName')}
-              autoCapitalize="words"
-              onChange={e => setName(e.target.value)}
-            />
-          </label>
-
-          <div className="mbud-field">
-            <span>{t('monthlyBudget')}</span>
-            <button className="mdebt-amount-row" onClick={() => setBudgetSheet(true)}>
-              <span className={budget > 0 ? 'mdebt-amt-set' : 'mdebt-amt-ph'}>
-                {budget > 0 ? fmt(budget, currency) : t('noLimitLabel')}
-              </span>
-              <Icon name="arrowUp" size={12} style={{ transform: 'rotate(90deg)', color: 'var(--m-muted)' }} />
-            </button>
-            <button
-              type="button"
-              className={`mbud-nolimit${budget === 0 ? ' on' : ''}`}
-              onClick={() => setBudget(0)}
-            >
-              {budget === 0 && <Icon name="check" size={13} />}
-              {t('noLimitLabel')}
-            </button>
-          </div>
-
-          {budget > 0 && (
-            <div className="mpr-form-section mpr-toggle-row">
-              <div className="mpr-toggle-row-text">
-                <span className="mpr-toggle-row-label">{t('rolloverLabel')}</span>
-                <small className="mpr-toggle-row-desc">{t('rolloverDesc')}</small>
-              </div>
-              <label className="mset-toggle-wrap">
-                <input
-                  type="checkbox"
-                  className="mset-toggle-input"
-                  checked={rolloverEnabled}
-                  onChange={e => setRolloverEnabled(e.target.checked)}
-                />
-                <span className="mset-toggle" />
-              </label>
-            </div>
-          )}
-
-          <div className="mbud-field">
-            <span>{t('color')}</span>
+      <NxSheet
+        title={initialName}
+        onClose={onClose}
+        footer={(
+          <>
+            {avg > 0 && avg !== budget && <button className="nx-btn" onClick={() => setBudget(avg)}>{t('nxbUseAvg').replace('{amount}', fmtCompact(avg, currency))}</button>}
+            <button className="nx-btn pri" onClick={save}>{t('save')}</button>
+          </>
+        )}
+      >
+        <button className="nxb-amount" onClick={() => setAmountSheet(true)}>
+          <span className="nx-big">{budget > 0 ? fmt(budget, currency, { decimals: 0 }) : t('noLimitLabel')}</span>
+          {budget > 0 && <em>{t('nxbPerMonth')}</em>}
+        </button>
+        <div className="nxb-slider">
+          <input
+            id={`budget-${category.id}`}
+            type="range"
+            min={0}
+            max={max}
+            step={step}
+            value={Math.min(budget, max)}
+            aria-label={t('monthlyBudget')}
+            onChange={e => setBudget(Number(e.target.value))}
+          />
+          {avg > 0 && <i className="nxb-avg" style={{ left: `${Math.min(100, (avg / max) * 100)}%` }} aria-hidden="true" />}
+        </div>
+        {avg > 0 && (
+          <p className="nx-note">
+            {t('nxbAvgNote').replace('{amount}', fmt(avg, currency, { decimals: 0 }))}
+            {budget > 0 && avg > budget && ` ${t('nxbAvgOver')}`}
+          </p>
+        )}
+        <div className="nx-list nxb-opts">
+          <NxRow label={t('rolloverLabel')} hint={t('rolloverDesc')} value={rolloverEnabled ? t('yes') : t('no')} onTap={() => setRolloverEnabled(v => !v)} />
+          <NxRow label={t('noLimitLabel')} value={budget === 0 ? t('yes') : t('no')} onTap={() => setBudget(budget === 0 ? Math.max(avg, step) : 0)} />
+          <NxRow label={t('nxbLook')} value={look ? '−' : '+'} onTap={() => setLook(v => !v)} />
+        </div>
+        {look && (
+          <div className="nxb-look">
+            <label className="mbud-field">
+              <span>{t('name')}</span>
+              <input className="mbud-input" type="text" value={name} placeholder={t('egCategoryName')} autoCapitalize="words" onChange={e => setName(e.target.value)} />
+            </label>
             <div className="mbud-color-strip">
               {COLORS.map(c => (
-                <button
-                  key={c}
-                  className={`mbud-color-dot${color === c ? ' on' : ''}`}
-                  aria-label={t('colorOption').replace('{c}', c)}
-                  aria-pressed={color === c}
-                  style={{ background: c, color: c }}
-                  onClick={() => setColor(c)}
-                />
+                <button key={c} className={`mbud-color-dot${color === c ? ' on' : ''}`} aria-label={t('colorOption').replace('{c}', c)} aria-pressed={color === c} style={{ background: c, color: c }} onClick={() => setColor(c)} />
               ))}
             </div>
-          </div>
-
-          <div className="mbud-field">
-            <span>{t('icon')}</span>
             <div className="mbud-icon-grid-sheet">
               {ALL_ICONS.map(ic => (
-                <button
-                  key={ic}
-                  className={`mbud-icon-btn-sheet${icon === ic ? ' on' : ''}`}
-                  aria-label={t('iconOption').replace('{ic}', ic)}
-                  aria-pressed={icon === ic}
-                  style={icon === ic ? { color, background: `color-mix(in oklab, ${color} 18%, transparent)` } : {}}
-                  onClick={() => setIcon(ic)}
-                >
+                <button key={ic} className={`mbud-icon-btn-sheet${icon === ic ? ' on' : ''}`} aria-label={t('iconOption').replace('{ic}', ic)} aria-pressed={icon === ic} style={icon === ic ? { color, background: `color-mix(in oklab, ${color} 18%, transparent)` } : {}} onClick={() => setIcon(ic)}>
                   <Icon name={ic} size={20} />
                 </button>
               ))}
             </div>
           </div>
+        )}
+        {!confirmDel ? (
+          <button className="nx-link nxb-del" onClick={() => setConfirmDel(true)}>{t('deleteCategory')}</button>
+        ) : (
+          <div className="mbud-confirm-del">
+            <p>{t('deleteCategoryConfirm').replace('{name}', initialName)}</p>
+            <div>
+              <button onClick={() => setConfirmDel(false)}>{t('cancel')}</button>
+              <button className="danger" onClick={() => onDelete(category)}><Icon name="trash" size={16} /> {t('delete')}</button>
+            </div>
+          </div>
+        )}
+      </NxSheet>
+      {amountSheet && (
+        <MobileAmountSheet
+          title={t('monthlyBudget')}
+          value={budget}
+          currency={currency}
+          onDone={v => { setBudget(v); setAmountSheet(false) }}
+          onClose={() => setAmountSheet(false)}
+        />
+      )}
+    </>
+  )
+}
 
-          {category && onDelete && (
-            !confirmDel ? (
-              <button className="mbud-del-btn" onClick={() => setConfirmDel(true)}>
-                <Icon name="trash" size={16} /> {t('deleteCategory')}
-              </button>
-            ) : (
-              <div className="mbud-confirm-del">
-                <p>{t('deleteCategoryConfirm').replace('{name}', initialName)}</p>
-                <div>
-                  <button onClick={() => setConfirmDel(false)}>{t('cancel')}</button>
-                  <button className="danger" onClick={() => onDelete(category)}>
-                    <Icon name="trash" size={16} /> {t('delete')}
-                  </button>
-                </div>
-              </div>
-            )
-          )}
-        </div>
-
-        <div className="mbud-editor-actions">
-          <button className="mbud-btn-cancel" onClick={onClose}>{t('cancel')}</button>
-          <button
-            className="mbud-btn-save"
-            style={{ background: color }}
-            onClick={() => onSave({ name, budget, color, icon, rolloverEnabled })}
-          >
-            {category ? t('save') : t('create')}
+/** Un presupuesto nuevo, en una frase (B1): «Quiero gastar como máximo RD$X al mes en Y». */
+function NewBudgetSheet({ onClose, onSave }: { onClose: () => void; onSave: (f: BudgetFields) => void }) {
+  const { currency, categories } = useFinance()
+  const t = useT()
+  const [name, setName] = useState('')
+  const [budget, setBudget] = useState(0)
+  const [sub, setSub] = useState<'amount' | 'name' | null>(null)
+  const usados = new Set(categories.map(c => c.color))
+  const color = COLORS.find(c => !usados.has(c)) ?? COLORS[0]
+  const missing = !name.trim()
+  return (
+    <>
+      <NxSheet
+        title={t('newCategory')}
+        sub={t('nxPhraseHint')}
+        onClose={onClose}
+        footer={(
+          <button className={`nx-btn pri${missing ? ' form-save-missing' : ''}`} onClick={() => (missing ? setSub('name') : onSave({ name, budget, color, icon: 'tag', rolloverEnabled: false }))}>
+            {missing ? t('missingFieldLabel').replace('{field}', t('fieldName')) : t('create')}
           </button>
-        </div>
-      </section>
-    </div>
-    </SheetPortal>
-
-    {budgetSheet && (
-      <MobileAmountSheet
-        title={t('monthlyBudget')}
-        value={budget}
-        currency={currency}
-        onDone={v => { setBudget(v); setBudgetSheet(false) }}
-        onClose={() => setBudgetSheet(false)}
-      />
-    )}
+        )}
+      >
+        <Phrase parts={[
+          t('nxbPhrase1'),
+          { key: 'amount', text: budget > 0 ? fmt(budget, currency, { decimals: 0 }) : '', hint: t('nxbPhraseNoLimit'), onTap: () => setSub('amount'), active: sub === 'amount' },
+          t('nxbPhrase2'),
+          { key: 'name', text: name, hint: t('nxbPhraseName'), onTap: () => setSub('name'), active: sub === 'name' },
+          '.',
+        ]} />
+      </NxSheet>
+      {sub === 'amount' && (
+        <MobileAmountSheet title={t('monthlyBudget')} value={budget} currency={currency} onDone={v => { setBudget(v); setSub(null) }} onClose={() => setSub(null)} />
+      )}
+      {sub === 'name' && (
+        <MobileTextSheet title={t('name')} value={name} placeholder={t('egCategoryName')} onDone={v => { setName(v); setSub(null) }} onClose={() => setSub(null)} />
+      )}
     </>
   )
 }

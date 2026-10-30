@@ -21,13 +21,17 @@ const barra = leer('mobile/MobileTopBar.tsx')
 const shell = leer('mobile/MobileShell.tsx')
 const panel = leer('mobile/MobileAvatarSheet.tsx')
 const movs = leer('mobile/MobileMovements.tsx')
-const negocio = leer('mobile/MobileBusiness.tsx')
+// Negocio se partió en un armazón, sus tres pestañas y la pantalla de cada
+// servicio: «la pantalla» es la suma de todos, que es lo que ve el usuario.
+const negocio = ['mobile/MobileBusiness.tsx', 'mobile/business/ClientsTab.tsx', 'mobile/business/CollectTab.tsx',
+  'mobile/business/ProfitTab.tsx', 'mobile/business/ServiceScreen.tsx'].map(leer).join('\n')
 const ficha = leer('mobile/business/ClientCard.tsx')
 const formCliente = leer('mobile/business/ClientSheet.tsx')
 const formServicio = leer('mobile/business/ServiceSheet.tsx')
 const hojas = leer('mobile/business/shared.tsx')
 const caprichos = leer('mobile/MobileCaprices.tsx')
-const antojos = leer('mobile/caprices/WishesTab.tsx')
+// Desde la 2.7 los antojos viven en la misma pantalla que el bote.
+const antojos = leer('mobile/MobileCaprices.tsx')
 const logros = leer('mobile/caprices/WinsTab.tsx')
 const descartar = leer('mobile/caprices/SkipSheet.tsx')
 const crear = leer('mobile/MobileCreateFlow.tsx')
@@ -81,7 +85,7 @@ describe('B · lo visual de Negocio', () => {
   })
 
   it('la cabecera del negocio va teñida con su color', () => {
-    expect(negocio).toContain('mbiz-biz-head tinted')
+    expect(negocio).toContain("'--biz': biz.color")
   })
 
   it('el titular de cobros va sin caja', () => {
@@ -89,8 +93,8 @@ describe('B · lo visual de Negocio', () => {
   })
 
   it('la ficha del cliente tiene cabecera propia', () => {
-    expect(ficha).toContain('mcli-head')
-    expect(ficha).toContain("t('bizClientSince')")
+    expect(ficha).toContain('mcc-hero')
+    expect(ficha).toContain("t('cliSince')")
   })
 
   it('el resumen de todos los negocios solo sale con dos o más', () => {
@@ -102,8 +106,11 @@ describe('B · lo visual de Negocio', () => {
 
 describe('C · organizar', () => {
   it('un servicio se mueve a otro negocio, avisando de la categoría', () => {
-    expect(formServicio).toContain('moveService(existente.id, moverA)')
-    expect(formServicio).toContain("t('bizMoveServiceWarn')")
+    // Vive en la pantalla del servicio, y avisa de lo viejo que se queda.
+    const pantallaServicio = leer('mobile/business/ServiceScreen.tsx')
+    expect(pantallaServicio).toContain('moveService(service.id, b.id)')
+    expect(pantallaServicio).toContain("t('svcMoveOld')")
+    void formServicio
   })
 
   it('se ordena y se archiva', () => {
@@ -129,7 +136,8 @@ describe('D · duplicados', () => {
 
   it('NUNCA fusiona sola', () => {
     // Dos hermanos pueden llamarse igual. Sugiere, y decide el usuario.
-    expect(negocio).toContain('setMergeKey(g.key)')
+    expect(negocio).toContain('onMerge(g.key)')
+    expect(negocio).toContain('setMergeKey(key)')
     expect(negocio).not.toMatch(/mergeClients\(/)
   })
 
@@ -151,11 +159,10 @@ describe('D · duplicados', () => {
 })
 
 describe('E · Caprichos', () => {
-  it('se llama Caprichos y el bote es una de sus pestañas', () => {
-    for (const clave of ['capTabWishes', 'capTabJar', 'capTabWins']) {
-      expect(caprichos, clave).toContain(`'${clave}'`)
-    }
-    expect(caprichos).toContain('mcap-tabs')
+  it('se llama Caprichos y es una sola pantalla (2.7): bote, antojos y logros', () => {
+    expect(caprichos).toContain('nxk-jar')
+    expect(caprichos).toContain('<WinsTab')
+    expect(caprichos).not.toContain('mcap-tabs')
   })
 
   it('los antojos se apuntan y se deciden', () => {
@@ -239,7 +246,7 @@ describe('F · el tacto', () => {
     // Un cobro parcial es normal, y esto crea un movimiento real en el libro.
     expect(negocio).toContain('<SwipeCharge')
     expect(leer('mobile/business/SwipeCharge.tsx')).toContain('useSwipeAction')
-    expect(negocio).toMatch(/onCollect=\{\(\) => setCollectId\(charge\.id\)\}/)
+    expect(negocio).toMatch(/onCollect=\{\(\) => onCollect\(charge\.id\)\}/)
   })
 
   it('lo ya cobrado no se puede deslizar', () => {

@@ -46,6 +46,8 @@ export interface BusinessInvestment {
    * y en ese caso hay que decirlo, no dibujar un número enorme.
    */
   monthsToRecover: number | null
+  /** Fecha del primer pago contado, o `null` si todavía no hay ninguno. */
+  since: string | null
 }
 
 function cents(n: number): number {
@@ -63,17 +65,36 @@ export function businessInvestment(
   txns: Transaction[],
   mkey: string,
   monthlyProfit: number,
+  /**
+   * Los servicios de este negocio. Sin ellos no se puede saber qué gastos
+   * pagaron qué, y entonces esto devuelve cero en vez de un número inventado.
+   */
+  services: Service[] = [],
 ): BusinessInvestment {
-  const gastos = new Set(business.expenseCategoryIds)
   const ingresos = new Set(business.incomeCategoryIds)
+  const suyos = new Set(services.filter(v => v.businessId === business.id).map(v => v.id))
 
+  /*
+   * LO PUESTO ES LO QUE SE PAGÓ, NO TODO LO QUE SE GASTÓ.
+   *
+   * Antes se sumaba cualquier gasto en las categorías del negocio. Como esas
+   * categorías son las de siempre —Entretenimiento, Online, Servicios—, ahí
+   * dentro estaba todo el gasto personal del usuario: la pantalla decía que
+   * había invertido 13,671 en un Netflix de 14.99 al mes.
+   *
+   * Ahora solo cuentan los gastos marcados con el servicio que pagaron, que
+   * son los que salen del botón «Pagar». Un gasto sin marca no se adivina:
+   * adivinarlo es justo lo que produjo el número que nadie se creía.
+   */
   let total = 0, thisMonth = 0, collected = 0
+  let since = ''
   for (const tx of txns) {
-    if (tx.type === 'transfer' || !tx.categoryId) continue
-    if (tx.type === 'expense' && gastos.has(tx.categoryId)) {
+    if (tx.type === 'transfer') continue
+    if (tx.type === 'expense' && tx.paidService && suyos.has(tx.paidService)) {
       total += tx.amount
       if (monthKey(tx.date) === mkey) thisMonth += tx.amount
-    } else if (tx.type === 'income' && ingresos.has(tx.categoryId)) {
+      if (!since || tx.date < since) since = tx.date
+    } else if (tx.type === 'income' && tx.categoryId && ingresos.has(tx.categoryId)) {
       collected += tx.amount
     }
   }
@@ -84,6 +105,15 @@ export function businessInvestment(
     thisMonth: cents(thisMonth),
     collected: cents(collected),
     returned,
+    /*
+     * DESDE CUÁNDO se sabe lo invertido.
+     *
+     * Quien ya usaba la app tiene pagos viejos sin marcar, y su total empieza
+     * el día que la app empezó a marcarlos. Decirlo es la diferencia entre un
+     * número incompleto y un número mentiroso: el usuario puede mirar su
+     * libro y ver que cuadra.
+     */
+    since: since || null,
     isProfitable: returned >= 0,
     // Solo se estima si el negocio de verdad gana algo al mes. Con ganancia
     // cero o negativa no hay plazo: hay un problema, y fingir un plazo de

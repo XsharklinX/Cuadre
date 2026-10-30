@@ -206,3 +206,29 @@ describe('prepaySavingPct · como lo anuncian los servicios', () => {
     expect(pct).toBeCloseTo((200 / 1_200) * 100, 0)
   })
 })
+
+describe('prepaySaving · pagando al mes no se adelanta nada', () => {
+  it('un ciclo MENSUAL no tiene ahorro por adelantado', () => {
+    /*
+     * Es la mitad del «ahorras US$3,420.12» que salía en la pantalla de un
+     * Netflix de 14.99 al mes. Pagando mes a mes no hay nada que adelantar,
+     * así que la cifra no existía.
+     */
+    expect(prepaySaving({ amount: 14.99, cycle: 'monthly' }, 300)).toBe(0)
+  })
+
+  it('ni semanal ni quincenal', () => {
+    expect(prepaySaving({ amount: 100, cycle: 'weekly' }, 500)).toBe(0)
+    expect(prepaySaving({ amount: 200, cycle: 'biweekly' }, 500)).toBe(0)
+  })
+
+  it('el ahorro ANUAL sigue saliendo', () => {
+    // 100 al mes son 1,200 al año; pagando 1,000 por adelantado, 200 menos.
+    expect(prepaySaving({ amount: 1_000, cycle: 'annual' }, 100)).toBe(200)
+  })
+
+  it('y el trimestral también', () => {
+    // 100 al mes son 1,200 al año; 270 cada trimestre son 1,080.
+    expect(prepaySaving({ amount: 270, cycle: 'quarterly' }, 100)).toBe(120)
+  })
+})

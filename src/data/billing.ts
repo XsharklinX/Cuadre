@@ -105,6 +105,19 @@ export function prepaySaving(prepaid: Billing, monthlyPrice: number): number {
   const meses = cycleMonths(prepaid.cycle, prepaid.customMonths)
   if (meses === null || !(meses > 0) || !Number.isFinite(prepaid.amount)) return 0
   /*
+   * PAGANDO AL MES NO SE ADELANTA NADA.
+   *
+   * Un ciclo de un mes o menos no es un pago por adelantado, así que no hay
+   * ahorro que calcular. Sin esto, un Netflix mensual comparado contra un
+   * precio de lista daba «ahorras 3,420» — una cifra que no existe, sobre
+   * una suscripción que se paga mes a mes como cualquier otra.
+   *
+   * Quien llama tiene además que pasar los dos montos en la MISMA divisa: un
+   * coste en dólares contra un precio en pesos resta números que no se pueden
+   * restar, y fue la otra mitad de ese 3,420.
+   */
+  if (meses <= 1) return 0
+  /*
    * Se calcula sobre el AÑO, no multiplicando el mensual por doce.
    *
    * `perMonth` redondea a céntimos, y ese redondeo multiplicado por doce

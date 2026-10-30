@@ -40,10 +40,11 @@ export function WishSheet({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <BizSheet title={t('wishNew')} onClose={onClose} onSave={guardar} canSave={canSave}>
+    <BizSheet title={t('wishNew')} onClose={onClose} onSave={guardar} canSave={canSave}
+      missing={!name.trim() ? t('fieldName') : !(monto > 0) ? t('fieldAmount') : null}>
       <p className="mbizs-calc">{t('wishNewWhy').replace('{n}', String(WAIT_DAYS))}</p>
 
-      <Field label={t('wishWhat')}>
+      <Field label={t('wishWhat')} needs={!name.trim()}>
         <input
           className="mbizs-input"
           value={name}
@@ -56,6 +57,7 @@ export function WishSheet({ onClose }: { onClose: () => void }) {
       <Field
         label={t('amount')}
         hint={monto > 0 ? fmt(monto, currency, { decimals: moneyDecimals }) : undefined}
+        needs={!!name.trim() && !(monto > 0)}
       >
         <input
           className="mbizs-input mbizs-input-sm"

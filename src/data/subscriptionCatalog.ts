@@ -13,18 +13,31 @@ export interface SubscriptionCatalogItem {
    * como respaldo — sigue siendo reconocible, solo no es el logo exacto.
    */
   logoSlug?: string
+  /**
+   * PLAZAS DEL PLAN, cuando es un número publicado por la propia marca.
+   *
+   * Solo para proponerlo al crear un servicio que se revende, y siempre
+   * editable. Ausente donde no hay una cifra clara o donde depende del plan:
+   * inventar un tope haría que «quedan 2 plazas libres» fuera mentira, y esa
+   * frase es justo por la que se mira esa pantalla.
+   *
+   * El PRECIO no está aquí a propósito. Cambia por país y por plan, y un
+   * precio equivocado no se nota: se cuela en el margen y en la ganancia del
+   * negocio sin que nadie lo revise.
+   */
+  slots?: number
 }
 
 /** Catálogo de servicios de suscripción comunes para el flujo "Agregar suscripción". */
 export const SUBSCRIPTION_CATALOG: SubscriptionCatalogItem[] = [
-  { id: 'netflix',     name: 'Netflix',                color: '#E50914', icon: 'tv',        categoryHint: 'entertainment', logoSlug: 'netflix' },
+  { id: 'netflix',     name: 'Netflix',                color: '#E50914', icon: 'tv',        categoryHint: 'entertainment', logoSlug: 'netflix', slots: 4 },
   { id: 'prime',       name: 'Amazon Prime',           color: '#00A8E1', icon: 'play',      categoryHint: 'entertainment' },
-  { id: 'disney',      name: 'Disney+',                color: '#113CCF', icon: 'tv',        categoryHint: 'entertainment' },
-  { id: 'hbo',         name: 'HBO Max',                color: '#9B30FF', icon: 'tv',        categoryHint: 'entertainment', logoSlug: 'hbo' },
+  { id: 'disney',      name: 'Disney+',                color: '#113CCF', icon: 'tv',        categoryHint: 'entertainment', slots: 4 },
+  { id: 'hbo',         name: 'HBO Max',                color: '#9B30FF', icon: 'tv',        categoryHint: 'entertainment', logoSlug: 'hbo', slots: 3 },
   { id: 'crunchyroll', name: 'Crunchyroll',            color: '#F47521', icon: 'tv',        categoryHint: 'entertainment', logoSlug: 'crunchyroll' },
-  { id: 'spotify',     name: 'Spotify',                color: '#1DB954', icon: 'music',     categoryHint: 'entertainment', logoSlug: 'spotify' },
+  { id: 'spotify',     name: 'Spotify',                color: '#1DB954', icon: 'music',     categoryHint: 'entertainment', logoSlug: 'spotify', slots: 6 },
   { id: 'applemusic',  name: 'Apple Music',            color: '#FA243C', icon: 'music',     categoryHint: 'entertainment', logoSlug: 'applemusic' },
-  { id: 'youtube',     name: 'YouTube Premium',        color: '#FF0000', icon: 'play',      categoryHint: 'entertainment', logoSlug: 'youtube' },
+  { id: 'youtube',     name: 'YouTube Premium',        color: '#FF0000', icon: 'play',      categoryHint: 'entertainment', logoSlug: 'youtube', slots: 5 },
   { id: 'twitch',      name: 'Twitch',                 color: '#9146FF', icon: 'tv',        categoryHint: 'entertainment', logoSlug: 'twitch' },
   { id: 'xbox',        name: 'Xbox Game Pass',         color: '#107C10', icon: 'gamepad',   categoryHint: 'entertainment' },
   { id: 'playstation', name: 'PlayStation Plus',       color: '#0070D1', icon: 'gamepad',   categoryHint: 'entertainment', logoSlug: 'playstation' },

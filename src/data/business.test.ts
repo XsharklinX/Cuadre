@@ -507,9 +507,38 @@ describe('accountOccupancy', () => {
     expect(accountOccupancy(dos, clientes)[0].used).toBe(0)
   })
 
-  it('un cliente sin cuenta asignada no ocupa ninguna', () => {
+  it('S2 · UN CLIENTE SIN CUENTA OCUPA SITIO, no queda fuera de todas', () => {
+    // Era el fallo: los clientes de antes de que hubiera cuentas no tenían
+    // ninguna, y la cuenta 1 salía vacía con cuatro personas dentro.
     const clientes = [cliente({ serviceId: 's1' })]
-    expect(accountOccupancy(dos, clientes).every(a => a.used === 0)).toBe(true)
+    const r = accountOccupancy(dos, clientes)
+    expect(r[0].used).toBe(1)
+    expect(r[1].used).toBe(0)
+  })
+
+  it('los que no tienen cuenta llenan la primera y siguen en la siguiente', () => {
+    const clientes = Array.from({ length: 6 }, (_, i) => cliente({ serviceId: 's1', createdAt: i }))
+    const r = accountOccupancy(dos, clientes)
+    expect(r.map(a => a.used)).toEqual([4, 2])
+  })
+
+  it('respeta a quien ya tiene cuenta y coloca al resto alrededor', () => {
+    const clientes = [
+      ...Array.from({ length: 3 }, () => cliente({ serviceId: 's1', serviceAccountId: 'ac1' })),
+      cliente({ serviceId: 's1', createdAt: 5 }),
+      cliente({ serviceId: 's1', createdAt: 6 }),
+    ]
+    expect(accountOccupancy(dos, clientes).map(a => a.used)).toEqual([4, 1])
+  })
+
+  it('con todas llenas, el que sobra va a la última: nunca desaparece', () => {
+    const clientes = Array.from({ length: 9 }, (_, i) => cliente({ serviceId: 's1', createdAt: i }))
+    expect(accountOccupancy(dos, clientes).map(a => a.used)).toEqual([4, 5])
+  })
+
+  it('un cliente cuya cuenta se cerró se vuelve a colocar', () => {
+    const clientes = [cliente({ serviceId: 's1', serviceAccountId: 'cerrada' })]
+    expect(accountOccupancy(dos, clientes)[0].used).toBe(1)
   })
 })
 

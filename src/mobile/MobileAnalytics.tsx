@@ -1,82 +1,38 @@
-import { APP_NAME } from '@/data/release'
 import { useMemo, useState } from 'react'
 import { Icon } from '@/components/ui/Icon'
-import { AnimatedMoney } from '@/components/ui/AnimatedMoney'
 import { toast } from '@/components/ui/Toast'
 import { generateFinancialIntelligence, subscriptionInsightKey } from '@/data/financeIntelligence'
 import { compareCategoryTotals } from '@/data/comparisons'
-import { computeVerdict, savingsRate as savingsRateOf } from '@/data/analyticsVerdict'
-import { exportElementPng } from '@/data/imageExport'
-import { exportCsv, exportExcel, exportMonthlyPdf } from '@/data/professionalExport'
+import { savingsRate as savingsRateOf } from '@/data/analyticsVerdict'
 import { advanceRecurrenceDate } from '@/hooks/useRecurring'
 import { playConfirmSound } from '@/lib/sound'
-import { accountSavingsRate, amountForCategory, byCategory, categoryParts, currentMonthKey, dateLocale, monthLabel, monthlySeries, netWorthBreakdown, rollingNetWorthSeries, savingsBalance, shortMonth, totalBalanceInBase, totals, transactionsForTotals, txForMonth, type NetWorthPoint } from '@/data/helpers'
-import { projectNetWorth } from '@/data/netWorthProjection'
+import { byCategory, currentMonthKey, dateLocale, fmt, monthLabel, monthlySeries, totalBalanceInBase, totals, transactionsForTotals, txForMonth } from '@/data/helpers'
+import { businessIncome, spendShares } from '@/data/analyticsSummary'
 import { canScope, scopeTransactions, type ReportScope } from '@/data/reportScope'
+import { makeOwner } from '@/data/attribution'
 import { useBusiness } from '@/store/business'
-import { useAnalyticsSections, type AnalyticsSectionId } from '@/store/analyticsSections'
 import { useDismissals } from '@/store/dismissals'
 import { useFinance } from '@/store/finance'
 import { useSettings } from '@/store/settings'
 import { useFmt } from '@/hooks/useFmt'
 import { translateCategoryName, useT } from '@/i18n'
-import { useMobileBackDismiss } from './useMobileBackDismiss'
-import { useDialogA11y } from './useDialogA11y'
 import { SheetPortal } from './SheetPortal'
-import type { CurrencyCode, IconName, Transaction } from '@/types'
-import { useDebt } from '@/store/debt'
+import type { IconName, Transaction } from '@/types'
+import { useCaprices } from '@/store/caprices'
+import { useWishes } from '@/store/wishes'
+import { remaining as capriceRemaining } from '@/data/caprices'
+import { receivablesSummary } from '@/data/receivables'
+import { localToday } from '@/data/helpers'
+import { ExportSheet } from './ExportSheet'
+import { dailySeries, fixedVsVariable, monthPace, weekdayStats } from '@/data/analyticsViews'
+import { CategorySheet, DaySheet, HeatCalendar, PaceChart, SpendBars } from './analytics/AnalyticsParts'
+import { useNetWorthNow } from './analytics/NetWorthCard'
+import { IconTile, NxSheet } from '@/components/ui/Phrase'
+import { CatBadge } from '@/views/shared'
+import { biggestExpense, merchantTotals, normalWeekExpense, priciestMonth } from '@/data/analyticsQuestions'
 
 export type AnalyticsPeriod = 'week' | 'month' | 'year'
-
-/**
- * Sección plegable de Análisis. El contenido se monta solo cuando está abierta:
- * varias de estas secciones llevan gráficos que recorren todas las
- * transacciones, y montarlos todos de golpe era parte de por qué la pantalla
- * iba pesada.
- *
- * `count` adelanta cuánto hay dentro — sin eso, plegar sí sería esconder: el
- * usuario no tendría forma de saber si vale la pena abrir.
- */
-function AnalyticsFold({
-  id,
-  title,
-  subtitle,
-  count,
-  children,
-}: {
-  id: AnalyticsSectionId
-  title: string
-  subtitle?: string
-  count?: number
-  children: React.ReactNode
-}) {
-  const open = useAnalyticsSections(s => s.open[id] === true)
-  const toggle = useAnalyticsSections(s => s.toggle)
-
-  return (
-    <section className={`man-fold${open ? ' on' : ''}`}>
-      <button
-        type="button"
-        className="man-fold-head"
-        aria-expanded={open}
-        aria-controls={`man-fold-${id}`}
-        onClick={() => toggle(id)}
-      >
-        <span className="man-fold-title">
-          {title}
-          {subtitle && <small>{subtitle}</small>}
-        </span>
-        {count !== undefined && count > 0 && <span className="man-fold-count">{count}</span>}
-        <Icon name="arrowUp" size={14} className="man-fold-chevron" />
-      </button>
-      {open && (
-        <div className="man-fold-body" id={`man-fold-${id}`}>
-          {children}
-        </div>
-      )}
-    </section>
-  )
-}
+type CompareBase = 'prev' | 'lastYear' | 'avg'
 
 interface InsightRow {
   /** Tipo de tarjeta: lo que se oculta con "ocultar todas las de este tipo". */
@@ -109,150 +65,18 @@ function getPeriods(t: ReturnType<typeof useT>): Array<{ id: AnalyticsPeriod; la
 }
 
 
-/**
- * Curva de patrimonio neto: últimos 12 meses reales + proyección lineal a 6
- * meses. SVG a mano (sin recharts) para no meter ~150 KB de librería de
- * gráficos en Análisis, que carga en el arranque (no es lazy).
- */
-function NetWorthHistoryChart({ history, projected, currency, lang, fmtAmount }: {
-  history: NetWorthPoint[]
-  projected: NetWorthPoint[]
-  currency: CurrencyCode
-  lang: 'en' | 'es'
-  fmtAmount: (n: number, c: CurrencyCode) => string
-}) {
-  const t = useT()
-  const all = [...history, ...projected]
-  if (all.length < 2) return null
-
-  const W = 300
-  const H = 90
-  const PAD_Y = 8
-  const values = all.map(p => p.value)
-  const min = Math.min(...values)
-  const max = Math.max(...values)
-  const span = max - min || 1
-  const stepX = W / (all.length - 1)
-  const yOf = (v: number) => H - PAD_Y - ((v - min) / span) * (H - PAD_Y * 2)
-  const xOf = (i: number) => i * stepX
-
-  const historyPoints = history.map((p, i) => `${xOf(i)},${yOf(p.value)}`).join(' ')
-  const projectedPoints = [history[history.length - 1], ...projected]
-    .map((p, i) => `${xOf(history.length - 1 + i)},${yOf(p.value)}`)
-    .join(' ')
-  const areaPath = `M${xOf(0)},${H} L${historyPoints.split(' ').map(pt => pt).join(' L')} L${xOf(history.length - 1)},${H} Z`
-
-  const current = history[history.length - 1]
-  const projectedEnd = projected[projected.length - 1]
-
-  return (
-    <div className="man-networth-chart">
-      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none">
-        <line x1={0} y1={H - PAD_Y} x2={W} y2={H - PAD_Y} stroke="rgba(255,255,255,.08)" strokeWidth={1} />
-        <path className="man-nw-area" d={areaPath} fill="url(#nwGrad)" stroke="none" />
-        <defs>
-          <linearGradient id="nwGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--income)" stopOpacity="0.28" />
-            <stop offset="100%" stopColor="var(--income)" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        {/* `pathLength={1}` normaliza el largo del trazo a 1, asi el CSS puede
-            dibujarlo de 1 a 0 sin saber cuantos pixeles mide. Con un valor
-            inventado, una serie corta se dibujaria a trozos y una larga se
-            quedaria a medias. */}
-        <polyline className="man-nw-linea" pathLength={1} points={historyPoints} fill="none" stroke="var(--income)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-        <polyline points={projectedPoints} fill="none" stroke="var(--income)" strokeWidth={1.6} strokeDasharray="3 3" strokeLinecap="round" strokeLinejoin="round" opacity={0.55} />
-        {/* El punto de HOY llega al final del trazo, no antes: marca donde
-            estas justo cuando la linea termina de contarlo. */}
-        <circle className="man-nw-hoy" cx={xOf(history.length - 1)} cy={yOf(current.value)} r={3} fill="var(--income)" />
-      </svg>
-      <div className="man-networth-legend">
-        <div>
-          <span>{shortMonth(history[0].key, lang === 'en' ? 'en-US' : 'es-DO')}</span>
-          <strong>{fmtAmount(history[0].value, currency)}</strong>
-        </div>
-        <div>
-          <span>{t('today')}</span>
-          <strong>{fmtAmount(current.value, currency)}</strong>
-        </div>
-        {projectedEnd && (
-          <div className="man-networth-projected">
-            <span>{t('netWorthProjectedLabel')}</span>
-            <strong>{fmtAmount(projectedEnd.value, currency)}</strong>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-/**
- * Colores de los formatos de exportacion. Son CATEGORICOS (distinguir PDF de
- * Excel de CSV), no semanticos: no significan bueno ni malo. Viven juntos aqui
- * en vez de dispersos como hex sueltos para que el rediseno de paleta tenga un
- * solo sitio que tocar.
- */
-const EXPORT_COLORS = {
-  pdf:    '#e8b13d',
-  excel:  '#35a06f',
-  csv:    '#4a80c4',
-  import: '#8b6fd4',
-} as const
-
-/** Icono de exportacion: relleno al 13% del color y el trazo a color pleno. */
-function exportIcon(color: string): React.CSSProperties {
-  return { background: `color-mix(in oklab, ${color} 13%, transparent)`, color }
-}
-
-export function MobileAnalytics({ mkey, onBudgets, onImport, onEditTx, initialPeriod }: { mkey: string; onBudgets?: () => void; onImport?: () => void; onEditTx?: (tx: Transaction) => void; initialPeriod?: AnalyticsPeriod }) {
-  const { transactions, accounts, categories, goalContributions, currency, updateTx } = useFinance()
+export function MobileAnalytics({ mkey, onBudgets, onAccounts, onEditTx, initialPeriod }: { mkey: string; onBudgets?: () => void; onAccounts?: () => void; onEditTx?: (tx: Transaction) => void; initialPeriod?: AnalyticsPeriod }) {
+  const { transactions, accounts, categories, currency, updateTx } = useFinance()
   const fmtVal = useFmt()
   const t = useT()
   const settings = useSettings()
   const lang = (settings.language ?? 'es') as 'en' | 'es'
-  const compactNumbers = settings.compactNumbers
   const MONTHS_SHORT = getMonthsShort(t)
   const PERIODS = getPeriods(t)
   const [period, setPeriod] = useState<AnalyticsPeriod>(initialPeriod ?? 'month')
-  // Categoría enfocada en la dona: al tocar una porción/leyenda se resalta esa
-  // rebanada, el resto se atenúa y el centro muestra su monto. Es solo estado
-  // visual local (no filtra datos ni muta nada), así que es 100% reversible.
-  const [focusCat, setFocusCat] = useState<string | null>(null)
-  const finance = useFinance()
-  const ownerName = useSettings(s => s.displayName) || APP_NAME
   const [exportOpen, setExportOpen] = useState(false)
-  const [exporting, setExporting] = useState<'pdf' | 'excel' | 'csv' | 'png' | null>(null)
-  useMobileBackDismiss(exportOpen, () => setExportOpen(false))
-  const exportRef = useDialogA11y<HTMLDivElement>(() => setExportOpen(false), exportOpen)
-
-  const runExport = async (kind: 'pdf' | 'excel' | 'csv' | 'png') => {
-    setExporting(kind)
-    try {
-      if (kind === 'png') {
-        // Compartir el periodo como imagen: era lo unico de la vista "Anual"
-        // que no existia aqui.
-        const el = document.getElementById('man-capture')
-        if (el) {
-          await exportElementPng(el, `sharky-${period}-${mkey}`)
-          toast(t('reportExportedAsImage'), { icon: 'download', type: 'ok' })
-        }
-      } else if (kind === 'pdf') {
-        await exportMonthlyPdf(finance, mkey, ownerName, lang)
-        toast(t('pdfExportedFor').replace('{month}', monthLabel(mkey, dateLocale(lang))), { icon: 'download', type: 'ok' })
-      } else if (kind === 'excel') {
-        await exportExcel(finance)
-        toast(t('excelExported'), { icon: 'download', type: 'ok' })
-      } else {
-        await exportCsv(finance)
-        toast(t('csvExported'), { icon: 'download', type: 'ok' })
-      }
-      setExportOpen(false)
-    } catch {
-      toast(t(kind === 'pdf' ? 'pdfExportError' : kind === 'excel' ? 'excelExportError' : 'csvExportError'), { icon: 'alert' })
-    } finally {
-      setExporting(null)
-    }
-  }
+  /* A8 · Con qué se compara el mes: el anterior, el mismo del año pasado o tu media. */
+  const [compareBase, setCompareBase] = useState<CompareBase>('prev')
   const year = Number(mkey.slice(0, 4))
 
   /*
@@ -273,6 +97,14 @@ export function MobileAnalytics({ mkey, onBudgets, onImport, onEditTx, initialPe
    */
   const businesses = useBusiness(s => s.businesses)
   const puedeFiltrar = canScope(businesses)
+  /* G1 · La misma frontera que Ganancia: de quién es cada movimiento. */
+  const bizServices = useBusiness(s => s.services)
+  const bizClients = useBusiness(s => s.clients)
+  const bizCharges = useBusiness(s => s.charges)
+  const owner = useMemo(
+    () => makeOwner({ businesses, services: bizServices, clients: bizClients, charges: bizCharges }),
+    [businesses, bizServices, bizClients, bizCharges],
+  )
   const [scope, setScope] = useState<ReportScope>(() => {
     try {
       const guardado = localStorage.getItem('cuadre-report-scope')
@@ -287,8 +119,8 @@ export function MobileAnalytics({ mkey, onBudgets, onImport, onEditTx, initialPe
 
   const todoTx = useMemo(() => transactionsForTotals(transactions, accounts, currency, categories), [transactions, accounts, currency, categories])
   const visTx = useMemo(
-    () => scopeTransactions(todoTx, businesses, puedeFiltrar ? scope : 'all'),
-    [todoTx, businesses, puedeFiltrar, scope],
+    () => scopeTransactions(todoTx, businesses, puedeFiltrar ? scope : 'all', owner),
+    [todoTx, businesses, puedeFiltrar, scope, owner],
   )
   const monthTx = txForMonth(visTx, mkey)
   const weekWindow = useMemo(() => {
@@ -314,17 +146,11 @@ export function MobileAnalytics({ mkey, onBudgets, onImport, onEditTx, initialPe
   }, [monthTx, period, visTx, weekWindow.tx, year])
 
   const summary = totals(scopedTx)
-  const savedAmount = savingsBalance(accounts)
-  const savingsRate = accountSavingsRate(accounts)
   const currentNetWorth = totalBalanceInBase(accounts, currency)
   // Todas las categorías del periodo (no recortadas): las top se muestran una a
   // una y el resto se agrega en "Otros" para que nada quede oculto y el donut
   // sume el 100% del gasto.
   const allExpenseRows = useMemo(() => byCategory(scopedTx, 'expense', categories), [scopedTx, categories])
-  const LEGEND_TOP = 5
-  const topRows = allExpenseRows.slice(0, LEGEND_TOP)
-  const othersRows = allExpenseRows.slice(LEGEND_TOP)
-  const othersAmount = othersRows.reduce((sum, r) => sum + r.amount, 0)
   const totalExpense = Math.max(1, summary.expense)
   const monthly = monthlySeries(visTx, year)
 
@@ -367,13 +193,29 @@ export function MobileAnalytics({ mkey, onBudgets, onImport, onEditTx, initialPe
   const dayOfMonth = today.getDate()
   const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()
   const projectedExpense = isCurrentMonth && dayOfMonth > 0 ? summary.expense / dayOfMonth * daysInMonth : 0
-  const prevMkey = (() => {
+  const base: CompareBase = period === 'month' ? compareBase : 'prev'
+  const monthsBack = (k: number) => {
     const [y, m] = mkey.split('-').map(Number)
-    const d = new Date(y, m - 2, 1)
+    const d = new Date(y, m - 1 - k, 1)
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-  })()
-  const prevSum = totals(txForMonth(visTx, prevMkey))
-  const prevCategoryRows = byCategory(txForMonth(visTx, prevMkey), 'expense', categories)
+  }
+  const prevMkey = base === 'lastYear' ? monthsBack(12) : monthsBack(1)
+  /*
+   * «Tu media»: los tres meses anteriores divididos entre tres. Se escalan
+   * los movimientos (y sus divisiones) para que todo lo que compara por
+   * categoría o por concepto funcione igual que con un mes de verdad.
+   */
+  const avgTx = useMemo(() => {
+    if (base !== 'avg') return null
+    const keys = [monthsBack(1), monthsBack(2), monthsBack(3)]
+    return visTx
+      .filter(tx => keys.includes(tx.date.slice(0, 7)))
+      .map(tx => ({ ...tx, amount: tx.amount / 3, splits: tx.splits?.map(sp => ({ ...sp, amount: sp.amount / 3 })) }))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [base, visTx, mkey])
+  const prevMonthTx = avgTx ?? txForMonth(visTx, prevMkey)
+  const prevSum = totals(prevMonthTx)
+  const prevCategoryRows = byCategory(prevMonthTx, 'expense', categories)
   const prevCategoryMap = new Map(prevCategoryRows.map(row => [row.category.id, row.amount]))
   const prevPace = prevSum.expense > 0 && dayOfMonth > 0 ? prevSum.expense / daysInMonth * dayOfMonth : 0
   const spendTrend = prevPace > 0 ? Math.round((summary.expense / prevPace - 1) * 100) : null
@@ -382,77 +224,55 @@ export function MobileAnalytics({ mkey, onBudgets, onImport, onEditTx, initialPe
   const budgetPct = totalBudget > 0 ? Math.min(100, Math.round(summary.expense / totalBudget * 100)) : 0
 
   const prevYear = year - 1
-  const prevYearSum = useMemo(() => totals(visTx.filter(tx => tx.date.startsWith(String(prevYear)))), [visTx, prevYear])
-  const compareLabel = period === 'year' ? String(prevYear) : monthLabel(prevMkey, dateLocale(lang))
-  const comparePrev = period === 'year' ? prevYearSum : prevSum
-  const compareRows: Array<{ label: string; current: number; prev: number; goodWhenUp: boolean; cls: string }> = [
-    { label: t('incomes'), current: summary.income, prev: comparePrev.income, goodWhenUp: true, cls: 'income' },
-    { label: t('expenses'), current: summary.expense, prev: comparePrev.expense, goodWhenUp: false, cls: 'expense' },
-    { label: t('netLabel'), current: summary.net, prev: comparePrev.net, goodWhenUp: true, cls: summary.net >= 0 ? 'income' : 'expense' },
-  ]
+  const compareLabel = period === 'year' ? String(prevYear) : base === 'avg' ? t('anCmpAvgLabel') : monthLabel(prevMkey, dateLocale(lang))
   const showCompare = period === 'month' || period === 'year'
   const previousScopedTx = period === 'year'
     ? visTx.filter(tx => tx.date.startsWith(String(prevYear)))
-    : txForMonth(visTx, prevMkey)
+    : prevMonthTx
   const categoryComparison = useMemo(
-    () => showCompare ? compareCategoryTotals(scopedTx, previousScopedTx, categories, 'expense').slice(0, 5) : [],
+    () => showCompare ? compareCategoryTotals(scopedTx, previousScopedTx, categories, 'expense') : [],
     [scopedTx, previousScopedTx, categories, showCompare],
   )
 
-  // Solo cuenta como enfoque si la categoría sigue en el periodo visible (evita
-  // un enfoque "fantasma" al cambiar de mes/periodo sin tener que resetearlo).
-  const activeFocus = focusCat && topRows.some(row => row.category.id === focusCat) ? focusCat : null
-  const focusRow = activeFocus ? topRows.find(row => row.category.id === activeFocus) : null
 
-  // Estadísticas de la categoría enfocada (al tocar una porción o la leyenda):
-  // nº de movimientos, promedio, mayor gasto y % del total. Respeta splits.
-  const focusStats = useMemo(() => {
-    if (!activeFocus) return null
-    const amounts: number[] = []
-    for (const tx of scopedTx) {
-      if (tx.type !== 'expense') continue
-      const a = amountForCategory(tx, activeFocus)
-      if (a > 0) amounts.push(a)
-    }
-    const count = amounts.length
-    const sum = amounts.reduce((s, a) => s + a, 0)
-    return { count, sum, avg: count ? sum / count : 0, max: count ? Math.max(...amounts) : 0, pct: Math.round(sum / totalExpense * 100) }
-  }, [activeFocus, scopedTx, totalExpense])
-  // Conteo de movimientos por categoría (para mostrar "N mov." en la leyenda).
-  const countByCategory = useMemo(() => {
-    const m: Record<string, number> = {}
-    for (const tx of scopedTx) {
-      if (tx.type !== 'expense') continue
-      for (const p of categoryParts(tx)) if (p.categoryId && p.amount > 0) m[p.categoryId] = (m[p.categoryId] ?? 0) + 1
-    }
-    return m
-  }, [scopedTx])
-  const focusCategory = activeFocus ? categories.find(c => c.id === activeFocus) : null
-  const focusBudgetPct = focusCategory && focusCategory.budget > 0 && focusStats
-    ? Math.min(100, Math.round(focusStats.sum / focusCategory.budget * 100))
-    : null
+  /*
+   * A4 · A DÓNDE SE FUE. Una sola barra en vez de pedirle al ojo que compare
+   * porciones de un anillo; el anillo sigue debajo para tocar y enfocar.
+   */
+  const shares = useMemo(() => spendShares(scopedTx, categories), [scopedTx, categories])
 
-  const donutValueLabel = fmtVal(focusRow ? focusRow.amount : summary.expense, currency)
-  const donutCaption = focusRow ? translateCategoryName(focusRow.category, lang) : t('expenses')
-  const donutValueSize = donutValueLabel.length > 11 ? 12 : donutValueLabel.length > 8 ? 14 : 16
-
-  // Donut: top categorías + segmento gris "Otros" (resto), para sumar el 100%.
-  const donutSegments = othersAmount > 0
-    ? [...topRows, { category: { id: '__others__', color: 'color-mix(in oklab, var(--m-text) 22%, transparent)' }, amount: othersAmount }]
-    : topRows
-  const donut = donutSegments.length
-    ? `conic-gradient(${donutSegments.map((row, i) => {
-        const start = donutSegments.slice(0, i).reduce((sum, current) => sum + current.amount / totalExpense * 100, 0)
-        const end = start + row.amount / totalExpense * 100
-        const color = activeFocus && activeFocus !== row.category.id
-          ? 'color-mix(in oklab, var(--m-text) 9%, transparent)'
-          : row.category.color
-        return `${color} ${start}% ${end}%`
-      }).join(', ')}, rgba(255,255,255,.07) 0)`
-    : 'conic-gradient(rgba(255,255,255,.07) 0 100%)'
+  /*
+   * A2 · LO QUE EL SALDO NO ENSEÑA. Análisis resumía el libro como si no
+   * existieran el negocio, lo que te deben, los caprichos por recuperar ni
+   * los antojos en espera. Todo son cifras que la app ya tenía.
+   */
+  const charges = useBusiness(s => s.charges)
+  const capricesItems = useCaprices(s => s.items)
+  const wishItems = useWishes(s => s.items)
+  const deNegocio = useMemo(() => {
+    const vivos = businesses.filter(b => !b.archivedAt)
+    // Con el filtro en Negocio o Personal la parte sería 100 o 0: no dice nada.
+    if (!vivos.length || (puedeFiltrar && scope !== 'all')) return null
+    return businessIncome(scopedTx, vivos, owner)
+  }, [scopedTx, businesses, scope, puedeFiltrar, owner])
+  const teDeben = useMemo(() => receivablesSummary(charges, localToday()).outstandingTotal, [charges])
+  const caprichosFalta = capricesItems
+    .filter(c => !c.closed)
+    .reduce((sum, c) => sum + Math.max(0, capriceRemaining(c)), 0)
+  const antojos = wishItems.filter(w => !w.resolvedAt)
+  const antojosTotal = antojos.reduce((sum, w) => sum + w.amount, 0)
+  const extras: Array<{ id: string; icon: IconName; label: string; value: string; pct?: number }> = []
+  if (deNegocio && deNegocio.pct !== null && deNegocio.fromBusiness > 0) {
+    extras.push({ id: 'biz', icon: 'briefcase', label: t('anFromBusiness').replace('{pct}', String(deNegocio.pct)), value: fmtVal(deNegocio.fromBusiness, currency), pct: deNegocio.pct })
+  }
+  if (teDeben > 0.005) extras.push({ id: 'owed', icon: 'receipt', label: t('anOwedToYou'), value: fmtVal(teDeben, currency) })
+  if (caprichosFalta > 0.005) extras.push({ id: 'cap', icon: 'gift', label: t('anCapricesLeft'), value: fmtVal(caprichosFalta, currency) })
+  if (antojos.length) extras.push({ id: 'wish', icon: 'heart', label: t('anWishesWaiting').replace('{n}', String(antojos.length)), value: fmtVal(antojosTotal, currency) })
 
   const heroLabel = period === 'week'
-    ? `${weekWindow.start} - ${weekWindow.end}`
+    ? (weekWindow.start
+        ? `${new Date(`${weekWindow.start}T00:00:00`).toLocaleDateString(dateLocale(lang), { day: 'numeric', month: 'short' })} – ${new Date(`${weekWindow.end}T00:00:00`).toLocaleDateString(dateLocale(lang), { day: 'numeric', month: 'short' })}`
+        : t('periodWeek'))
     : period === 'year'
       ? String(year)
       : monthLabel(mkey, dateLocale(lang))
@@ -476,35 +296,6 @@ export function MobileAnalytics({ mkey, onBudgets, onImport, onEditTx, initialPe
   // (previousAvg > 0) — si no, cualquier gasto nuevo dispararia el insight cada mes.
   const topTrend = intelligence.trends.find(item => item.previousAvg > 0 && item.delta > Math.max(300, item.previousAvg * 0.3))
   const upcomingSubscription = intelligence.subscriptions.find(item => !item.alreadyRecurring) ?? intelligence.subscriptions[0]
-  /*
-   * La tarjeta de patrimonio mezclaba dos momentos: el NUMERO era el del mes
-   * seleccionado y el desglose de debajo el de HOY. Eran dos periodos
-   * distintos en la misma tarjeta, y eso es la mitad de por que la cifra no se
-   * entendia. Ahora las dos lineas hablan del presente; la evolucion mes a mes
-   * la cuenta la grafica, que es su sitio.
-   */
-  const compareNetDeltaPct = showCompare
-    ? comparePrev.net !== 0
-      ? Math.round(((summary.net - comparePrev.net) / Math.abs(comparePrev.net)) * 100)
-      : (summary.net !== 0 ? 100 : 0)
-    : 0
-
-  const netWorthRolling = useMemo(
-    () => rollingNetWorthSeries(accounts, transactions, goalContributions, mkey, 12, dateLocale(lang), currency),
-    [accounts, transactions, goalContributions, mkey, lang, currency],
-  )
-  const netWorthProjected = useMemo(() => projectNetWorth(netWorthRolling, 6), [netWorthRolling])
-  /*
-   * El patrimonio incluye las deudas registradas a mano (prestamos, lo que le
-   * debes a alguien) y lo que TE deben. Sin ellas la cifra decia "patrimonio"
-   * y era "saldo de mis cuentas", que no es lo mismo.
-   */
-  const manualDebts = useDebt(st => st.debts)
-  const netWorthSplit = useMemo(
-    () => netWorthBreakdown(accounts, currency, manualDebts),
-    [accounts, currency, manualDebts],
-  )
-  const netWorthNow = netWorthSplit.assets - netWorthSplit.liabilities
 
   const hiddenInsights = useDismissals(s => s.hiddenInsights)
   const hiddenInsightTypes = useDismissals(s => s.hiddenInsightTypes)
@@ -654,19 +445,6 @@ export function MobileAnalytics({ mkey, onBudgets, onImport, onEditTx, initialPe
    * y se contradecian, y el que mentia era el grande. `prevPace` ya existia
    * para el aviso de ritmo; ahora el veredicto usa la misma vara.
    */
-  const verdictPrevious = useMemo(
-    () => (period === 'month' && isCurrentMonth && prevPace > 0
-      ? { ...comparePrev, expense: prevPace }
-      : comparePrev),
-    [period, isCurrentMonth, prevPace, comparePrev],
-  )
-
-  const verdict = useMemo(() => computeVerdict({
-    current: summary,
-    previous: verdictPrevious,
-    txCount: scopedTx.length,
-    noPrevious: previousScopedTx.length === 0,
-  }), [summary, verdictPrevious, scopedTx.length, previousScopedTx.length])
 
   const rate = savingsRateOf(summary)
 
@@ -695,540 +473,519 @@ export function MobileAnalytics({ mkey, onBudgets, onImport, onEditTx, initialPe
     }
   }, [period, visTx, year, lang, scopedTx, categories])
 
-  // Dos titulares como máximo. Tres ya es una lista, y una lista vuelve a ser
-  // "todo con el mismo peso", que es justo lo que había que resolver.
-  const headlineInsights = visibleInsights.slice(0, 2)
-  // El resto sigue viviendo en su acordeón: no se pierde nada, solo deja de
-  // competir por la parte alta de la pantalla.
-  const foldInsights = visibleInsights.slice(2)
+  /*
+   * ANÁLISIS 2.6: SIN CAJONES.
+   *
+   * Antes: un veredicto, una dona y cinco acordeones cerrados que había que
+   * abrir uno por uno (y que se cerraban al volver). Ahora la pantalla cuenta
+   * el periodo de arriba abajo, en el orden en que uno se lo pregunta:
+   * ¿cuánto me queda?, ¿voy mejor o peor?, ¿en qué se va?, ¿qué días gasto?,
+   * ¿cómo voy a largo plazo? Cada gráfico se toca y lleva a los movimientos.
+   */
+  const todayISO = localToday()
+  const daily = useMemo(() => dailySeries(visTx, mkey, todayISO), [visTx, mkey, todayISO])
+  const prevDaily = useMemo(() => {
+    if (base !== 'avg') return dailySeries(visTx, prevMkey, todayISO)
+    const three = [1, 2, 3].map(k => dailySeries(visTx, monthsBack(k), todayISO))
+    return three[0].map((p, i) => ({ ...p, expense: three.reduce((sum, arr) => sum + (arr[i]?.expense ?? 0), 0) / 3 }))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visTx, prevMkey, todayISO, base, mkey])
+  const pace = useMemo(() => monthPace(daily, prevDaily, todayISO), [daily, prevDaily, todayISO])
+  const weekdays = useMemo(() => weekdayStats(daily), [daily])
+  const fixedVar = useMemo(() => fixedVsVariable(scopedTx, visTx), [scopedTx, visTx])
+  const [dayOpen, setDayOpen] = useState<string | null>(null)
+  const [catOpen, setCatOpen] = useState<string | null>(null)
+
+  const barPoints = useMemo(() => {
+    if (period === 'month') return daily.map(p => ({ key: p.date, label: String(p.day), value: p.expense, future: p.future }))
+    if (period === 'week') {
+      return Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(`${(weekWindow.start || `${mkey}-01`)}T00:00:00`)
+        d.setDate(d.getDate() + i)
+        const key = localToday(d)
+        return { key, label: String(d.getDate()), value: weekWindow.tx.filter(tx => tx.date === key && tx.type === 'expense').reduce((s, tx) => s + tx.amount, 0), future: key > todayISO }
+      })
+    }
+    return monthly.map(m => ({ key: m.key, label: MONTHS_SHORT[parseInt(m.key.slice(5, 7)) - 1] ?? m.label, value: m.expense, future: m.key > currentMonthKey() }))
+  }, [period, daily, weekWindow.start, weekWindow.tx, mkey, todayISO, monthly, MONTHS_SHORT])
+
+
+  const weekdayName = (wd: number) => new Date(2024, 0, 7 + wd).toLocaleDateString(dateLocale(lang), { weekday: 'long' })
+  const fixedTotal = fixedVar.fixed + fixedVar.variable
+  const money0 = (n: number) => fmt(n, currency, { decimals: 0 })
+
+  /*
+   * ANÁLISIS 2.8 · CON LAS PIEZAS DE LA APP.
+   *
+   * La 2.6 quitó los cajones; seguían cuatro filas de controles antes del
+   * primer dato y cada sección repetía los ingresos y los gastos. Ahora:
+   *  A1  una fila de pastillas (periodo, filtro, comparar, compartir);
+   *  A2  la tarjeta del periodo contesta primero («Te sobraron…»);
+   *  A3  «Lo que hay que mirar»: una tarjeta de filas, cada una abre su detalle;
+   *  A4  las categorías con su icono, su parte y la flecha contra la comparación;
+   *  A5  preguntas rápidas al final.
+   */
+  const [scopeOpen, setScopeOpen] = useState(false)
+  const [baseOpen, setBaseOpen] = useState(false)
+  const [detail, setDetail] = useState<'pace' | 'evolution' | 'days' | 'floor' | 'sources' | null>(null)
+  const [question, setQuestion] = useState<{ q: string; answer: string; sub: string } | null>(null)
+  const netWorth = useNetWorthNow()
+  const scopeLabel = scope === 'business'
+    ? (businesses.filter(b => !b.archivedAt).length === 1 ? businesses.find(b => !b.archivedAt)!.name : t('scopeBusiness'))
+    : scope === 'personal' ? t('scopePersonal') : t('scopeAll')
+
+  // La semana normal, para decir si esta va por encima o por debajo.
+  const weekNormal = useMemo(
+    () => (period === 'week' && weekWindow.start ? normalWeekExpense(visTx, weekWindow.start) : null),
+    [period, weekWindow.start, visTx],
+  )
+  // El día más caro del mes: una línea que lleva a ese día.
+  const priciestDay = period === 'month'
+    ? daily.filter(p => !p.future && p.expense > 0).reduce<typeof daily[number] | null>((m, p) => (!m || p.expense > m.expense ? p : m), null)
+    : null
+  const avgDay = period === 'month' ? (() => {
+    const past = daily.filter(p => !p.future)
+    return past.length ? past.reduce((s, p) => s + p.expense, 0) / past.length : 0
+  })() : 0
+
+  // A2 · El titular: la respuesta, no el porcentaje que asusta.
+  const head = (() => {
+    if (!scopedTx.length) return { line: t('noExpensesToAnalyze'), tone: '' }
+    if (period === 'week') return { line: t('an28HeadWeek').replace('{amount}', money0(summary.expense)), tone: '' }
+    if (summary.net >= 0) {
+      return {
+        line: (period === 'year' ? t('an28HeadYear').replace('{year}', String(year)) : t('an28HeadSaved')).replace('{amount}', money0(summary.net)),
+        tone: 'ok',
+      }
+    }
+    return { line: t('an28HeadOver').replace('{amount}', money0(-summary.net)), tone: 'bad' }
+  })()
+  const headSub = (() => {
+    const parts: string[] = []
+    if (period !== 'week' && rate !== null && summary.net >= 0) parts.push(t('an28OfIncome').replace('{pct}', String(Math.round(rate))))
+    if (period === 'week' && weekNormal !== null) {
+      const d = summary.expense - weekNormal
+      parts.push(Math.abs(d) < weekNormal * 0.05
+        ? t('an28WeekSame')
+        : (d > 0 ? t('an28WeekMore') : t('an28WeekLess')).replace('{amount}', money0(Math.abs(d))))
+    }
+    if (period === 'month' && pace && pace.previousAtDay > 0) {
+      const pct = Math.round((pace.current / pace.previousAtDay - 1) * 100)
+      parts.push(Math.abs(pct) < 5
+        ? t('an28PaceSame').replace('{month}', compareLabel)
+        : (pct > 0 ? t('an28PaceMorePct') : t('an28PaceLessPct')).replace('{pct}', String(Math.abs(pct))).replace('{month}', compareLabel))
+    }
+    return parts.join(' · ')
+  })()
+
+  // A3 · Lo que hay que mirar, en filas.
+  type LookRow = { key: string; icon: IconName; color: string; title: string; sub?: string; value?: string; valueTone?: string; onTap?: () => void; onHide?: () => void }
+  const TONE_COLOR: Record<string, string> = { warn: '#f59e0b', danger: 'var(--m-expense)', ok: 'var(--m-income)', '': 'var(--m-primary)' }
+  const look: LookRow[] = []
+  for (const ins of visibleInsights) {
+    if (ins.id === 'trend' || ins.id === 'projection' || ins.id === 'top-category') continue
+    look.push({ key: ins.dismissKey, icon: ins.icon, color: TONE_COLOR[ins.tone] ?? TONE_COLOR[''], title: ins.title, sub: ins.subtitle, onTap: ins.action?.onClick, onHide: () => setHiding(ins) })
+  }
+  if (period === 'month' && pace && (pace.current > 0 || pace.previousAtDay > 0)) {
+    look.push({
+      key: 'pace', icon: pace.delta > 0 ? 'arrowUp' : 'arrowDn', color: pace.delta > 0 ? '#f59e0b' : 'var(--m-income)',
+      title: Math.abs(pace.delta) < 1
+        ? t('anPaceSame').replace('{month}', compareLabel)
+        : (pace.delta > 0 ? t('an28PaceMore') : t('an28PaceLess')).replace('{month}', compareLabel),
+      sub: pace.projected !== null ? t('anPaceProjection').replace('{amount}', money0(pace.projected)) : undefined,
+      value: Math.abs(pace.delta) < 1 ? undefined : `${pace.delta > 0 ? '+' : '−'}${money0(Math.abs(pace.delta))}`,
+      onTap: () => setDetail('pace'),
+    })
+  }
+  if (period !== 'month' && barData.some(d => d.income > 0 || d.expense > 0)) {
+    look.push({ key: 'evolution', icon: 'trend', color: 'var(--m-primary)', title: period === 'year' ? t('incomeVsExpense') : t('weeklyExpenses'), sub: t('an28SeeChart'), onTap: () => setDetail('evolution') })
+  }
+  if (period === 'month' && weekdays && weekdays.avg[weekdays.top] > 0) {
+    look.push({
+      key: 'days', icon: 'calendar', color: '#ffdd3d',
+      title: t('an28DaysTop').replace('{day}', weekdayName(weekdays.top)),
+      sub: t('an28DaysAvg').replace('{amount}', money0(weekdays.avg[weekdays.top])),
+      onTap: () => setDetail('days'),
+    })
+  }
+  if (fixedTotal > 0 && fixedVar.fixed > 0) {
+    look.push({
+      key: 'floor', icon: 'repeat', color: '#5bc0ff',
+      title: t('an28Fixed').replace('{amount}', money0(fixedVar.fixed)),
+      sub: t('an28FixedSub').replace('{pct}', String(Math.round((fixedVar.fixed / fixedTotal) * 100))),
+      onTap: () => setDetail('floor'),
+    })
+  }
+  if (period === 'month' && totalBudget > 0) {
+    look.push({
+      key: 'budget', icon: 'wallet', color: budgetPct >= 100 ? 'var(--m-expense)' : budgetPct >= 80 ? '#f59e0b' : 'var(--m-income)',
+      title: t('an28Budget').replace('{pct}', String(budgetPct)), sub: t('an28BudgetSub'),
+      value: `${budgetPct} %`, valueTone: budgetPct >= 100 ? 'bad' : '', onTap: onBudgets,
+    })
+  }
+  for (const x of extras) look.push({ key: `x-${x.id}`, icon: x.icon, color: x.id === 'biz' ? '#5bc0ff' : x.id === 'owed' ? 'var(--m-income)' : x.id === 'cap' ? '#ff9a3d' : '#a78bfa', title: x.label, value: x.value })
+  if (period === 'year' && yearHighlights?.incomeSources.length) {
+    look.push({ key: 'sources', icon: 'briefcase', color: 'var(--m-income)', title: t('incomeSourcesTitle'), sub: yearHighlights.incomeSources.slice(0, 2).map(r => translateCategoryName(r.category, lang)).join(' · '), onTap: () => setDetail('sources') })
+  }
+  look.push({
+    key: 'networth', icon: 'landmark', color: 'var(--m-income)',
+    title: t('an28NetWorth').replace('{amount}', money0(netWorth.now)),
+    sub: netWorth.change !== null && Math.abs(netWorth.change) >= 1
+      ? (netWorth.change > 0 ? t('an28NetWorthUp') : t('an28NetWorthDown')).replace('{amount}', money0(Math.abs(netWorth.change)))
+      : t('an28NetWorthSee'),
+    onTap: onAccounts,
+  })
+
+  // A4 · La comparación de cada categoría, para su flecha.
+  const cmpByCat = new Map(categoryComparison.map(r => [r.category.id, r]))
+
+  // A5 · Preguntas rápidas: salen de tus comercios y categorías.
+  const questions = useMemo(() => {
+    const out: { q: string; answer: string; sub: string }[] = []
+    const merchants = merchantTotals(visTx, year).filter(m => m.count >= 2).slice(0, 2)
+    for (const m of merchants) {
+      out.push({ q: t('an28QMerchant').replace('{name}', m.note), answer: money0(m.total), sub: t('an28QMerchantSub').replace('{n}', String(m.count)).replace('{year}', String(year)) })
+    }
+    const pricey = priciestMonth(visTx, year)
+    if (pricey) {
+      const why = biggestExpense(visTx, pricey.mkey)
+      out.push({
+        q: t('an28QPriciest'),
+        answer: monthLabel(pricey.mkey, dateLocale(lang)),
+        sub: t('an28QPriciestSub').replace('{amount}', money0(pricey.expense)) + (why ? ` · ${t('an28QBiggest').replace('{note}', why.note).replace('{amount}', money0(why.amount))}` : ''),
+      })
+    }
+    const topYear = byCategory(visTx.filter(tx => tx.date.startsWith(String(year))), 'expense', categories)[0]
+    if (topYear) {
+      out.push({ q: t('an28QCategory').replace('{name}', translateCategoryName(topYear.category, lang)), answer: money0(topYear.amount), sub: t('an28QCategorySub').replace('{year}', String(year)) })
+    }
+    return out
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visTx, year, categories, lang, currency])
+
+  const baseLabel = base === 'avg' ? t('anCmpAvgShort') : base === 'lastYear' ? t('anCmpLastYearShort') : t('anCmpPrevShort')
 
   return (
-    <div className="man-root" id="man-capture">
-      <div className="mobile-segment man-tabs" role="tablist" aria-label={t('periodLabel')}>
-        {PERIODS.map(p => (
-          <button key={p.id} className={period === p.id ? 'on' : ''} role="tab" aria-selected={period === p.id} onClick={() => setPeriod(p.id)}>
-            {p.label}
-          </button>
-        ))}
+    <div className="man-root an28" id="man-capture">
+      {/* A1 · Una fila: periodo, filtro, comparar y compartir. */}
+      <div className="an28-ctrl">
+        <div className="an28-pills" role="tablist" aria-label={t('periodLabel')}>
+          {PERIODS.map(p => (
+            <button key={p.id} className={period === p.id ? 'on' : ''} role="tab" aria-selected={period === p.id} onClick={() => setPeriod(p.id)}>
+              {p.label}
+            </button>
+          ))}
+          {puedeFiltrar && (
+            <button className={scope !== 'all' ? 'on' : ''} onClick={() => setScopeOpen(true)} aria-haspopup="dialog">
+              {scopeLabel} ▾
+            </button>
+          )}
+          {period === 'month' && (
+            <button className={base !== 'prev' ? 'on' : ''} onClick={() => setBaseOpen(true)} aria-haspopup="dialog">
+              {baseLabel} ▾
+            </button>
+          )}
+        </div>
+        <button className="an28-share" aria-label={t('exportData')} onClick={() => setExportOpen(true)}>
+          <Icon name="share" size={17} />
+        </button>
       </div>
 
-      {/*
-        NEGOCIO O PERSONAL.
-        Solo sale si hay una frontera real que trazar: sin negocios con
-        categorias, «solo personal» seria todo y «solo negocio» nada, y
-        ofrecer un filtro que no filtra es peor que no ofrecerlo.
-      */}
-      {puedeFiltrar && (
-        <>
-          <div className="mobile-segment man-scope" role="tablist" aria-label={t('scopeAll')}>
-            {([
-              { id: 'all' as const, label: t('scopeAll') },
-              { id: 'business' as const, label: t('scopeBusiness') },
-              { id: 'personal' as const, label: t('scopePersonal') },
-            ]).map(o => (
-              <button
-                key={o.id}
-                className={scope === o.id ? 'on' : ''}
-                role="tab"
-                aria-selected={scope === o.id}
-                onClick={() => cambiarScope(o.id)}
-              >
-                {o.label}
-              </button>
-            ))}
-          </div>
-          {/* Con un filtro puesto se dice QUE se esta mirando: si no, las
-              cifras de abajo parecen las de siempre y no cuadran con nada. */}
-          {scope !== 'all' && (
-            <p className="man-scope-note">
-              {scope === 'business' ? t('scopeBusinessNote') : t('scopePersonalNote')}
-            </p>
-          )}
-        </>
-      )}
-
-      {/* ── VEREDICTO ────────────────────────────────────────
-          La pantalla responde UNA pregunta —¿cómo voy?— antes de ofrecer
-          nada. Antes abría con cuatro números empatados (ingresos, gastos,
-          neto y el anillo de ahorro) y cinco acordeones cerrados: el usuario
-          tenía que saber de antemano qué buscaba. */}
-      <section className={`man-verdict ${verdict.tone}`}>
-        <div className="man-verdict-head">
-          <span className="man-verdict-kicker">{heroLabel}</span>
-          <h2 className="man-verdict-line">{t(verdict.key).replace('{pct}', String(verdict.params.pct ?? ''))}</h2>
-        </div>
-
-        <div className="man-verdict-hero">
-          <span className="man-verdict-hero-label">
-            {verdict.heroKind === 'overspent' ? t('overspentLabel')
-              : verdict.heroKind === 'saved' ? t('savedThisPeriod')
-              : t('netLabel')}
+      {/* A2 · La tarjeta del periodo. */}
+      <section className="an28-card an28-month">
+        <span className="an28-label">{heroLabel}</span>
+        <h2 className={`an28-head ${head.tone}`}>{head.line}</h2>
+        {headSub && <p className="an28-sub">{headSub}</p>}
+        {(summary.income > 0 || summary.expense > 0) && (
+          <span className="an28-split" aria-hidden="true">
+            <i style={{ flexGrow: Math.min(summary.expense, Math.max(summary.income, summary.expense)), background: 'var(--m-expense)' }} />
+            {summary.net > 0 && <i style={{ flexGrow: summary.net, background: 'var(--m-income)' }} />}
           </span>
-          <strong className="man-verdict-hero-value">
-            <AnimatedMoney value={verdict.hero} compact={compactNumbers} />
-          </strong>
+        )}
+        <div className="an28-trio">
+          <span><small>{t('anIn')}</small><b className="ok">{money0(summary.income)}</b></span>
+          <span><small>{t('anOut')}</small><b className="bad">{money0(summary.expense)}</b></span>
+          <span><small>{t('anLeft')}</small><b className={summary.net < 0 ? 'bad' : 'blue'}>{money0(summary.net)}</b></span>
         </div>
-
-        {/* Ingresos y gastos SOSTIENEN la cifra de arriba, no compiten con
-            ella: por eso van pequeños y en una sola línea. */}
-        <div className="man-verdict-support">
-          <span><i className="dot income" />{t('incomes')} <b>{fmtVal(summary.income, currency)}</b></span>
-          <span><i className="dot expense" />{t('expenses')} <b>{fmtVal(summary.expense, currency)}</b></span>
-          {rate !== null && (
-            <span><i className="dot save" />{t('savingsRateLabel')} <b>{Math.round(rate)}%</b></span>
-          )}
-        </div>
-      </section>
-
-      {/* ── TU AÑO ───────────────────────────────────────────
-          Los superlativos y las fuentes de ingreso vivían en una vista
-          "Anual" aparte que, por lo demás, repetía exactamente este período
-          de Análisis: los mismos totales, la misma comparación contra el año
-          anterior, el mismo desglose y la misma serie de patrimonio. Mantener
-          dos destinos para el mismo dato es lo que hacía que la app se
-          sintiera dispersa. */}
-      {period === 'year' && yearHighlights && (
-        <section className="man-year">
-          <div className="man-year-grid">
-            <article>
-              <small>{t('bestSavingsMonthLabel')}</small>
-              <b>{yearHighlights.bestMonth.label}</b>
-              <span className="income">{fmtVal(yearHighlights.bestMonth.net, currency)}</span>
-            </article>
-            <article>
-              <small>{t('highestExpenseMonthLabel')}</small>
-              <b>{yearHighlights.worstMonth.label}</b>
-              <span className="expense">{fmtVal(yearHighlights.worstMonth.expense, currency)}</span>
-            </article>
-          </div>
-
-          {yearHighlights.incomeSources.length > 0 && (
-            <div className="man-year-sources">
-              <p className="man-year-sources-title">{t('incomeSourcesTitle')}</p>
-              {yearHighlights.incomeSources.map(row => (
-                <div key={row.category.id} className="man-year-source">
-                  <span className="man-year-source-dot" style={{ background: row.category.color }} />
-                  <span className="man-year-source-name">{translateCategoryName(row.category, lang)}</span>
-                  <span className="man-year-source-amount">{fmtVal(row.amount, currency)}</span>
-                </div>
-              ))}
+        {period === 'year' && yearHighlights ? (
+          <>
+            <div className="an28-yearbars" aria-hidden="true">
+              {monthly.map(m => {
+                const top = Math.max(1, ...monthly.map(x => Math.abs(x.net)))
+                return <i key={m.key} className={m.net < 0 ? 'neg' : m.key > currentMonthKey() ? 'fut' : ''} style={{ height: `${Math.max(4, (Math.abs(m.net) / top) * 100)}%` }} />
+              })}
             </div>
-          )}
-        </section>
-      )}
-
-      {/* ── LO QUE CAMBIÓ ────────────────────────────────────
-          Los dos o tres avisos más urgentes, FUERA del acordeón. Había 465
-          líneas de motor de insights alimentando un cajón cerrado que nadie
-          abría. */}
-      {headlineInsights.length > 0 && (
-        <section className="man-headlines">
-          {headlineInsights.map(insight => (
-            <div key={insight.id} className="man-headline">
-              <span className={`man-headline-ico ${insight.tone || ''}`}>
-                <Icon name={insight.icon} size={17} />
-              </span>
-              <span className="man-headline-body">
-                <b>{insight.title}</b>
-                <small>{insight.subtitle}</small>
-              </span>
-            </div>
-          ))}
-        </section>
-      )}
-
-      <section className="man-panel man-panel-distribution">
-        <div className="man-panel-head">
-          <h3>{t('expenseDistribution')}</h3>
-          <p>{t('byCategoryLabel')}</p>
-        </div>
-
-        <div className="man-donut-wrap">
-          <button
-            type="button"
-            className="man-donut"
-            style={{ background: donut }}
-            aria-label={activeFocus ? t('clearSelectionLabel') : t('expenseDistribution')}
-            onClick={() => setFocusCat(null)}
-          >
+            <p className="an28-axis"><span>{MONTHS_SHORT[0]}</span><span>{t('an28YearBars')}</span><span>{MONTHS_SHORT[11]}</span></p>
+          </>
+        ) : scopedTx.length > 0 && (
+          <SpendBars points={barPoints} highlight={dayOpen} onPick={key => setDayOpen(key)} />
+        )}
+        {priciestDay && avgDay > 0 && priciestDay.expense > avgDay * 2 && (
+          <button className="an28-dayline" onClick={() => setDayOpen(priciestDay.date)}>
+            <IconTile icon="alert" color="var(--m-expense)" size={30} />
             <span>
-              <small>{donutCaption}</small>
-              <strong style={{ fontSize: donutValueSize }}>{donutValueLabel}</strong>
+              {t('an28PriciestDay')
+                .replace('{day}', String(priciestDay.day))
+                .replace('{amount}', money0(priciestDay.expense))}
             </span>
+            <Icon name="arrowUp" size={13} style={{ transform: 'rotate(90deg)' }} />
           </button>
-
-          <div className="man-legend">
-            {topRows.map(row => {
-              const pct = Math.round(row.amount / totalExpense * 100)
-              const category = categories.find(item => item.id === row.category.id)
-              const budgetUsagePct = category && category.budget > 0 ? Math.min(100, row.amount / category.budget * 100) : null
-              const dimmed = activeFocus !== null && activeFocus !== row.category.id
-              const count = countByCategory[row.category.id] ?? 0
-              return (
-                <button
-                  type="button"
-                  key={row.category.id}
-                  className={`man-legend-row${activeFocus === row.category.id ? ' on' : ''}${dimmed ? ' dim' : ''}`}
-                  aria-pressed={activeFocus === row.category.id}
-                  onClick={() => setFocusCat(prev => prev === row.category.id ? null : row.category.id)}
-                >
-                  <i style={{ background: row.category.color }} />
-                  <div className="man-legend-main">
-                    <strong>{translateCategoryName(row.category, lang)}</strong>
-                    {budgetUsagePct !== null && (
-                      <span className={`man-budget-chip${budgetUsagePct >= 100 ? ' over' : budgetUsagePct >= 80 ? ' warn' : ''}`}>
-                        {t('pctOfBudget').replace('{pct}', String(Math.round(budgetUsagePct)))}
-                      </span>
-                    )}
-                  </div>
-                  <div className="man-legend-amount">
-                    {fmtVal(row.amount, currency)}
-                    <small>{pct}% · {t('txCountShort').replace('{n}', String(count))}</small>
-                  </div>
-                </button>
-              )
-            })}
-            {othersAmount > 0 && (
-              <div className="man-legend-row man-legend-others">
-                <i />
-                <div className="man-legend-main">
-                  <strong>{t('othersLabel')}</strong>
-                  <span>{t('otherCategoriesCount').replace('{n}', String(othersRows.length))}</span>
-                </div>
-                <div className="man-legend-amount">
-                  {fmtVal(othersAmount, currency)}
-                  <small>{Math.round(othersAmount / totalExpense * 100)}%</small>
-                </div>
-              </div>
-            )}
-            {!allExpenseRows.length && <p className="man-empty">{t('noExpensesToAnalyze')}</p>}
-          </div>
-        </div>
-
-        {/* Detalle de la categoría enfocada: aparece al tocar una porción o fila. */}
-        {focusStats && focusRow && (
-          <div className="man-cat-detail">
-            <div className="man-cat-detail-head">
-              <i style={{ background: focusRow.category.color }} />
-              <strong>{translateCategoryName(focusRow.category, lang)}</strong>
-              <b>{t('pctOfTotalShort').replace('{pct}', String(focusStats.pct))}</b>
-            </div>
-            <div className="man-cat-stats">
-              <div className="man-cat-stat">
-                <small>{t('movementsCountLabel')}</small>
-                <strong>{focusStats.count}</strong>
-              </div>
-              <div className="man-cat-stat">
-                <small>{t('averageLabel')}</small>
-                <strong>{fmtVal(focusStats.avg, currency)}</strong>
-              </div>
-              <div className="man-cat-stat">
-                <small>{t('largestLabel')}</small>
-                <strong>{fmtVal(focusStats.max, currency)}</strong>
-              </div>
-            </div>
-            {focusBudgetPct !== null && (
-              <div className="man-cat-detail-budget">
-                <div className="man-cat-detail-budget-track">
-                  <div
-                    className="man-cat-detail-budget-fill"
-                    style={{ width: `${focusBudgetPct}%`, background: focusBudgetPct >= 100 ? 'var(--m-expense)' : focusRow.category.color }}
-                  />
-                </div>
-                <small>{t('pctOfBudget').replace('{pct}', String(focusBudgetPct))}</small>
-              </div>
-            )}
-          </div>
         )}
       </section>
 
-      <AnalyticsFold id="metrics" title={t('analyticsMetricsTitle')} subtitle={t('analyticsMetricsDesc')}>
-        <div className="man-quick-grid">
-          <article className="man-quick-card">
-            <span className="man-chip-label">{t('monthlyFlowMetric')}</span>
-            <strong className={`man-quick-value ${summary.net >= 0 ? 'income' : 'expense'}`}>
-              {fmtVal(summary.net, currency)}
-            </strong>
-            <span className="man-quick-subtle">{t('incomes')} / {t('expenses')}</span>
-          </article>
-
-          {period === 'month' && totalBudget > 0 && onBudgets ? (
-            <button className="man-quick-card" onClick={onBudgets}>
-              <span className="man-chip-label">{t('monthBudget')}</span>
-              <strong className={`man-quick-value ${budgetPct >= 100 ? 'expense' : budgetPct >= 80 ? 'warn' : ''}`}>{budgetPct}%</strong>
-              <div className="man-quick-track">
-                <span
-                  style={{
-                    width: `${Math.min(100, budgetPct)}%`,
-                    background: budgetPct >= 100 ? 'var(--expense)' : budgetPct >= 80 ? 'var(--warn)' : 'var(--income)',
-                  }}
-                />
-              </div>
-            </button>
-          ) : (
-            <article className="man-quick-card">
-              <span className="man-chip-label">{t('savingsRateTitle')}</span>
-              <strong className="man-quick-value income">{Math.round(savingsRate)}%</strong>
-              <span className="man-quick-subtle">{fmtVal(savedAmount, currency)}</span>
-            </article>
-          )}
-
-          <article className="man-quick-card">
-            <span className="man-chip-label">{t('topCategoryLabel')}</span>
-            <strong className="man-quick-value">{topCategory ? translateCategoryName(topCategory.category, lang) : '—'}</strong>
-            <span className="man-quick-subtle">{topCategory ? fmtVal(topCategory.amount, currency) : t('noExpensesToAnalyze')}</span>
-          </article>
-
-          <article className="man-quick-card">
-            <span className="man-chip-label">{t('comparisonLabel')}</span>
-            <strong className={`man-quick-value ${compareNetDeltaPct >= 0 ? 'income' : 'expense'}`}>
-              {showCompare ? `${compareNetDeltaPct >= 0 ? '+' : ''}${compareNetDeltaPct}%` : '—'}
-            </strong>
-            <span className="man-quick-subtle">vs. {compareLabel}</span>
-          </article>
-
-          <article className="man-quick-card">
-            <span className="man-chip-label">{t('netWorthLabel')}</span>
-            <strong className={`man-quick-value ${netWorthNow >= 0 ? 'income' : 'expense'}`}>
-              {fmtVal(netWorthNow, currency)}
-            </strong>
-            {/* SIEMPRE el desglose, aunque no haya deudas. Un numero solo no
-                se puede comprobar: con "Tienes X · Debes Y" el usuario ve de
-                donde sale y detecta el dato que falta. */}
-            <span className="man-quick-subtle">
-              {t('netWorthBreakdownLabel')
-                .replace('{assets}', fmtVal(netWorthSplit.assets, currency))
-                .replace('{liabilities}', fmtVal(netWorthSplit.liabilities, currency))}
+      {/* A9 · El año: su mejor y su peor mes, con el porqué. */}
+      {period === 'year' && yearHighlights && (
+        <div className="an28-card an28-rows">
+          <div className="an28-row">
+            <IconTile icon="star" color="var(--m-income)" size={36} />
+            <span className="an28-row-main"><b>{t('an28BestMonth').replace('{month}', yearHighlights.bestMonth.label)}</b><small>{t('an28BestMonthSub').replace('{amount}', money0(yearHighlights.bestMonth.net))}</small></span>
+          </div>
+          <div className="an28-row">
+            <IconTile icon="alert" color="var(--m-expense)" size={36} />
+            <span className="an28-row-main">
+              <b>{t('an28WorstMonth').replace('{month}', yearHighlights.worstMonth.label)}</b>
+              <small>
+                {money0(yearHighlights.worstMonth.expense)}
+                {(() => { const why = biggestExpense(visTx, yearHighlights.worstMonth.key); return why ? ` · ${t('an28QBiggest').replace('{note}', why.note).replace('{amount}', money0(why.amount))}` : '' })()}
+              </small>
             </span>
-          </article>
+          </div>
+          {allExpenseRows[0] && (
+            <div className="an28-row">
+              <CatBadge category={allExpenseRows[0].category} size={36} />
+              <span className="an28-row-main">
+                <b>{t('an28TopCategory').replace('{name}', translateCategoryName(allExpenseRows[0].category, lang))}</b>
+                <small>
+                  {money0(allExpenseRows[0].amount)}
+                  {(() => { const c = cmpByCat.get(allExpenseRows[0].category.id); return c && c.deltaPct !== null ? ` · ${t(c.deltaPct >= 0 ? 'an28MoreThan' : 'an28LessThan').replace('{pct}', String(Math.abs(c.deltaPct))).replace('{period}', compareLabel)}` : '' })()}
+                </small>
+              </span>
+            </div>
+          )}
         </div>
-      </AnalyticsFold>
-
-      {(showCompare || foldInsights.length > 0) && (
-        <AnalyticsFold
-          id="trends"
-          title={t('quickReadTitle')}
-          subtitle={t('quickReadDesc')}
-          count={foldInsights.length + (showCompare ? categoryComparison.length : 0)}
-        >
-
-          {showCompare && (
-            <div className="man-compare-list">
-              {compareRows.map(row => {
-                const delta = row.prev !== 0
-                  ? Math.round((row.current / row.prev - 1) * 100)
-                  : (row.current !== 0 ? 100 : 0)
-                const isUp = delta >= 0
-                const isGood = isUp === row.goodWhenUp
-                return (
-                  <div key={row.label} className="man-compare-row">
-                    <div className="man-compare-main">
-                      <span>{row.label}</span>
-                      <strong className={row.cls}>{fmtVal(row.current, currency)}</strong>
-                    </div>
-                    <div className="man-compare-side">
-                      <span className={`man-compare-delta ${delta === 0 ? '' : isGood ? 'ok' : 'warn'}`}>
-                        <Icon name={isUp ? 'arrowUp' : 'arrowDn'} size={11} />
-                        {Math.abs(delta)}%
-                      </span>
-                      <small>{fmtVal(row.prev, currency)}</small>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-
-          {showCompare && categoryComparison.length > 0 && (
-            <div className="man-catcompare-list">
-              <p className="man-catcompare-title">{t('categoryComparisonTitle')}</p>
-              {categoryComparison.map(row => {
-                const isUp = row.delta >= 0
-                return (
-                  <div key={row.category.id} className="man-catcompare-row">
-                    <span className="man-catcompare-icon" style={{ color: row.category.color, background: `color-mix(in oklab, ${row.category.color} 16%, transparent)` }}>
-                      <Icon name={row.category.icon} size={15} />
-                    </span>
-                    <div className="man-catcompare-main">
-                      <span>{translateCategoryName(row.category, lang)}</span>
-                      <small>{fmtVal(row.current, currency)}</small>
-                    </div>
-                    <span className={`man-catcompare-delta ${row.delta === 0 ? '' : isUp ? 'warn' : 'ok'}`}>
-                      <Icon name={isUp ? 'arrowUp' : 'arrowDn'} size={11} />
-                      {row.deltaPct === null ? t('newLabel') : `${Math.abs(row.deltaPct)}%`}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-
-          {foldInsights.length > 0 && (
-            <div className="man-insights">
-              {foldInsights.map(insight => (
-                <div key={insight.id} className="man-insight-row">
-                  <span className={`man-insight-icon ${insight.tone}`}>
-                    <Icon name={insight.icon} size={16} />
-                  </span>
-                  <div className="man-insight-copy">
-                    <strong>{insight.title}</strong>
-                    <small>{insight.subtitle}</small>
-                    {insight.action && (
-                      <button className="man-insight-action" onClick={insight.action.onClick}>
-                        {insight.action.label} <Icon name="arrowUp" size={11} style={{ transform: 'rotate(90deg)' }} />
-                      </button>
-                    )}
-                  </div>
-                  <button
-                    className="man-insight-hide"
-                    aria-label={t('hideInsightLabel')}
-                    onClick={() => setHiding(insight)}
-                  >
-                    <Icon name="close" size={14} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </AnalyticsFold>
       )}
 
-      <AnalyticsFold
-        id="evolution"
-        title={period === 'week' ? t('weeklyExpenses') : period === 'year' ? t('incomeVsExpense') : t('last6Months')}
-        subtitle={period === 'week' ? `${weekWindow.start} - ${weekWindow.end}` : t('comparisonLabel')}
-      >
-        <div className="man-bar-chart">
-          {barData.map(d => (
-            <div key={d.label} className="man-bar-col">
-              <div className="man-bar-tracks">
-                {(period !== 'week' || d.income > 0) && (
-                  <div
-                    className="man-bar-income"
-                    style={{ height: `${Math.max(2, d.income / maxBar * 100)}%` }}
-                    title={t('incomeColon').replace('{amount}', fmtVal(d.income, currency))}
-                  />
+      {/* A3 · Lo que hay que mirar. */}
+      {look.length > 0 && (
+        <>
+          <p className="an28-title">{t('an28Look')}</p>
+          <div className="an28-card an28-rows">
+            {look.map(r => (
+              <div key={r.key} className="an28-row">
+                <button className="an28-row-btn" onClick={r.onTap} disabled={!r.onTap}>
+                  <IconTile icon={r.icon} color={r.color} size={36} />
+                  <span className="an28-row-main"><b>{r.title}</b>{r.sub && <small>{r.sub}</small>}</span>
+                  {r.value && <span className={`an28-row-v ${r.valueTone ?? ''}`}>{r.value}</span>}
+                  {r.onTap && !r.value && <Icon name="arrowUp" size={13} className="an28-chev" style={{ transform: 'rotate(90deg)' }} />}
+                </button>
+                {r.onHide && (
+                  <button className="an28-hide" aria-label={t('hideInsightLabel')} onClick={r.onHide}><Icon name="close" size={13} /></button>
                 )}
-                <div
-                  className="man-bar-expense"
-                  style={{ height: `${Math.max(2, d.expense / maxBar * 100)}%` }}
-                  title={t('expenseColon').replace('{amount}', fmtVal(d.expense, currency))}
-                />
               </div>
-              <span className="man-bar-label">{d.label}</span>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </>
+      )}
 
-        {(period !== 'week' || barData.some(d => d.income > 0)) && (
+      {/* A4 · Categorías. */}
+      <p className="an28-title">{t('an28WhereItWent')}{showCompare && <span>{t('an28Vs').replace('{period}', compareLabel)}</span>}</p>
+      <div className="an28-card an28-cats">
+        {shares.length > 0 && (
+          <div className="man-stack" role="img" aria-label={shares.map(sh => `${sh.category ? translateCategoryName(sh.category, lang) : t('anTheRest')} ${sh.pct}%`).join(', ')}>
+            {shares.map(sh => (
+              <i key={sh.category?.id ?? 'rest'} className={sh.category ? undefined : 'rest'} style={{ flexGrow: sh.amount, background: sh.category?.color }} />
+            ))}
+          </div>
+        )}
+        {allExpenseRows.map(row => {
+          const category = categories.find(item => item.id === row.category.id)
+          const budget = category && category.budget > 0 && period === 'month' ? category.budget : 0
+          const over = budget > 0 && row.amount > budget
+          const cmp = cmpByCat.get(row.category.id)
+          const pct = cmp?.deltaPct ?? null
+          return (
+            <button key={row.category.id} type="button" className="an28-cat" onClick={() => setCatOpen(row.category.id)}>
+              <CatBadge category={row.category} size={36} />
+              <span className="an28-row-main">
+                <b>{translateCategoryName(row.category, lang)}</b>
+                <small>
+                  {over && <span className="bad">{t('an28OverBy').replace('{amount}', money0(row.amount - budget))} · </span>}
+                  {Math.round(row.amount / totalExpense * 100)} %
+                  {!over && budget > 0 && ` · ${t('an28LeftOf').replace('{amount}', money0(budget - row.amount))}`}
+                </small>
+              </span>
+              <span className="an28-cat-v">
+                <b>{money0(row.amount)}</b>
+                {showCompare && cmp && (
+                  <small className={cmp.delta > 0 ? 'bad' : cmp.delta < 0 ? 'ok' : ''}>
+                    {Math.abs(cmp.delta) < 1 ? t('an28Same') : pct === null ? t('an28New') : `${cmp.delta > 0 ? '↑' : '↓'} ${Math.abs(pct)} %`}
+                  </small>
+                )}
+              </span>
+            </button>
+          )
+        })}
+        {!allExpenseRows.length && <p className="man-empty">{t('noExpensesToAnalyze')}</p>}
+      </div>
+
+      {/* A5 · Preguntas rápidas. */}
+      {questions.length > 0 && (
+        <>
+          <p className="an28-title">{t('an28Questions')}</p>
+          <div className="an28-questions">
+            {questions.map(q => <button key={q.q} onClick={() => setQuestion(q)}>{q.q}</button>)}
+          </div>
+        </>
+      )}
+
+      <div style={{ height: 'calc(12px + env(safe-area-inset-bottom))' }} />
+
+      {/* ── Hojas ─────────────────────────────────────────────────── */}
+      {scopeOpen && (
+        <NxSheet title={t('an28ScopeTitle')} onClose={() => setScopeOpen(false)}>
+          <div className="nx-list">
+            {([
+              { id: 'all' as const, icon: 'brand' as IconName, label: t('scopeAll'), sub: t('an28ScopeAllSub') },
+              { id: 'personal' as const, icon: 'user' as IconName, label: t('scopePersonal'), sub: t('scopePersonalNote') },
+              { id: 'business' as const, icon: 'briefcase' as IconName, label: scope === 'business' ? scopeLabel : (businesses.filter(b => !b.archivedAt).length === 1 ? businesses.find(b => !b.archivedAt)!.name : t('scopeBusiness')), sub: t('scopeBusinessNote') },
+            ]).map(o => (
+              <button key={o.id} className="an28-pick" onClick={() => { cambiarScope(o.id); setScopeOpen(false) }}>
+                <IconTile icon={o.icon} color="var(--m-primary)" size={34} />
+                <span className="an28-row-main"><b>{o.label}</b><small>{o.sub}</small></span>
+                {scope === o.id && <Icon name="check" size={16} />}
+              </button>
+            ))}
+          </div>
+        </NxSheet>
+      )}
+
+      {baseOpen && (
+        <NxSheet title={t('an28BaseTitle')} onClose={() => setBaseOpen(false)}>
+          <div className="nx-list">
+            {([
+              { id: 'prev' as const, label: t('anCmpPrev'), sub: monthLabel(monthsBack(1), dateLocale(lang)) },
+              { id: 'lastYear' as const, label: t('anCmpLastYear'), sub: monthLabel(monthsBack(12), dateLocale(lang)) },
+              { id: 'avg' as const, label: t('anCmpAvg'), sub: t('anCmpAvgSub') },
+            ]).map(o => (
+              <button key={o.id} className="an28-pick" onClick={() => { setCompareBase(o.id); setBaseOpen(false) }}>
+                <span className="an28-row-main"><b>{o.label}</b><small>{o.sub}</small></span>
+                {compareBase === o.id && <Icon name="check" size={16} />}
+              </button>
+            ))}
+          </div>
+        </NxSheet>
+      )}
+
+      {detail === 'pace' && pace && (
+        <NxSheet title={t('anPaceTitle')} sub={pace.projected !== null ? t('anPaceProjection').replace('{amount}', money0(pace.projected)) : undefined} onClose={() => setDetail(null)}>
+          <PaceChart
+            cur={daily.map((_, i) => daily.slice(0, i + 1).reduce((s, p) => s + p.expense, 0))}
+            prev={prevDaily.map((_, i) => prevDaily.slice(0, i + 1).reduce((s, p) => s + p.expense, 0))}
+            pace={pace}
+          />
+          <div className="man-bar-legend">
+            <span><i style={{ background: 'var(--m-primary)' }} />{monthLabel(mkey, dateLocale(lang))}</span>
+            <span><i className="dash" />{compareLabel}</span>
+          </div>
+        </NxSheet>
+      )}
+
+      {detail === 'evolution' && (
+        <NxSheet title={period === 'year' ? t('incomeVsExpense') : t('weeklyExpenses')} onClose={() => setDetail(null)}>
+          <div className="man-bar-chart">
+            {barData.map(d => (
+              <div key={d.label} className="man-bar-col">
+                <div className="man-bar-tracks">
+                  {(period !== 'week' || d.income > 0) && <div className="man-bar-income" style={{ height: `${Math.max(2, d.income / maxBar * 100)}%` }} />}
+                  <div className="man-bar-expense" style={{ height: `${Math.max(2, d.expense / maxBar * 100)}%` }} />
+                </div>
+                <span className="man-bar-label">{d.label}</span>
+              </div>
+            ))}
+          </div>
           <div className="man-bar-legend">
             <span><i style={{ background: 'var(--income)' }} />{t('incomes')}</span>
             <span><i style={{ background: 'var(--expense)' }} />{t('expenses')}</span>
           </div>
-        )}
-      </AnalyticsFold>
-
-      {netWorthRolling.length >= 2 && (
-        <AnalyticsFold id="networth" title={t('netWorthTimelineTitle')}>
-          <NetWorthHistoryChart history={netWorthRolling} projected={netWorthProjected} currency={currency} lang={lang} fmtAmount={fmtVal} />
-        </AnalyticsFold>
+        </NxSheet>
       )}
 
-      {allExpenseRows.length > 0 && (
-        <AnalyticsFold
-          id="categories"
-          title={t('topCategoriesTitle')}
-          subtitle={t('topExpenseOfPeriod')}
-          count={allExpenseRows.length}
-        >
-          <div className="man-category-list">
-            {allExpenseRows.map((row, index) => {
-              const category = categories.find(item => item.id === row.category.id)
-              const pct = row.amount / totalExpense * 100
-              return (
-                <div key={row.category.id} className="man-cat-row">
-                  <div className="man-cat-top">
-                    <div className="man-cat-meta">
-                      <span className="man-cat-rank">{index + 1}</span>
-                      <span
-                        className="man-cat-icon"
-                        style={{
-                          color: row.category.color,
-                          background: `color-mix(in oklab, ${row.category.color} 16%, transparent)`,
-                        }}
-                      >
-                        <Icon name={row.category.icon} size={18} />
-                      </span>
-                      <span className="man-cat-name">{translateCategoryName(row.category, lang)}</span>
-                    </div>
-                    <strong>{fmtVal(row.amount, currency)}</strong>
-                  </div>
-                  <div className="man-cat-bar">
-                    <div style={{ width: `${pct}%`, background: row.category.color }} />
-                  </div>
-                  {category && category.budget > 0 && (
-                    <span className={`man-cat-budget${row.amount > category.budget ? ' over' : ''}`}>
-                      {row.amount > category.budget
-                        ? t('overBudgetAmount').replace('{amount}', fmtVal(row.amount - category.budget, currency))
-                        : t('availableAmount').replace('{amount}', fmtVal(category.budget - row.amount, currency))}
-                    </span>
-                  )}
-                </div>
-              )
-            })}
+      {detail === 'days' && (
+        <NxSheet title={t('anDaysTitle')} sub={weekdays && weekdays.weekdayAvg > 0 ? t('anDaysWeekend').replace('{weekend}', money0(weekdays.weekendAvg)).replace('{weekday}', money0(weekdays.weekdayAvg)) : undefined} onClose={() => setDetail(null)}>
+          <HeatCalendar points={daily} lang={lang} compact onPick={d => { setDetail(null); setDayOpen(d) }} />
+        </NxSheet>
+      )}
+
+      {detail === 'floor' && (
+        <NxSheet title={t('anFloorTitle')} sub={t('anFloorNote').replace('{amount}', money0(fixedVar.fixed))} onClose={() => setDetail(null)}>
+          <div className="man-floor-bar">
+            <i className="fixed" style={{ flexGrow: fixedVar.fixed }} />
+            <i className="variable" style={{ flexGrow: fixedVar.variable }} />
           </div>
-        </AnalyticsFold>
+          <div className="man-floor-legend">
+            <span><i className="fixed" />{t('anFixed')} <b>{money0(fixedVar.fixed)}</b></span>
+            <span><i className="variable" />{t('anVariable')} <b>{money0(fixedVar.variable)}</b></span>
+          </div>
+        </NxSheet>
       )}
 
-      {/* Exportar e importar — compacto, sin robar espacio al análisis */}
-      <div className="man-export-bar">
-        <button className="man-export-btn" onClick={() => setExportOpen(true)}>
-          <Icon name="download" size={16} />
-          {t('exportData')}
-        </button>
-        {onImport && (
-          <button className="man-export-btn ghost" onClick={onImport}>
-            <Icon name="upload" size={16} />
-            {t('importLabel')}
-          </button>
-        )}
-      </div>
+      {detail === 'sources' && yearHighlights && (
+        <NxSheet title={t('incomeSourcesTitle')} onClose={() => setDetail(null)}>
+          <div className="nx-list">
+            {yearHighlights.incomeSources.map(row => (
+              <div key={row.category.id} className="an28-pick">
+                <CatBadge category={row.category} size={34} />
+                <span className="an28-row-main"><b>{translateCategoryName(row.category, lang)}</b></span>
+                <b className="ok">{money0(row.amount)}</b>
+              </div>
+            ))}
+          </div>
+        </NxSheet>
+      )}
 
-      <div style={{ height: 'calc(12px + env(safe-area-inset-bottom))' }} />
+      {question && (
+        <NxSheet title={question.q} onClose={() => setQuestion(null)}>
+          <b className="an28-answer">{question.answer}</b>
+          <p className="an28-sub">{question.sub}</p>
+        </NxSheet>
+      )}
+
+      {dayOpen && (
+        <DaySheet date={dayOpen} txs={visTx} currency={currency} lang={lang} onClose={() => setDayOpen(null)} onEditTx={onEditTx} />
+      )}
+      {catOpen && categories.find(c => c.id === catOpen) && (
+        <CategorySheet
+          category={categories.find(c => c.id === catOpen)!}
+          allTx={visTx}
+          periodTx={scopedTx}
+          mkey={period === 'year' ? `${year}-12` : mkey}
+          currency={currency}
+          lang={lang}
+          onClose={() => setCatOpen(null)}
+          onEditTx={onEditTx}
+        />
+      )}
 
       {exportOpen && (
-        <SheetPortal>
-          <div ref={exportRef} className="mobile-detail-sheet" role="dialog" aria-modal="true" aria-label={t('exportData')} onClick={() => setExportOpen(false)}>
-            <section className="man-export-sheet" onClick={e => e.stopPropagation()}>
-              <header>
-                <span>{t('exportData')}</span>
-                <button aria-label={t('close')} onClick={() => setExportOpen(false)}><Icon name="close" size={18} /></button>
-              </header>
-              <button className="man-export-row" disabled={exporting !== null} onClick={() => void runExport('png')}>
-                <span className="man-export-ic" style={exportIcon(EXPORT_COLORS.import)}><Icon name="camera" size={20} /></span>
-                <div><b>{t('exportImageLabel')}</b><small>{exporting === 'png' ? t('generatingImageEllipsis') : t('shareAsImageHint')}</small></div>
-              </button>
-              <button className="man-export-row" disabled={exporting !== null} onClick={() => void runExport('pdf')}>
-                <span className="man-export-ic" style={exportIcon(EXPORT_COLORS.pdf)}><Icon name="book" size={20} /></span>
-                <div><b>{t('monthStatementPdf')}</b><small>{exporting === 'pdf' ? t('generatingPdf') : monthLabel(mkey, dateLocale(lang))}</small></div>
-              </button>
-              <button className="man-export-row" disabled={exporting !== null} onClick={() => void runExport('excel')}>
-                <span className="man-export-ic" style={{ background: '#35d0a222', color: 'var(--income)' }}><Icon name="trend" size={20} /></span>
-                <div><b>{t('fullReportExcelTitle')}</b><small>{exporting === 'excel' ? t('generatingExcel') : t('movementsAccountsCategories')}</small></div>
-              </button>
-              <button className="man-export-row" disabled={exporting !== null} onClick={() => void runExport('csv')}>
-                <span className="man-export-ic" style={exportIcon(EXPORT_COLORS.csv)}><Icon name="fileJson" size={20} /></span>
-                <div><b>{t('fullReportCsvTitle')}</b><small>{exporting === 'csv' ? t('generatingCsv') : t('csvReportReady')}</small></div>
-              </button>
-              {onImport && (
-                <button className="man-export-row" onClick={() => { setExportOpen(false); onImport() }}>
-                  <span className="man-export-ic" style={exportIcon(EXPORT_COLORS.import)}><Icon name="upload" size={20} /></span>
-                  <div><b>{t('importBankStatement')}</b><small>{t('csvOfxFromBanks')}</small></div>
-                </button>
-              )}
-            </section>
-          </div>
-        </SheetPortal>
+        <ExportSheet
+          mkey={mkey}
+          captureId="an28-share-card"
+          captureName={`cuadre-${period}-${mkey}`}
+          onClose={() => setExportOpen(false)}
+          preview={(hide: boolean) => (
+            <div className="an28-sharecard" id="an28-share-card">
+              <div className="an28-sharecard-top"><b>Cuadre</b><span>{heroLabel}</span></div>
+              <small>{summary.net >= 0 ? t('an28ShareLeft') : t('an28ShareOver')}</small>
+              <strong>{hide ? (rate !== null ? `${Math.round(rate)} %` : '—') : money0(Math.abs(summary.net))}</strong>
+              <div className="an28-sharecard-trio">
+                <span><small>{t('anIn')}</small><b>{hide ? '·····' : money0(summary.income)}</b></span>
+                <span><small>{t('anOut')}</small><b>{hide ? `${summary.income > 0 ? Math.round((summary.expense / summary.income) * 100) : 0} %` : money0(summary.expense)}</b></span>
+                <span><small>{t('an28ShareRate')}</small><b>{rate !== null ? `${Math.round(rate)} %` : '—'}</b></span>
+              </div>
+              {allExpenseRows[0] && <small className="an28-sharecard-foot">{t('an28ShareTop').replace('{name}', translateCategoryName(allExpenseRows[0].category, lang))}</small>}
+            </div>
+          )}
+        />
       )}
 
       {hiding && (
@@ -1246,8 +1003,6 @@ export function MobileAnalytics({ mkey, onBudgets, onImport, onEditTx, initialPe
               <button
                 className="mnc-choice-btn"
                 onClick={() => {
-                  // La sugerencia de suscripción se rechaza por su clave
-                  // compartida, para que tampoco vuelva en Suscripciones.
                   if (hiding.subscriptionKey) dismissSubscription(hiding.subscriptionKey)
                   else hideInsight(hiding.dismissKey)
                   setHiding(null)

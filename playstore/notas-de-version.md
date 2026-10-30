@@ -36,6 +36,72 @@ Si hay que recortar, se quitan ideas enteras —la menos visible primero— en
 vez de dejar frases a medias.
 
 ---
+## 2.4.0 · versionCode 2003001
+
+### Español (ES) · 472 caracteres
+
+```
+Negocio ahora tiene tres pestañas: Clientes, Cobros y Ganancia.
+
+Clientes: búscalos, fíltralos y elige varios para cambiarles el precio de una vez. Cada uno tiene su historia de pagos.
+Estrellas: quien te trae a otro cliente paga menos, y la estrella se pone sola.
+Servicios: se pagan solos el día que toca, o te avisan. Une los repetidos en uno.
+Ganancia: ahora sale de lo que cobras y pagas, y muestra los próximos meses.
+
+Los avisos del teléfono vuelven a actualizarse.
+```
+
+### English (EN) · 448 characters
+
+```
+Business now has three tabs: Clients, Payments and Profit.
+
+Clients: search, filter and select several to change their price at once. Each one has a payment history.
+Stars: whoever brings you another client pays less, and the star is added automatically.
+Services: they pay themselves on the due day, or remind you. Merge duplicates into one.
+Profit: now based on what you collect and pay, with the coming months.
+
+Phone notifications update again.
+```
+
+### Para la ficha de Seguridad de datos
+
+Sin cambios respecto a la 2.3.0. Estrellas, pagos automáticos y plantillas viven en el dispositivo y no salen de él.
+
+---
+## 2.3.0 · versionCode 2002001
+
+### Español (ES) · 497 caracteres
+
+```
+La ganancia de tus negocios ya cuadra: «Has puesto» suma solo lo que pagaste por sus servicios, y puedes verla en pesos o en dólares.
+
+- Los clientes salen bajo su servicio y cada uno dice si está al día o debe.
+- Un servicio admite varias cuentas y te dice cuánto cuesta cada plaza y cuándo toca pagar.
+- El + en Negocio crea clientes, cobros o servicios.
+- Análisis abre con lo que entró, salió y queda, y compara dos meses cualesquiera.
+
+Al tocar un formulario ya no se mueve lo que hay detrás.
+```
+
+### English (EN) · 489 characters
+
+```
+Your business profit now adds up: "You've put in" counts only what you paid for its services, and you can view it in pesos or dollars.
+
+- Clients sit under their service, each showing if they're paid up or owe.
+- A service can have several accounts and shows the cost per slot and when to pay.
+- The + in Business creates clients, charges or services.
+- Analytics opens with what came in, went out and is left, and compares any two months.
+
+Tapping a form no longer moves what's behind it.
+```
+
+### Para la ficha de Seguridad de datos
+
+Sin cambios respecto a la 2.2.0. Nada nuevo sale del dispositivo.
+
+---
 ## 2.2.0 · versionCode 2001001
 
 ### Español (ES)

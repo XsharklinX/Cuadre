@@ -3,6 +3,7 @@ import {
   type Charge, type Client,
 } from './clients'
 import { monthKey } from './helpers'
+import { applyDiscount } from './referrals'
 
 /**
  * EL GENERADOR DE COBROS Y EL RESUMEN DE «POR COBRAR».
@@ -53,6 +54,11 @@ export function pendingCharges(
   clients: Client[],
   existing: Charge[],
   today: string,
+  /**
+   * El descuento por estrellas de cada cliente, en %. Se calcula fuera
+   * porque depende de las reglas de su negocio (ver `referrals.ts`).
+   */
+  discountFor?: (client: Client) => number,
 ): Array<Omit<Charge, 'id'>> {
   const hoy = parseMs(today)
   if (hoy === null) return []
@@ -63,7 +69,8 @@ export function pendingCharges(
 
   const nuevos: Array<Omit<Charge, 'id'>> = []
   for (const client of clients) {
-    if (!client.active) continue
+    if (!client.active || client.deletedAt) continue
+    const descuento = discountFor ? Math.max(0, Math.min(100, discountFor(client))) : 0
     // Nunca antes de que el cliente existiera: generar hacia atrás noventa días
     // le inventaría deudas a quien acabas de registrar.
     const nacido = iso(client.createdAt)
@@ -78,7 +85,10 @@ export function pendingCharges(
         // El TOTAL de sus servicios, no su `amount`: con varios servicios
         // `amount` deja de ser la verdad, y cobrar por el seria cobrarle de
         // menos todos los meses sin que nadie lo note.
-        amount: clientTotalAmount(client),
+        amount: applyDiscount(clientTotalAmount(client), descuento),
+        // Guardado en el cobro, no recalculado: si una estrella caduca
+        // mañana, lo que ya se le pidió no cambia.
+        ...(descuento > 0 ? { discountPct: descuento } : {}),
         paid: 0,
         txIds: [],
         paidAt: 0,

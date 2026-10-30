@@ -332,8 +332,21 @@ class LocalRemindersPlugin(private val activity: Activity) : Plugin(activity) {
         val incomeIcon = drawableId("ic_action_income")
         // Ícono grande (foto del app) en el cuerpo expandido — sin esto la
         // notificación se ve pelada, solo texto sin ninguna marca visual.
+        /*
+         * REDUCIDO AL TAMAÑO DEL AVISO, no a resolucion completa.
+         * Play Console avisaba de un BitmapFactory sin opciones: el icono del
+         * launcher viene en xxxhdpi y aqui se pinta en unos 64dp. Se mira
+         * primero su tamaño y se decodifica a la potencia de dos que basta.
+         */
         val largeIcon = try {
-            android.graphics.BitmapFactory.decodeResource(activity.resources, activity.applicationInfo.icon)
+            val res = activity.resources
+            val target = res.getDimensionPixelSize(android.R.dimen.notification_large_icon_width).coerceAtLeast(1)
+            val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            android.graphics.BitmapFactory.decodeResource(res, activity.applicationInfo.icon, bounds)
+            var sample = 1
+            while (bounds.outWidth / (sample * 2) >= target && bounds.outHeight / (sample * 2) >= target) sample *= 2
+            val options = android.graphics.BitmapFactory.Options().apply { inSampleSize = sample }
+            android.graphics.BitmapFactory.decodeResource(res, activity.applicationInfo.icon, options)
         } catch (_: Exception) {
             null
         }

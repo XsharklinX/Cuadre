@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Icon } from '@/components/ui/Icon'
 import { toast } from '@/components/ui/Toast'
-import { accountCurrency, dateLocale, fmt } from '@/data/helpers'
+import { accountCurrency, dateLocale } from '@/data/helpers'
 import { useSettings } from '@/store/settings'
 import { useFmt } from '@/hooks/useFmt'
 import { useFinance } from '@/store/finance'
@@ -9,14 +9,15 @@ import { creditCardsAsDebts } from '@/data/creditCard'
 import {
   useDebt, simulatePayoff, debtProgress, monthlyPaymentPlan, payoffTargetId,
   freedomDate, isOwed, lastPaymentDate, monthsLabel,
-  type Debt, type DebtDirection, type DebtKind, type PayoffMethod,
+  type Debt, type DebtKind, type PayoffMethod,
 } from '@/store/debt'
 import {
-  dueStatus, installmentsLeft, nextDueDate, paymentForTerm, type DueStatus,
+  dueStatus,
 } from '@/data/debtSchedule'
 import { localToday } from '@/data/helpers'
-import { MobileDatePicker } from './MobileDatePicker'
-import { DayOfMonthSheet } from './MobileNumberSheets'
+import { DayOfMonthSheet, PercentSheet } from './MobileNumberSheets'
+import { IconTile, NxRow, NxSheet, Phrase } from '@/components/ui/Phrase'
+import { SheetSelectList } from '@/components/ui/SheetSelect'
 import { MobileTextSheet } from './MobileTextSheet'
 import { playConfirmSound, playDeleteSound, playSuccessHaptic } from '@/lib/sound'
 import { deleteWithUndo } from '@/lib/undoDelete'
@@ -45,23 +46,9 @@ const KIND_LABEL = (t: ReturnType<typeof useT>): Record<DebtKind, string> => ({
   store: t('debtKindStore'), personal: t('debtKindPersonal'),
 })
 
-const KIND_ICON: Record<DebtKind, Parameters<typeof Icon>[0]['name']> = {
+/** El icono del tipo: un préstamo del banco y lo que le debes a tu primo no se parecen. */
+const KIND_ICON: Record<DebtKind, Parameters<typeof IconTile>[0]['icon']> = {
   loan: 'landmark', card: 'cards', store: 'bag', personal: 'heart',
-}
-
-function DueBadge({ debt, today }: { debt: Debt; today: string }) {
-  const t = useT()
-  const status: DueStatus = dueStatus(debt.dueDay, today, lastPaymentDate(debt))
-  if (status === 'none') return null
-  if (status === 'ok') {
-    return <span className="mdebt-due ok">{t('debtPaidThisCycle')}</span>
-  }
-  const due = nextDueDate(debt.dueDay!, today)
-  const days = Math.round((new Date(`${due}T00:00:00`).getTime() - new Date(`${today}T00:00:00`).getTime()) / 86_400_000)
-  const label = status === 'due-today' ? t('debtDueTodayLabel')
-    : status === 'overdue' ? t('debtOverdueLabel')
-    : t('debtDueSoonLabel').replace('{n}', String(days))
-  return <span className={`mdebt-due ${status}`}><Icon name="calendar" size={11} /> {label}</span>
 }
 
 export function MobileDebt() {
@@ -130,279 +117,167 @@ export function MobileDebt() {
   // para que arrastrar tenga rango útil sin llegar a cifras absurdas.
   const extraMax = Math.max(10000, Math.ceil((debts.reduce((s, d) => s + d.minPayment, 0) * 3) / 1000) * 1000)
 
+  const kinds = KIND_LABEL(t)
+  const locale = dateLocale(lang)
+  const monthName = (months: number) => {
+    const iso = freedomDate(months)
+    const s = iso ? new Date(`${iso}T00:00:00`).toLocaleDateString(locale, { month: 'long', year: 'numeric' }) : ''
+    return s.charAt(0).toUpperCase() + s.slice(1)
+  }
+  const shortMonth = (months: number) => {
+    const iso = freedomDate(months)
+    return iso ? new Date(`${iso}T00:00:00`).toLocaleDateString(locale, { month: 'short', year: 'numeric' }) : ''
+  }
+  const [detail, setDetail] = useState<Debt | null>(null)
+
+  /*
+   * D1 · DEUDAS: UNA LÍNEA DE TIEMPO HASTA QUEDAR LIBRE.
+   *
+   * Antes las tarjetas salían con un velo gris que las hacía parecer
+   * deshabilitadas, una franja «Pagar» pegada al lado, la cifra roja enorme y
+   * el plan, el extra y lo que te deben mezclados. Ahora: la fecha en que
+   * quedas libre en grande; una línea de tiempo con un punto por deuda en el
+   * mes en que la terminas; las deudas en filas planas en el orden en que
+   * conviene pagarlas; el pago extra como deslizador que mueve la fecha; y lo
+   * que te deben, aparte, al final.
+   */
   if (all.length === 0) return (
-    <div className="mdebt-root">
-      <div className="mdebt-empty">
-        <Icon name="dollar" size={44} style={{ opacity: .18 }} />
-        <p>{t('noDebtsRegistered')}</p>
-        <small>{t('addDebtsHint')}</small>
-        <button className="mdebt-add-btn" onClick={() => setEditing('new')}>
-          <Icon name="plus" size={16} /> {t('addDebt')}
-        </button>
+    <div className="mdebt-root nx">
+      <div className="nx-hero">
+        <span className="nx-serif nxd-empty">{t('noDebtsRegistered')}</span>
+        <p className="nx-note">{t('addDebtsHint')}</p>
+        <button className="nx-btn pri nxd-add" onClick={() => setEditing('new')}>{t('addDebt')}</button>
       </div>
-      {editing && (
-        <DebtSheet debt={undefined} onClose={() => setEditing(null)}
-          onSave={d => { addDebt(d); setEditing(null) }} />
-      )}
+      {editing && <DebtPhraseSheet debt={undefined} onClose={() => setEditing(null)} onSave={d => { addDebt(d); setEditing(null) }} />}
     </div>
   )
 
+  const finished = active.finishedAt ?? {}
+  const maxMonths = Math.max(1, active.months)
+
   return (
-    <div className="mdebt-root">
-
-      {/*
-        ══════════════════════════════════════════════════════════════
-        EL HÉROE.
-
-        Antes esto era texto centrado sobre un degradado suave: la pantalla
-        empezaba en gris y no se veía dinero hasta la mitad. Ahora es un panel
-        con peso propio — la fecha de libertad enorme, el total debajo, y el
-        anillo de progreso a la derecha con el porcentaje dentro.
-
-        El anillo y no otra barra: en una pantalla que ya tiene tres barras
-        (progreso global, composición y una por deuda), una cuarta se pierde.
-        Un círculo se lee de reojo y no compite con nada.
-        ══════════════════════════════════════════════════════════════
-      */}
-      {debts.length > 0 && <>
-      <div className="mdebt-hero">
-        <div className="mdebt-hero-main">
-          <span className="mdebt-hero-eyebrow">{freeAt ? t('freeInLabel') : t('keepPayingLabel')}</span>
-          {freeAt ? (
-            <strong className="mdebt-hero-date">
-              {new Date(`${freeAt}T00:00:00`).toLocaleDateString(dateLocale(lang), { month: 'long', year: 'numeric' })}
-            </strong>
-          ) : (
-            <strong className="mdebt-hero-date">{monthsLabel(active.months, t)}</strong>
-          )}
-          <span className="mdebt-hero-owe">{fmtVal(totalDebt, currency)}</span>
-        </div>
-
-        {/* Anillo de progreso. `strokeDasharray` sobre una circunferencia
-            conocida: sin JS de animación y sin dependencias. */}
-        <svg className="mdebt-ring" viewBox="0 0 84 84" aria-hidden="true">
-          <circle className="mdebt-ring-track" cx="42" cy="42" r="36" />
-          <circle
-            className="mdebt-ring-fill"
-            cx="42" cy="42" r="36"
-            strokeDasharray={`${(paidPct / 100) * 2 * Math.PI * 36} ${2 * Math.PI * 36}`}
-          />
-          <text className="mdebt-ring-pct" x="42" y="42">{paidPct}%</text>
-          <text className="mdebt-ring-cap" x="42" y="55">{t('paidLabelShort')}</text>
-        </svg>
-      </div>
-
-      {/*
-        DE QUÉ ESTÁ HECHA TU DEUDA — ahora con nombres, no una barra muda.
-
-        Un total no dice nada del reparto: RD$ 80.000 puede ser una deuda
-        enorme o cinco medianas, y lo que toca hacer en cada caso es distinto.
-        La barra es gruesa y va etiquetada con la mayor, para que se entienda
-        sin tener que cruzarla con la lista de abajo.
-      */}
-      {debts.length > 1 && totalDebt > 0 && (
-        <div className="mdebt-mix-block">
-          <div className="mdebt-mix" aria-hidden="true">
-            {[...debts].sort((a, b) => b.balance - a.balance).map(d => (
-              <i key={d.id} style={{ width: `${(d.balance / totalDebt) * 100}%`, background: d.color }} />
-            ))}
-          </div>
-          <div className="mdebt-mix-legend">
-            {[...debts].sort((a, b) => b.balance - a.balance).slice(0, 3).map(d => (
+    <div className="mdebt-root nx">
+      {debts.length > 0 && (
+        <div className="nx-hero">
+          <small>{freeAt ? t('freeInLabel') : t('keepPayingLabel')}</small>
+          <span className="nx-serif nxd-date">{freeAt ? monthName(active.months) : monthsLabel(active.months, t)}</span>
+          <small>
+            {fmtVal(totalDebt, currency)} · {t('nxdPaidPct').replace('{pct}', String(Math.max(0, paidPct)))}
+            {active.totalInterest > 0 && ` · ${t('nxdInterestTotal').replace('{amount}', fmtVal(active.totalInterest, currency))}`}
+          </small>
+        <div className="nxd-timeline" aria-hidden="true">
+          <span className="nxd-line" />
+          <span className="nxd-pt start" style={{ left: 0 }} />
+          <span className="nxd-lbl bottom" style={{ left: 0 }}>{t('today')}</span>
+          {orderedDebts.map((d, i) => {
+            const m = finished[d.id] ?? active.months
+            const left = `${Math.min(100, (m / maxMonths) * 100)}%`
+            return (
               <span key={d.id}>
-                <i style={{ background: d.color }} />
-                {d.name} · {Math.round((d.balance / totalDebt) * 100)}%
+                <span className="nxd-pt" style={{ left, background: d.color }} />
+                <span className={`nxd-lbl ${i % 2 ? 'bottom' : 'top'}${m / maxMonths > .7 ? ' end' : ''}`} style={{ left }}>
+                  {shortMonth(m)} · {d.name}
+                </span>
               </span>
-            ))}
-          </div>
+            )
+          })}
+        </div>
         </div>
       )}
 
-      {/* Estrategia, sin jerga */}
-      <div className="mdebt-plan">
-        <button className={method === 'snowball' ? 'on' : ''} aria-pressed={method === 'snowball'} onClick={() => setMethod('snowball')}>
-          <b>{t('planImpulso')}</b><small>{t('planImpulsoDesc')}</small>
-        </button>
-        <button className={method === 'avalanche' ? 'on' : ''} aria-pressed={method === 'avalanche'} onClick={() => setMethod('avalanche')}>
-          <b>{t('planInteres')}</b><small>{t('planInteresDesc')}</small>
-        </button>
-      </div>
-
-      {/* Este mes paga */}
-      <div className="mdebt-card">
-        <div className="mdebt-card-title">{t('thisMonthPayLabel')}</div>
-        {plan.map(line => {
-          const debt = debts.find(d => d.id === line.id)
-          if (!debt) return null
-          return (
-            <div key={line.id} className="mdebt-pay-row">
-              <span className="mdebt-pay-dot" style={{ background: debt.color }} />
-              <span className="mdebt-pay-name">
-                {debt.name}
-                {line.isTarget && <span className="mdebt-pay-target">{t('targetTag')}</span>}
-              </span>
-              <span className="mdebt-pay-amt">
-                {fmt(line.amount, currency)}
-                <small>{line.isTarget && extraPayment > 0 ? t('minPlusExtra') : t('minOnly')}</small>
-              </span>
-            </div>
-          )
-        })}
-        <div className="mdebt-pay-total">
-          <span>{t('monthTotalLabel')}</span>
-          <b>{fmtVal(totalMonthPay, currency)}</b>
-        </div>
-      </div>
-
-      {/* Extra: deslizador que mueve la fecha */}
-      <div className="mdebt-card">
-        <div className="mdebt-card-title">{t('extraMonthlyPayment')}</div>
-        <div className="mdebt-extra">
-          <div className="mdebt-extra-top">
-            <span>{t('aboveMinimums')}</span>
-            <b>{fmt(extraPayment, currency)}</b>
-          </div>
-          <input
-            type="range" min={0} max={extraMax} step={500}
-            value={Math.min(extraPayment, extraMax)}
-            aria-label={t('extraMonthlyPayment')}
-            onChange={e => setExtraPayment(Number(e.target.value))}
-          />
-          <span className="mdebt-extra-note">
-            {monthsSaved > 0
-              ? t('extraFreesMonths').replace('{n}', String(monthsSaved))
-              : t('extraPromptHint')}
-          </span>
-        </div>
-      </div>
-
-      </>}
-
-      {/* Deudas con progreso, en orden de pago */}
-      <div className="mdebt-section-title">
-        {t('yourDebtsInOrder')}
-        <button className="mdebt-add-inline" onClick={() => setEditing('new')}>
-          <Icon name="plus" size={14} /> {t('add')}
-        </button>
-      </div>
-      <div className="mdebt-list">
-        {orderedDebts.map(debt => {
-          const prog = Math.round(debtProgress(debt) * 100)
-          return (
-            <div
-              key={debt.id}
-              className={`mdebt-debt owed${debt.id === targetId ? ' target' : ''}`}
-              style={{ '--debt': debt.color } as React.CSSProperties}
-            >
-              <button
-                className="mdebt-debt-main"
-                onClick={() => { if (!isDerived(debt.id)) setEditing(debt) }}
-                disabled={isDerived(debt.id)}
-              >
-                {/*
-                  LA CABECERA, con el icono del tipo a tamaño de verdad.
-                  Antes era un punto de 11px que se perdía entre el texto; un
-                  préstamo del banco y lo que le debes a tu primo se veían
-                  idénticos.
-                */}
-                <div className="mdebt-debt-head">
-                  <span className="mdebt-kind">
-                    <Icon name={debt.kind ? KIND_ICON[debt.kind] : isDerived(debt.id) ? 'cards' : 'dollar'} size={17} />
-                  </span>
-                  <span className="mdebt-debt-id">
-                    <b>{debt.name}</b>
-                    <small>
-                      {isDerived(debt.id) ? t('fromCardBadge')
-                        : debt.counterparty ? debt.counterparty
-                        : debt.kind ? KIND_LABEL(t)[debt.kind]
-                        : t('debtDirectionOwed')}
-                      {debt.rate > 0 && <> · {debt.rate}%</>}
+      {debts.length > 0 && (
+        <>
+          <p className="nx-label">
+            {t('nxdPayFirst')}
+            <button onClick={() => setEditing('new')}>+ {t('nxdDebt')}</button>
+          </p>
+          <div className="nx-list">
+            {orderedDebts.map(d => {
+              const st = dueStatus(d.dueDay, today, lastPaymentDate(d))
+              const meta = [
+                d.rate > 0 ? `${d.rate} %` : null,
+                d.dueDay ? t('nxdDueDay').replace('{d}', String(d.dueDay)) : null,
+                d.minPayment > 0 ? t('nxdMin').replace('{amount}', fmtVal(d.minPayment, currency)) : null,
+              ].filter(Boolean).join(' · ')
+              return (
+                <div key={d.id} className="nxd-row">
+                  <IconTile icon={KIND_ICON[d.kind ?? 'loan']} color={d.color} />
+                  <button className="nxd-row-main" onClick={() => setDetail(d)}>
+                    <b>{d.name}{d.id === targetId && <em>{t('targetTag')}</em>}</b>
+                    <small className={st === 'overdue' ? 'bad' : st === 'due-soon' || st === 'due-today' ? 'warn' : ''}>
+                      {meta || (d.kind ? kinds[d.kind] : '')}
+                      {st === 'overdue' && ` · ${t('nxdOverdue')}`}
                     </small>
-                  </span>
-                  {debt.id === targetId && (
-                    <span className="mdebt-target-flag">{t('targetTag')}</span>
-                  )}
+                    <span className="nx-thin"><i style={{ width: `${Math.round(debtProgress(d) * 100)}%`, background: d.color }} /></span>
+                  </button>
+                  <span className="nxd-amt">{fmtVal(d.balance, currency)}</span>
+                  <button className="nx-link nxd-pay" onClick={() => setPaying(d)}>{t('nxdPay')}</button>
                 </div>
+              )
+            })}
+          </div>
 
-                {/* LA CIFRA, grande. Es el dato por el que se abre la pantalla
-                    y estaba del tamaño del nombre. */}
-                <div className="mdebt-debt-amount">{fmtVal(debt.balance, currency)}</div>
+          <div className="nxd-extra">
+            <span className="nxd-extra-top">
+              {t('nxdExtraLine').replace('{amount}', fmtVal(extraPayment, currency))}
+              <b>{monthsSaved > 0 ? t('extraFreesMonths').replace('{n}', String(monthsSaved)) : ''}</b>
+            </span>
+            <input
+              id="debt-extra"
+              type="range" min={0} max={extraMax} step={500}
+              value={Math.min(extraPayment, extraMax)}
+              aria-label={t('extraMonthlyPayment')}
+              onChange={e => setExtraPayment(Number(e.target.value))}
+            />
+            <span className="nxd-method">
+              {t('nxdOrder')}{' '}
+              <button className={method === 'avalanche' ? 'on' : ''} onClick={() => setMethod('avalanche')}>{t('planInteres')}</button>
+              {' · '}
+              <button className={method === 'snowball' ? 'on' : ''} onClick={() => setMethod('snowball')}>{t('planImpulso')}</button>
+            </span>
+            {totalMonthPay > 0 && <span className="nx-note">{t('nxdThisMonth').replace('{amount}', fmtVal(totalMonthPay, currency))}</span>}
+          </div>
+        </>
+      )}
 
-                <div className="mdebt-debt-bar">
-                  <i style={{ width: `${Math.max(2, prog)}%`, background: debt.color }} />
-                </div>
-                <div className="mdebt-debt-sub">
-                  {isDerived(debt.id)
-                    ? t('editOnAccountHint')
-                    : t('paidOfOriginal').replace('{pct}', String(prog))}
-                </div>
-
-                {/* El calendario: cuándo toca pagar y cuánto falta para
-                    terminar, que es lo que de verdad se pregunta la gente. */}
-                {(debt.dueDay || debt.endDate) && (
-                  <div className="mdebt-debt-meta">
-                    <DueBadge debt={debt} today={today} />
-                    {debt.endDate && (
-                      <span className="mdebt-meta-chip">
-                        {installmentsLeft(debt.endDate, today) > 0
-                          ? t('debtInstallmentsLeft').replace('{n}', String(installmentsLeft(debt.endDate, today)))
-                          : t('debtLastInstallment')}
-                      </span>
-                    )}
-                  </div>
-                )}
-              </button>
-              {/* Una tarjeta se "paga" registrando una transferencia real hacia
-                  ella, no tocando un numero aqui: su saldo sale del libro. */}
-              {!isDerived(debt.id) && (
-                <button className="mdebt-debt-pay" onClick={() => setPaying(debt)} aria-label={t('registerPaymentLabel')}>
-                  <Icon name="check" size={15} /> {t('payLabel')}
+      {lent.length > 0 && (
+        <>
+          <p className="nx-label">
+            {t('nxdLent')}
+            <span className="nxd-lent-total">{fmtVal(lent.reduce((n, d) => n + d.balance, 0), currency)}</span>
+          </p>
+          <div className="nx-list">
+            {lent.map(d => (
+              <div key={d.id} className="nxd-row">
+                <IconTile icon={KIND_ICON[d.kind ?? 'personal']} color={d.color} />
+                <button className="nxd-row-main" onClick={() => setDetail(d)}>
+                  <b>{d.counterparty || d.name}</b>
+                  <small>{d.counterparty ? d.name : kinds[d.kind ?? 'personal']}</small>
                 </button>
-              )}
-            </div>
-          )
-        })}
-      </div>
+                <span className="nxd-amt ok">{fmtVal(d.balance, currency)}</span>
+                <button className="nx-link nxd-pay" onClick={() => setPaying(d)}>{t('debtCollectAction')}</button>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
 
-      {/*
-        LO QUE TE DEBEN, en su propia seccion.
-        No entra al simulador ni al total que debes: no es un pasivo. Aqui
-        "pagar" significa que te cobraron, asi que el dinero ENTRA.
-      */}
-      {lent.length > 0 && <>
-        <div className="mdebt-section-title">
-          {t('debtOwedToYouSection')}
-          <span className="mdebt-lent-total">{fmtVal(lent.reduce((n, d) => n + d.balance, 0), currency)}</span>
-        </div>
-        <div className="mdebt-list">
-          {lent.map(debt => (
-            <div key={debt.id} className="mdebt-debt lent">
-              <button className="mdebt-debt-main" onClick={() => setEditing(debt)}>
-                <div className="mdebt-debt-top">
-                  <span className="mdebt-kind">
-                    <Icon name={debt.kind ? KIND_ICON[debt.kind] : 'heart'} size={14} />
-                  </span>
-                  <b>{debt.name}</b>
-                  <span className="mdebt-dir lent">{t('debtDirectionLentShort')}</span>
-                  <strong>{fmtVal(debt.balance, currency)}</strong>
-                </div>
-                {(debt.dueDay || debt.counterparty) && (
-                  <div className="mdebt-debt-meta">
-                    <DueBadge debt={debt} today={today} />
-                    {debt.counterparty && <span className="mdebt-meta-chip">{debt.counterparty}</span>}
-                  </div>
-                )}
-              </button>
-              <button className="mdebt-debt-pay" onClick={() => setPaying(debt)} aria-label={t('debtCollectAction')}>
-                <Icon name="check" size={15} /> {t('collectShortLabel')}
-              </button>
-            </div>
-          ))}
-        </div>
-      </>}
+      {debts.length === 0 && <button className="nx-btn nxd-add" onClick={() => setEditing('new')}>{t('addDebt')}</button>}
+
+      {detail && (
+        <DebtDetailSheet
+          debt={all.find(d => d.id === detail.id) ?? detail}
+          derived={isDerived(detail.id)}
+          finishMonths={finished[detail.id]}
+          monthLabel={shortMonth}
+          onClose={() => setDetail(null)}
+          onPay={() => { setPaying(all.find(d => d.id === detail.id) ?? detail); setDetail(null) }}
+          onEdit={() => { setEditing(all.find(d => d.id === detail.id) ?? detail); setDetail(null) }}
+        />
+      )}
 
       {editing !== null && (
-        <DebtSheet
+        <DebtPhraseSheet
           debt={editing === 'new' ? undefined : editing}
           onClose={() => setEditing(null)}
           onSave={d => {
@@ -430,7 +305,84 @@ export function MobileDebt() {
   )
 }
 
-function DebtSheet({ debt, onClose, onSave, onDelete }: {
+/*
+ * D2 · LA FICHA DE UNA DEUDA.
+ *
+ * Cuánto llevas pagado, cuánto te cuesta en intereses ESTE mes, cuándo la
+ * terminas al ritmo del plan, sus pagos con fecha y el botón de pagar.
+ */
+function DebtDetailSheet({ debt, derived, finishMonths, monthLabel, onClose, onPay, onEdit }: {
+  debt: Debt
+  derived: boolean
+  finishMonths?: number
+  monthLabel: (months: number) => string
+  onClose: () => void
+  onPay: () => void
+  onEdit: () => void
+}) {
+  const t = useT()
+  const fmtVal = useFmt()
+  const lang = useSettings(s => s.language)
+  const { currency } = useFinance()
+  const owed = isOwed(debt)
+  const interestMonth = owed && debt.rate > 0 ? (debt.balance * debt.rate) / 100 / 12 : 0
+  const pct = Math.round(debtProgress(debt) * 100)
+  const pays = [...(debt.payments ?? [])].sort((a, b) => b.date.localeCompare(a.date))
+  return (
+    <NxSheet
+      title={debt.name}
+      sub={[debt.counterparty, debt.kind ? KIND_LABEL(t)[debt.kind] : null].filter(Boolean).join(' · ') || undefined}
+      onClose={onClose}
+      footer={(
+        <>
+          {!derived && <button className="nx-btn" onClick={onEdit}>{t('edit')}</button>}
+          <button className="nx-btn pri" onClick={onPay}>{owed ? t('nxdPay') : t('debtCollectAction')}</button>
+        </>
+      )}
+    >
+      <span className={`nx-big${owed ? '' : ' ok'}`}>{fmtVal(debt.balance, currency)}</span>
+      {debt.originalBalance && debt.originalBalance > debt.balance && (
+        <>
+          <span className="nx-thin nxd-detail-bar"><i style={{ width: `${pct}%`, background: debt.color }} /></span>
+          <p className="nx-note">{t('nxdPaidOf').replace('{pct}', String(pct)).replace('{amount}', fmtVal(debt.originalBalance, currency))}</p>
+        </>
+      )}
+      {interestMonth > 0 && (
+        <p className="nxd-interest">{t('nxdInterestMonth').replace('{amount}', fmtVal(interestMonth, currency))}</p>
+      )}
+      <div className="nx-list">
+        {owed && debt.minPayment > 0 && <NxRow label={t('debtMinPaymentLabel')} value={fmtVal(debt.minPayment, currency)} />}
+        {debt.dueDay && <NxRow label={t('debtDueDayLabel')} value={t('nxdDueDay').replace('{d}', String(debt.dueDay))} />}
+        {debt.rate > 0 && <NxRow label={t('debtRateLabel')} value={`${debt.rate} %`} />}
+        {owed && finishMonths && <NxRow label={t('nxdEndsIn')} value={monthLabel(finishMonths)} />}
+        {derived && <NxRow label={t('nxdFromCard')} value="" tone="muted" />}
+      </div>
+      {pays.length > 0 && (
+        <>
+          <p className="nx-label">{t('nxdPayments')}</p>
+          <div className="nx-list">
+            {pays.slice(0, 12).map(p => (
+              <NxRow
+                key={p.id}
+                label={new Date(`${p.date}T00:00:00`).toLocaleDateString(dateLocale(lang), { day: 'numeric', month: 'short', year: 'numeric' })}
+                value={fmtVal(p.amount, currency)}
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </NxSheet>
+  )
+}
+
+/*
+ * B1 · LA DEUDA, EN UNA FRASE.
+ *
+ * «Le debo RD$38,500 a Banco Popular en una tarjeta. Pago RD$2,500 el día 2
+ * de cada mes, al 60 % anual.» Cada hueco abre su teclado o su lista. Para lo
+ * que te deben: «Carlos me debe RD$6,000».
+ */
+function DebtPhraseSheet({ debt, onClose, onSave, onDelete }: {
   debt?: Debt
   onClose: () => void
   onSave: (d: Omit<Debt, 'id'>) => void
@@ -438,316 +390,101 @@ function DebtSheet({ debt, onClose, onSave, onDelete }: {
 }) {
   const { currency } = useFinance()
   const t = useT()
+  const fmtVal = useFmt()
+  const lang = useSettings(s => s.language)
   const [f, setF] = useState<Omit<Debt, 'id'>>(
     debt ? {
       name: debt.name, balance: debt.balance, rate: debt.rate,
       minPayment: debt.minPayment, color: debt.color,
       direction: debt.direction ?? 'owed', kind: debt.kind,
       counterparty: debt.counterparty, dueDay: debt.dueDay, endDate: debt.endDate,
-      // El historial y el saldo original NO se editan: son hechos, no ajustes.
-      // Viajan intactos para que guardar no los borre.
       originalBalance: debt.originalBalance, payments: debt.payments,
-    } : { ...EMPTY }
+    } : { ...EMPTY, kind: 'loan' },
   )
-  const [confirmDel, setConfirmDel] = useState(false)
-  const [sub, setSub] = useState<'balance' | 'rate' | 'minPayment' | 'dueDay' | 'endDate' | 'counterparty' | null>(null)
-  const amountSheet = sub === 'balance' || sub === 'rate' || sub === 'minPayment' ? sub : null
-  const p = <K extends keyof typeof f>(k: K, v: typeof f[K]) => setF(cur => ({ ...cur, [k]: v }))
-
+  const [sub, setSub] = useState<'balance' | 'who' | 'kind' | 'min' | 'day' | 'rate' | 'name' | null>(null)
+  const p = <K extends keyof Omit<Debt, 'id'>>(k: K, v: Omit<Debt, 'id'>[K]) => setF(prev => ({ ...prev, [k]: v }))
   const owed = (f.direction ?? 'owed') === 'owed'
-  const today = localToday()
-  const KINDS: { value: DebtKind; label: string }[] = [
-    { value: 'loan', label: t('debtKindLoan') },
-    { value: 'card', label: t('debtKindCard') },
-    { value: 'store', label: t('debtKindStore') },
-    { value: 'personal', label: t('debtKindPersonal') },
-  ]
+  const kinds = KIND_LABEL(t)
+  const autoName = f.counterparty ? `${f.kind ? kinds[f.kind] : ''} ${f.counterparty}`.trim() : ''
+  const missing = !(f.balance > 0) ? 'balance' : !(f.name.trim() || autoName) ? 'who' : null
 
-  /*
-   * LA CUOTA QUE SALE DE LA FECHA FINAL.
-   *
-   * Nadie sabe de memoria el "pago mínimo" de su préstamo, pero todo el mundo
-   * sabe que son 36 cuotas y cuándo termina. Con saldo, tasa y fecha final la
-   * cuota se calcula sola — es la fórmula del banco. Se OFRECE, no se impone:
-   * si el banco cobra otra cosa, manda el banco.
-   */
-  const suggested = useMemo(() => {
-    if (!f.endDate || f.balance <= 0) return null
-    const months = installmentsLeft(f.endDate, today)
-    if (months <= 0) return null
-    const value = paymentForTerm(f.balance, f.rate, months)
-    return value > 0 && Math.abs(value - f.minPayment) > 0.5 ? value : null
-  }, [f.endDate, f.balance, f.rate, f.minPayment, today])
+  // Lo que significa, en una línea: cuándo la saldas y cuánto pagas de intereses.
+  const preview = owed && f.balance > 0 && f.minPayment > 0
+    ? simulatePayoff([{ id: 'x', ...f, name: f.name || 'x' } as Debt], 0, 'avalanche')
+    : null
 
-  useMobileBackDismiss(sub !== null, () => setSub(null))
-  useMobileBackDismiss(sub === null, onClose)
-  const dialogRef = useDialogA11y<HTMLDivElement>(onClose, sub === null)
+  const save = () => {
+    if (missing) { setSub(missing === 'balance' ? 'balance' : 'who'); return }
+    const name = f.name.trim() || autoName
+    onSave({ ...f, name, originalBalance: f.originalBalance ?? f.balance })
+  }
+
+  const tk = (key: typeof sub & string, text: string, hint: string) => ({ key, text, hint, onTap: () => setSub(key), active: sub === key })
 
   return (
     <>
-    <SheetPortal>
-    <div ref={dialogRef} className="mobile-detail-sheet" role="dialog" aria-modal="true" aria-label={debt ? t('editDebt') : t('newDebt')} onClick={onClose}>
-      <section className="mdebt-sheet" onClick={e => e.stopPropagation()}>
-        <header>
-          <span>{debt ? t('editDebt') : t('newDebt')}</span>
-          <button aria-label={t('close')} onClick={onClose}><Icon name="close" size={18} /></button>
-        </header>
-
-        <div className="mdebt-sheet-body">
-          {/* DE QUE LADO ESTAS, lo primero: cambia el significado de todo lo
-              que viene debajo. Preguntarlo al final obligaria a releer el
-              formulario entero con otra cabeza. */}
-          <div className="mdebt-field">
-            <span>{t('debtKindLabel')}</span>
-            <div className="mdebt-seg">
-              {(['owed', 'lent'] as DebtDirection[]).map(d => (
-                <button
-                  key={d}
-                  className={(f.direction ?? 'owed') === d ? 'on' : ''}
-                  aria-pressed={(f.direction ?? 'owed') === d}
-                  onClick={() => p('direction', d)}
-                >
-                  {t(d === 'owed' ? 'debtDirectionOwed' : 'debtDirectionLent')}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <label className="mdebt-field">
-            <span>{t('name')}</span>
-            <input className="mdebt-input" value={f.name}
-              placeholder={t('egCreditCard')} onChange={e => p('name', e.target.value)} />
-          </label>
-
-          {owed && (
-            <div className="mdebt-field">
-              <span>{t('debtKindLabel')}</span>
-              <div className="mdebt-chips">
-                {KINDS.map(k => (
-                  <button
-                    key={k.value}
-                    className={f.kind === k.value ? 'on' : ''}
-                    aria-pressed={f.kind === k.value}
-                    onClick={() => p('kind', f.kind === k.value ? undefined : k.value)}
-                  >
-                    {k.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="mdebt-field">
-            <span>{t(owed ? 'debtCounterpartyLabel' : 'debtCounterpartyLent')}</span>
-            <button className="mdebt-amount-row" onClick={() => setSub('counterparty')}>
-              <span className={f.counterparty ? 'mdebt-amt-set' : 'mdebt-amt-ph'}>
-                {f.counterparty || t('debtCounterpartyPlaceholder')}
-              </span>
-              <Icon name="arrowUp" size={12} style={{ transform: 'rotate(90deg)', color: 'var(--m-muted)' }} />
+      <NxSheet
+        title={debt ? t('editDebt') : t('newDebt')}
+        sub={t('nxPhraseHint')}
+        onClose={onClose}
+        footer={(
+          <>
+            {onDelete && <button className="nx-btn nxd-del" onClick={onDelete}>{t('delete')}</button>}
+            <button className={`nx-btn pri${missing ? ' form-save-missing' : ''}`} onClick={save}>
+              {missing ? t('missingFieldLabel').replace('{field}', missing === 'balance' ? t('fieldAmount') : t('nxdWhoField')) : t('save')}
             </button>
-          </div>
-
-          <div className="mdebt-field-row">
-            <div className="mdebt-field" style={{ flex: 1 }}>
-              <span>{t('balance')}</span>
-              <button className="mdebt-amount-row" onClick={() => setSub('balance')}>
-                <span className={f.balance ? 'mdebt-amt-set' : 'mdebt-amt-ph'}>
-                  {f.balance ? fmt(f.balance, currency) : '—'}
-                </span>
-                <Icon name="arrowUp" size={12} style={{ transform: 'rotate(90deg)', color: 'var(--m-muted)' }} />
-              </button>
-            </div>
-            <div className="mdebt-field" style={{ flex: 1 }}>
-              <span>{t('annualInterestPctLabel')}</span>
-              <button className="mdebt-amount-row" onClick={() => setSub('rate')}>
-                <span className={f.rate ? 'mdebt-amt-set' : 'mdebt-amt-ph'}>
-                  {f.rate ? `${f.rate}%` : '—'}
-                </span>
-                <Icon name="arrowUp" size={12} style={{ transform: 'rotate(90deg)', color: 'var(--m-muted)' }} />
-              </button>
-            </div>
-          </div>
-
-          <div className="mdebt-field">
-            <span>{t('monthlyMinPaymentLabel')}</span>
-            <button className="mdebt-amount-row" onClick={() => setSub('minPayment')}>
-              <span className={f.minPayment ? 'mdebt-amt-set' : 'mdebt-amt-ph'}>
-                {f.minPayment ? fmt(f.minPayment, currency) : '—'}
-              </span>
-              <Icon name="arrowUp" size={12} style={{ transform: 'rotate(90deg)', color: 'var(--m-muted)' }} />
-            </button>
-          </div>
-
-          {/* EL CALENDARIO. Lo que faltaba para poder registrar una deuda en
-              condiciones: cuando se paga y hasta cuando dura. */}
-          <div className="mdebt-field-row">
-            <div className="mdebt-field" style={{ flex: 1 }}>
-              <span>{t('debtDueDayLabel')}</span>
-              <button className="mdebt-amount-row" onClick={() => setSub('dueDay')}>
-                <span className={f.dueDay ? 'mdebt-amt-set' : 'mdebt-amt-ph'}>
-                  {f.dueDay ? String(f.dueDay) : '—'}
-                </span>
-                <Icon name="arrowUp" size={12} style={{ transform: 'rotate(90deg)', color: 'var(--m-muted)' }} />
-              </button>
-            </div>
-            <div className="mdebt-field" style={{ flex: 1 }}>
-              <span>{t('debtEndDateLabel')}</span>
-              <button className="mdebt-amount-row" onClick={() => setSub('endDate')}>
-                <span className={f.endDate ? 'mdebt-amt-set' : 'mdebt-amt-ph'}>
-                  {f.endDate
-                    ? new Date(`${f.endDate}T00:00:00`).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })
-                    : t('debtNoEndDate')}
-                </span>
-                <Icon name="arrowUp" size={12} style={{ transform: 'rotate(90deg)', color: 'var(--m-muted)' }} />
-              </button>
-            </div>
-          </div>
-
-          {f.endDate && installmentsLeft(f.endDate, today) > 0 && (
-            <p className="mdebt-hint">
-              {t('debtInstallmentsLeft').replace('{n}', String(installmentsLeft(f.endDate, today)))}
-            </p>
-          )}
-
-          {/* La cuota calculada a partir del plazo. Se ofrece; el usuario
-              decide, porque quien manda sobre la cuota es su banco. */}
-          {suggested !== null && (
-            <button className="mdebt-suggest" onClick={() => p('minPayment', suggested)}>
-              <Icon name="info" size={13} />
-              {t('debtSuggestedPayment').replace('{amount}', fmt(suggested, currency))}
-              <b>{t('debtSuggestedPaymentApply')}</b>
-            </button>
-          )}
-
-          {/* HISTORIAL: lo que ya pagaste, comprobable. Antes solo habia un
-              porcentaje que no se podia contrastar con nada. */}
-          {debt && (debt.payments?.length ?? 0) > 0 && (
-            <div className="mdebt-field">
-              <span>{t('debtPaymentHistoryLabel')}</span>
-              <div className="mdebt-history">
-                {[...debt.payments!].reverse().slice(0, 8).map(payment => (
-                  <div key={payment.id} className="mdebt-history-row">
-                    <span>{new Date(`${payment.date}T00:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</span>
-                    <b>{fmt(payment.amount, currency)}</b>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="mdebt-field">
-            <span>{t('color')}</span>
-            <div className="mdebt-color-row">
-              {COLORS.map(c => (
-                <button key={c} className={`mdebt-color-dot${f.color === c ? ' on' : ''}`}
-                  aria-label={t('colorOption').replace('{c}', c)} aria-pressed={f.color === c}
-                  style={{ background: c }} onClick={() => p('color', c)} />
-              ))}
-            </div>
-          </div>
-
-          {debt && onDelete && (
-            !confirmDel
-              ? <button className="mdebt-del-btn" onClick={() => setConfirmDel(true)}>
-                  <Icon name="trash" size={16} /> {t('deleteDebtLabel')}
-                </button>
-              : <div className="mdebt-confirm-del">
-                  <p>{t('deleteQuotedConfirm').replace('{name}', debt.name)}</p>
-                  <div>
-                    <button onClick={() => setConfirmDel(false)}>{t('cancel')}</button>
-                    <button className="danger" onClick={onDelete}>{t('delete')}</button>
-                  </div>
-                </div>
-          )}
+          </>
+        )}
+      >
+        <div className="nxd-dir" role="tablist">
+          <button role="tab" aria-selected={owed} className={owed ? 'on' : ''} onClick={() => p('direction', 'owed')}>{t('nxdIOwe')}</button>
+          <button role="tab" aria-selected={!owed} className={!owed ? 'on' : ''} onClick={() => p('direction', 'lent')}>{t('nxdTheyOwe')}</button>
         </div>
+        {owed ? (
+          <Phrase parts={[
+            t('nxdP1'), tk('balance', f.balance > 0 ? fmtVal(f.balance, currency) : '', t('fieldAmount')),
+            t('nxdP2'), tk('who', f.counterparty ?? '', t('nxdWhoHint')),
+            t('nxdP3'), tk('kind', f.kind ? kinds[f.kind].toLowerCase() : '', t('nxdKindHint')),
+            t('nxdP4'), tk('min', f.minPayment > 0 ? fmtVal(f.minPayment, currency) : '', t('nxdMinHint')),
+            t('nxdP5'), tk('day', f.dueDay ? String(f.dueDay) : '', '—'),
+            t('nxdP6'), tk('rate', f.rate > 0 ? `${f.rate} %` : '', '0 %'),
+            t('nxdP7'),
+          ]} />
+        ) : (
+          <Phrase parts={[
+            tk('who', f.counterparty ?? '', t('nxdWhoHint')), t('nxdL1'),
+            tk('balance', f.balance > 0 ? fmtVal(f.balance, currency) : '', t('fieldAmount')), '.',
+          ]} />
+        )}
+        <Phrase className="nxd-name" parts={[t('nxdNameP'), tk('name', f.name, autoName || t('nxdNameHint')), '.']} />
+        {preview && preview.months > 0 && preview.months < 600 && (
+          <p className="nx-note">
+            {t('nxdPreview')
+              .replace('{date}', (() => { const iso = freedomDate(preview.months); return iso ? new Date(`${iso}T00:00:00`).toLocaleDateString(dateLocale(lang), { month: 'short', year: 'numeric' }) : '' })())
+              .replace('{amount}', fmtVal(preview.totalInterest, currency))}
+          </p>
+        )}
+      </NxSheet>
 
-        <div className="mdebt-sheet-actions">
-          <button className="mdebt-btn-cancel" onClick={onClose}>{t('cancel')}</button>
-          <button className="mdebt-btn-save" style={{ background: f.color }}
-            onClick={() => {
-              if (!f.name.trim()) { toast(t('enterNamePrompt'), { icon: 'alert' }); return }
-              if (f.balance <= 0) { toast(t('balanceMustBePositive'), { icon: 'alert' }); return }
-              onSave(f)
-            }}>
-            {debt ? t('save') : t('add')}
-          </button>
-        </div>
-      </section>
-    </div>
-    </SheetPortal>
-
-    {amountSheet === 'balance' && (
-      <MobileAmountSheet
-        title={t('debtBalanceTitle')}
-        value={f.balance}
-        currency={currency}
-        onDone={v => { p('balance', v); setSub(null) }}
-        onClose={() => setSub(null)}
-      />
-    )}
-    {amountSheet === 'rate' && (
-      <MobileAmountSheet
-        title={t('annualInterestPctLabel')}
-        value={f.rate}
-        unit="%"
-        onDone={v => { p('rate', v); setSub(null) }}
-        onClose={() => setSub(null)}
-      />
-    )}
-    {amountSheet === 'minPayment' && (
-      <MobileAmountSheet
-        title={t('monthlyMinPaymentLabel')}
-        value={f.minPayment}
-        currency={currency}
-        onDone={v => { p('minPayment', v); setSub(null) }}
-        onClose={() => setSub(null)}
-      />
-    )}
-    {sub === 'dueDay' && (
-      <DayOfMonthSheet
-        title={t('debtDueDaySheetTitle')}
-        value={f.dueDay}
-        onDone={day => { p('dueDay', day); setSub(null) }}
-        onClose={() => setSub(null)}
-      />
-    )}
-    {sub === 'endDate' && (
-      <MobileDatePicker
-        value={f.endDate ?? today}
-        onChange={v => { p('endDate', v); setSub(null) }}
-        onClose={() => setSub(null)}
-      />
-    )}
-    {sub === 'counterparty' && (
-      <MobileTextSheet
-        title={t(owed ? 'debtCounterpartyLabel' : 'debtCounterpartyLent')}
-        value={f.counterparty ?? ''}
-        placeholder={t('debtCounterpartyPlaceholder')}
-        maxLength={40}
-        onDone={v => { p('counterparty', v.trim() || undefined); setSub(null) }}
-        onClose={() => setSub(null)}
-      />
-    )}
+      {sub === 'balance' && <MobileAmountSheet title={t('fieldAmount')} value={f.balance} currency={currency} onDone={v => { p('balance', v); setSub(null) }} onClose={() => setSub(null)} />}
+      {sub === 'min' && <MobileAmountSheet title={t('debtMinPaymentLabel')} value={f.minPayment} currency={currency} onDone={v => { p('minPayment', v); setSub(null) }} onClose={() => setSub(null)} />}
+      {sub === 'who' && <MobileTextSheet title={t('nxdWhoHint')} value={f.counterparty ?? ''} placeholder={t('debtCounterpartyPlaceholder')} onDone={v => { p('counterparty', v.trim() || undefined); setSub(null) }} onClose={() => setSub(null)} />}
+      {sub === 'name' && <MobileTextSheet title={t('name')} value={f.name} placeholder={autoName || t('nxdNameHint')} onDone={v => { p('name', v.trim()); setSub(null) }} onClose={() => setSub(null)} />}
+      {sub === 'day' && <DayOfMonthSheet title={t('debtDueDaySheetTitle')} value={f.dueDay} onDone={day => { p('dueDay', day); setSub(null) }} onClose={() => setSub(null)} />}
+      {sub === 'rate' && <PercentSheet title={t('debtRateLabel')} value={f.rate || undefined} max={200} onDone={v => { p('rate', v ?? 0); setSub(null) }} onClose={() => setSub(null)} />}
+      {sub === 'kind' && (
+        <SheetSelectList
+          title={t('nxdKindHint')}
+          value={f.kind ?? ''}
+          options={(['loan', 'card', 'store', 'personal'] as DebtKind[]).map(k => ({ value: k, label: kinds[k] }))}
+          onPick={v => { p('kind', v as DebtKind); setSub(null) }}
+          onClose={() => setSub(null)}
+        />
+      )}
     </>
   )
 }
 
-/**
- * REGISTRAR UN PAGO.
- *
- * La hoja anterior pedía un monto y ya: bajaba la deuda sin tocar ninguna
- * cuenta. Pagabas RD$ 5.000 de tu préstamo y tu efectivo seguía intacto —
- * dinero que salía de un lado sin entrar en el otro.
- *
- * Ahora el pago **no se puede registrar sin decir de dónde sale**. Es el mismo
- * principio que rige las tarjetas: una cifra de dinero sin un movimiento
- * detrás es una cifra que el libro no puede sostener, y tarde o temprano
- * aparece como "dinero que no tengo".
- *
- * Elegir la cuenta va ANTES del monto a propósito. Al revés, el usuario teclea
- * la cifra, se topa con una pregunta que no esperaba y ya tiene medio trabajo
- * hecho para abandonar.
- */
 function DebtPaymentSheet({ debt, onClose }: { debt: Debt; onClose: () => void }) {
   const t = useT()
   const fmtVal = useFmt()

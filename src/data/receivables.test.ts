@@ -96,6 +96,21 @@ describe('pendingCharges', () => {
     const nuevos = pendingCharges([cliente({ amount: 1_500 })], [], HOY)
     expect(nuevos.every(c => c.amount === 1_500)).toBe(true)
   })
+
+  it('LAS ESTRELLAS bajan el cobro y el descuento queda guardado en él', () => {
+    const nuevos = pendingCharges([cliente({ amount: 350 })], [], HOY, () => 10)
+    expect(nuevos.length).toBeGreaterThan(0)
+    expect(nuevos.every(c => c.amount === 315 && c.discountPct === 10)).toBe(true)
+  })
+
+  it('sin descuento, el cobro no lleva la marca', () => {
+    const nuevos = pendingCharges([cliente()], [], HOY, () => 0)
+    expect(nuevos.every(c => c.discountPct === undefined)).toBe(true)
+  })
+
+  it('un cliente borrado con su historial no genera cobros', () => {
+    expect(pendingCharges([cliente({ deletedAt: 1 })], [], HOY)).toEqual([])
+  })
 })
 
 describe('receivablesSummary', () => {

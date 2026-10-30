@@ -38,6 +38,7 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
+import androidx.activity.enableEdgeToEdge
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import com.google.mlkit.vision.common.InputImage
@@ -161,6 +162,9 @@ class ScannerActivity : AppCompatActivity() {
     private val mainHandler = Handler(Looper.getMainLooper())
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Borde a borde con la API que no esta obsoleta. Antes lo hacia el tema
+        // pintando las barras transparentes, que Android 15 ignora.
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         setContentView(R.layout.activity_scanner)

@@ -34,6 +34,15 @@ const MobileCSVImport = lazy(() => import('./MobileCSVImport').then(m => ({ defa
 const MobileReceiptBatch = lazy(() => import('./MobileReceiptBatch').then(m => ({ default: m.MobileReceiptBatch })))
 const MobileNotificationCenter = lazy(() => import('./MobileNotificationCenter').then(m => ({ default: m.MobileNotificationCenter })))
 import { useSwipeRoute } from '@/hooks/useSwipeRoute'
+import { useCreateRequest } from '@/store/createRequest'
+import { useFinance } from '@/store/finance'
+import { useGoalsRequest } from './goals/goalsRequest'
+import { useSettings } from '@/store/settings'
+import { useWishes } from '@/store/wishes'
+import { OPEN_NOTIFICATIONS_EVENT, toastsOnScreen } from '@/components/ui/Toast'
+import { ToolsMenu, useToolsAttention, type UtilId } from './ToolsMenu'
+import { ExportSheet } from './ExportSheet'
+import { isGoalDone } from '@/data/goalPlans'
 import { MobileAvatarSheet } from './MobileAvatarSheet'
 import { MobileTopBar } from './MobileTopBar'
 import { useNotificationFeed } from '@/hooks/useNotificationFeed'
@@ -103,6 +112,8 @@ function internalTitles(t: ReturnType<typeof useT>): Partial<Record<ViewId, stri
     cashflow: t('cashflowTitle'),
     accounts: t('accounts'),
     goals: t('goals'),
+    // Sin esta línea, Caprichos heredaba el título de la ruta: «Perfil».
+    caprices: t('capTitle'),
   }
 }
 
@@ -149,6 +160,19 @@ export function MobileShell({
   const [converterOpen, setConverterOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [avatarOpen, setAvatarOpen] = useState(false)
+
+  /*
+   * «Movimiento» desde el menú del + en Negocio. Mismo destino que el + de
+   * siempre; se reacciona al CAMBIO del contador para que el primer render no
+   * abra una pantalla que nadie pidió.
+   */
+  const pedidoMovimiento = useCreateRequest(s => s.addMovement)
+  const movimientoVisto = useRef(pedidoMovimiento)
+  useEffect(() => {
+    if (pedidoMovimiento === movimientoVisto.current) return
+    movimientoVisto.current = pedidoMovimiento
+    setRoute('add')
+  }, [pedidoMovimiento])
   const [notifOpen, setNotifOpen] = useState(false)
   const [toolsOpen, setToolsOpen] = useState(false)
   const [csvOpen, setCsvOpen] = useState(false)
@@ -158,6 +182,11 @@ export function MobileShell({
   const [toolTransition, setToolTransition] = useState<'next' | 'prev'>('next')
   /** Hacia donde se movio entre las cuatro pestañas principales. */
   const [routeDir, setRouteDir] = useState<'next' | 'prev'>('next')
+  const [exportOpen, setExportOpen] = useState(false)
+  // H3 · El ☰ lleva un punto si alguna herramienta pide atención.
+  const toolsAttention = useToolsAttention()
+  // La meta principal (la primera sin lograr): la que propone el «+» en Metas.
+  const mainGoal = useFinance(s => s.goals.find(g => !isGoalDone(g)) ?? null)
 
   /*
    * LA ENTRADA, SOLO LA PRIMERA VEZ.
@@ -193,6 +222,44 @@ export function MobileShell({
     notifFeed.markAllSeen()
     setNotifOpen(true)
   }
+  // B3 · «N avisos · Ver» abre la campanita.
+  const openNotificationsRef = useRef(openNotifications)
+  openNotificationsRef.current = openNotifications
+  useEffect(() => {
+    const onOpen = () => openNotificationsRef.current()
+    window.addEventListener(OPEN_NOTIFICATIONS_EVENT, onOpen)
+    return () => window.removeEventListener(OPEN_NOTIFICATIONS_EVENT, onOpen)
+  }, [])
+
+  /*
+   * C2 · EL ANTOJO SE DECIDE EN UN TOQUE.
+   * Al abrir la app, si un antojo ya cumplió su espera, un aviso (una vez por
+   * antojo) que lleva a Caprichos, donde están los dos botones. Espera a que
+   * no haya otro aviso en pantalla: apilado encima de los del arranque tapaba
+   * media pantalla.
+   */
+  useEffect(() => {
+    let tries = 0
+    let id: ReturnType<typeof setTimeout>
+    const attempt = () => {
+      if (toastsOnScreen() > 0) {
+        if (++tries < 6) id = setTimeout(attempt, 2500)
+        return
+      }
+      const { dismissedAlerts, dismissAlert } = useSettings.getState()
+      const listo = useWishes.getState().items.find(w => !w.resolution && w.decideAt <= Date.now() && !dismissedAlerts.includes(`wishask:${w.id}`))
+      if (!listo) return
+      dismissAlert(`wishask:${listo.id}`)
+      toast(t('nudgeWishTitle').replace('{name}', listo.name), {
+        icon: 'piggy',
+        duration: 7000,
+        action: { label: t('nxkDecide'), onClick: () => gotoViewRef.current('caprices') },
+      })
+    }
+    id = setTimeout(attempt, 1800)
+    return () => clearTimeout(id)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const rememberScroll = () => {
     const scroller = contentRef.current
@@ -235,6 +302,15 @@ export function MobileShell({
   // Origen al abrir una herramienta: para volver ahí al salir (por defecto
   // Movimientos, que es donde vive el menú de herramientas).
   const toolReturn = useRef<{ route: MobileRoute; view: ViewId }>({ route: 'home', view: 'transactions' })
+
+  // Las utilidades del ☰, también alcanzables desde el buscador (S3).
+  const openUtil = (u: UtilId) => {
+    if (u === 'notes') gotoView('notes')
+    else if (u === 'calendar') gotoView('calendar')
+    else if (u === 'converter') setConverterOpen(true)
+    else if (u === 'export') setExportOpen(true)
+    else if (u === 'import') setCsvOpen(true)
+  }
 
   const gotoView = (next: ViewId) => {
     rememberScroll()
@@ -332,6 +408,8 @@ export function MobileShell({
       gotoViewRef.current('budgets')
     } else if (type === 'recurring' || type === 'lowfunds') {
       gotoViewRef.current('accounts')
+    } else if (type === 'subscription') {
+      gotoViewRef.current('subscriptions')
     } else if (type === 'goal') {
       gotoViewRef.current('goals')
     } else if (type === 'weekly') {
@@ -343,6 +421,12 @@ export function MobileShell({
       // Un aviso de cobro lleva a Negocio: quedarse en Inicio obligaria a
       // buscar en el menu justo lo que el aviso acaba de nombrar.
       gotoViewRef.current('business')
+    } else if (type === 'caprice') {
+      gotoViewRef.current('caprices')
+    } else if (type === 'debt') {
+      gotoViewRef.current('debt')
+    } else if (type === 'cashflow') {
+      gotoViewRef.current('cashflow')
     } else if (type === 'anomaly' || type === 'activity') {
       gotoViewRef.current('transactions')
     }
@@ -405,7 +489,7 @@ export function MobileShell({
               ))
             : (
               <Suspense fallback={<MobileSkeletonScreen />}>
-                <MobileAccounts mkey={mkey} createRequest={viewProps.createRequest} onEditTx={onEditTx} onDeleteTx={viewProps.onDeleteTx} />
+                <MobileAccounts mkey={mkey} createRequest={viewProps.createRequest} onEditTx={onEditTx} onDeleteTx={viewProps.onDeleteTx} onImport={() => setCsvOpen(true)} />
               </Suspense>
             )}
         </div>
@@ -472,7 +556,7 @@ export function MobileShell({
     if (route === 'analysis') {
       return (
         <Suspense fallback={<MobileSkeletonScreen />}>
-          <MobileAnalytics mkey={mkey} onBudgets={() => gotoView('budgets')} onImport={() => setCsvOpen(true)} onEditTx={onEditTx} initialPeriod={analyticsInitialPeriod} />
+          <MobileAnalytics mkey={mkey} onBudgets={() => gotoView('budgets')} onAccounts={() => gotoView('accounts')} onEditTx={onEditTx} initialPeriod={analyticsInitialPeriod} />
         </Suspense>
       )
     }
@@ -683,6 +767,9 @@ export function MobileShell({
             onGotoAccounts={() => gotoView('accounts')}
             onGotoCategories={() => gotoView('budgets')}
             onGotoGoals={() => gotoView('goals')}
+            onGoView={v => gotoView(v)}
+            onUtil={openUtil}
+            onSettings={sheet => onSettings(sheet ?? undefined)}
           />
         </Suspense>
       )}
@@ -697,6 +784,7 @@ export function MobileShell({
           />
         </Suspense>
       )}
+      {exportOpen && <ExportSheet mkey={mkey} onImport={() => setCsvOpen(true)} onClose={() => setExportOpen(false)} />}
       {toolsOpen && (
         <SheetPortal>
         <div
@@ -715,64 +803,13 @@ export function MobileShell({
               </button>
             </header>
 
-            <div className="mobile-tools-group">
-              <div className="mobile-tools-group-title">{t('toolsLabel')}</div>
-              <div className="mobile-tools-list">
-                <button className="mobile-tools-row" onClick={() => { setToolsOpen(false); gotoView('budgets') }}>
-                  <span className="mobile-tools-row-icon" style={{ background: '#22c55e22', color: '#22c55e' }}>
-                    <Icon name="wallet" size={20} />
-                  </span>
-                  <div>
-                    <b>{t('budgets')}</b>
-                    <small>{t('budgetsQuickDesc')}</small>
-                  </div>
-                  <Icon name="arrowUp" size={13} className="mobile-tools-row-arrow" />
-                </button>
-                <button className="mobile-tools-row" onClick={() => { setToolsOpen(false); gotoView('goals') }}>
-                  <span className="mobile-tools-row-icon" style={{ background: '#35d0a222', color: '#35d0a2' }}>
-                    <Icon name="target" size={20} />
-                  </span>
-                  <div>
-                    <b>{t('goals')}</b>
-                    <small>{t('goalsQuickDesc')}</small>
-                  </div>
-                  <Icon name="arrowUp" size={13} className="mobile-tools-row-arrow" />
-                </button>
-                {/* Con Presupuestos y Metas: las tres contestan «¿estoy
-                    gastando como quiero?». Con Negocio no pegaba — ese
-                    contesta «¿cuanto me deja esto?». */}
-                <button className="mobile-tools-row" onClick={() => { setToolsOpen(false); gotoView('caprices') }}>
-                  <span className="mobile-tools-row-icon" style={{ background: '#ff9a3d22', color: '#ff9a3d' }}>
-                    <Icon name="piggy" size={20} />
-                  </span>
-                  <div>
-                    <b>{t('capTitle')}</b>
-                    <small>{t('capQuickDesc')}</small>
-                  </div>
-                  <Icon name="arrowUp" size={13} className="mobile-tools-row-arrow" />
-                </button>
-                <button className="mobile-tools-row" onClick={() => { setToolsOpen(false); gotoView('notes') }}>
-                  <span className="mobile-tools-row-icon" style={{ background: '#35d0a222', color: '#35d0a2' }}>
-                    <Icon name="clipboard" size={20} />
-                  </span>
-                  <div>
-                    <b>{t('listsTitle')}</b>
-                    <small>{t('listsQuickDesc')}</small>
-                  </div>
-                  <Icon name="arrowUp" size={13} className="mobile-tools-row-arrow" />
-                </button>
-                <button className="mobile-tools-row" onClick={() => { setToolsOpen(false); setConverterOpen(true) }}>
-                  <span className="mobile-tools-row-icon" style={{ background: '#ffdd3d22', color: '#eab308' }}>
-                    <Icon name="coins" size={20} />
-                  </span>
-                  <div>
-                    <b>{t('converterTitle')}</b>
-                    <small>{t('converterQuickDesc')}</small>
-                  </div>
-                  <Icon name="arrowUp" size={13} className="mobile-tools-row-arrow" />
-                </button>
-              </div>
-            </div>
+            {/* H1–H4 · Mosaicos con su dato, buscador, avisos y favoritas. */}
+            <ToolsMenu
+              onGo={v => { setToolsOpen(false); gotoView(v) }}
+              onUtil={u => { setToolsOpen(false); openUtil(u) }}
+              onSettings={sheet => { setToolsOpen(false); onSettings(sheet) }}
+              onOpenSearch={() => { setToolsOpen(false); setSearchOpen(true) }}
+            />
           </section>
         </div>
         </SheetPortal>
@@ -785,6 +822,7 @@ export function MobileShell({
         title={(route === 'reports' || route === 'profile') ? internalTitles(t)[view] : undefined}
         onBack={topBarBack}
         onMenu={route === 'home' ? (() => setToolsOpen(true)) : undefined}
+        menuBadge={toolsAttention}
         onSelectMonth={onMonth}
         onAvatar={() => setAvatarOpen(true)}
         onCurrency={() => setCurrencyOpen(true)}
@@ -816,6 +854,14 @@ export function MobileShell({
             onQuickAdd={mode => {
               setQuickAddMode(mode)
               setRoute('add')
+            }}
+            fabContext={route === 'reports' ? (view === 'goals' ? 'goals' : 'accounts') : null}
+            mainGoalName={mainGoal?.name ?? null}
+            onFabAction={action => {
+              if (action === 'contributeMain') useGoalsRequest.getState().ask('contributeMain')
+              else if (action === 'newGoal') useGoalsRequest.getState().ask('new')
+              else if (action === 'newAccount') useCreateRequest.getState().askNewAccount()
+              else if (action === 'transfer') { setQuickAddMode('transfer'); setRoute('add') }
             }}
           />
         </>

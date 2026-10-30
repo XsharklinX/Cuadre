@@ -115,8 +115,14 @@
 }
 .mbiz-charge.late { border-color: color-mix(in oklab, var(--m-expense) 50%, var(--m-border)); }
 .mbiz-charge.today { border-color: color-mix(in oklab, var(--m-warn) 55%, var(--m-border)); }
+/* Atenuado con color, NO con opacidad: una fila transparente deja ver lo que
+   tenga debajo, y en el historial se veía el fondo de deslizar encimado. */
 .mbiz-charge.paid,
-.mbiz-charge.waived { opacity: .55; }
+.mbiz-charge.waived { background: var(--m-bg, var(--m-surface)); border-style: dashed; }
+.mbiz-charge.paid .mbiz-charge-id b,
+.mbiz-charge.waived .mbiz-charge-id b,
+.mbiz-charge.paid .mbiz-charge-right b,
+.mbiz-charge.waived .mbiz-charge-right b { color: var(--m-muted); }
 .mbiz-client.off { opacity: .5; }
 
 .mbiz-charge-id,
@@ -330,6 +336,71 @@
 .mbiz-sep { background: var(--m-border); height: 1px; margin: 3px 0; }
 
 /* ── La gráfica del año ─────────────────────────────────── */
+/*
+ * G3 · LAS CAPAS DE LA TARJETA.
+ *
+ * Lo que se pliega no se esconde si la cabecera dice cuanto hay dentro. Por
+ * eso cada una lleva su cifra a la derecha: se decide si vale la pena abrir
+ * sin abrirla.
+ */
+.mbiz-fold {
+  align-items: center;
+  background: var(--m-surface-2);
+  border: 0;
+  border-radius: 11px;
+  color: var(--m-text);
+  display: flex;
+  gap: 9px;
+  min-height: 44px;
+  padding: 0 12px;
+  text-align: left;
+  width: 100%;
+}
+.mbiz-fold > span {
+  flex: none;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.mbiz-fold > em {
+  color: var(--m-muted);
+  flex: 1;
+  font-size: 12px;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mbiz-fold > svg { color: var(--m-muted); flex: none; }
+.mbiz-fold:active { transform: scale(.99); }
+
+/*
+ * G4 · EL MEJOR Y EL PEOR MES.
+ *
+ * Doce barras no dicen cual fue bueno: solo cual fue el mayor. Con el nombre
+ * del mejor y del peor, la grafica pasa de forma a dato.
+ */
+.mbiz-chart-top { display: grid; gap: 8px; grid-template-columns: 1fr 1fr; margin-top: 4px; }
+.mbiz-chart-top span { display: grid; gap: 1px; min-width: 0; }
+.mbiz-chart-top small {
+  color: var(--m-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+.mbiz-chart-top b {
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .mbiz-chart {
   align-items: center;
   display: grid;
@@ -564,12 +635,21 @@
   width: 32px;
 }
 .mbizs-body {
+  /* Cada fila mide lo que su contenido. Con filas `auto` en un cuerpo de alto
+     fijo, las tarjetas altas se aplastaban a la altura de su título y lo de
+     dentro se salía por encima de la siguiente. */
+  align-content: start;
   display: grid;
   flex: 1;
   gap: 13px;
+  grid-auto-rows: max-content;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior-y: contain;
+  /* Quien se desplaza es este cuerpo, no la hoja: el gesto vertical tiene que
+     ser suyo, o el dedo no lo mueve (ver `.mobile-detail-sheet`). */
+  touch-action: pan-y pinch-zoom;
+  -webkit-overflow-scrolling: touch;
   padding: 14px 16px 18px;
 }
 
@@ -660,6 +740,83 @@
  * son días de la semana —no pueden serlo, el 1 cae en uno distinto cada mes—
  * pero la forma de rejilla de siete es la que la mano ya sabe recorrer.
  */
+/*
+ * C3 · EL RESUMEN DE LO PLEGADO.
+ *
+ * Con todo plegado hay que poder ver que valores se van a usar sin
+ * desplegar: si no, «mas opciones» esconde decisiones en vez de aplazarlas.
+ */
+/* C2 · Los pasos: tres pantallas cortas en vez de un muro. */
+/* C4 · «Crear» desde el +: cada opción con la línea que explica qué es. */
+.mcreate-row {
+  align-items: center;
+  background: var(--m-surface-2);
+  border: 0;
+  border-radius: 13px;
+  color: var(--m-text);
+  display: flex;
+  gap: 12px;
+  min-height: 58px;
+  padding: 8px 13px;
+  text-align: left;
+  width: 100%;
+}
+.mcreate-row > span:last-child { min-width: 0; }
+.mcreate-row b { display: block; font-size: 14.5px; font-weight: 800; }
+.mcreate-row small { color: var(--m-muted); display: block; font-size: 12px; line-height: 1.4; }
+.mcreate-row:disabled { opacity: .55; }
+.mcreate-row:not(:disabled):active { transform: scale(.99); }
+.mcreate-ico {
+  align-items: center;
+  background: color-mix(in oklab, var(--m-primary) 18%, transparent);
+  border-radius: 11px;
+  color: var(--m-primary);
+  display: grid;
+  flex: none;
+  height: 38px;
+  place-items: center;
+  width: 38px;
+}
+.mcreate-ico.k-client { background: color-mix(in oklab, var(--m-info) 18%, transparent); color: var(--m-info); }
+.mcreate-ico.k-charge { background: color-mix(in oklab, var(--m-income) 18%, transparent); color: var(--m-income); }
+.mcreate-ico.k-business { background: color-mix(in oklab, var(--m-warn) 18%, transparent); color: var(--m-warn); }
+.mcreate-ico.k-movement { background: var(--m-surface); color: var(--m-text); }
+
+.mbizs-steps { display: grid; gap: 5px; }
+.mbizs-steps-bar { background: var(--m-surface-2); border-radius: 99px; height: 4px; overflow: hidden; }
+.mbizs-steps-bar i {
+  background: var(--m-primary);
+  display: block;
+  height: 100%;
+  transition: width .28s cubic-bezier(.22, 1, .36, 1);
+}
+.mbizs-steps small { color: var(--m-muted); font-size: 11px; font-weight: 700; }
+@media (prefers-reduced-motion: reduce) { .mbizs-steps-bar i { transition: none; } }
+
+.mbizs-summary-line {
+  align-items: center;
+  background: var(--m-surface-2);
+  border: 0;
+  border-radius: 11px;
+  color: var(--m-muted);
+  display: flex;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 13px;
+  text-align: left;
+  width: 100%;
+}
+.mbizs-summary-line > span {
+  flex: 1;
+  font-size: 12.5px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mbizs-summary-line > svg { flex: none; }
+.mbizs-summary-line:active { background: var(--m-surface); }
+
 .mbizs-days {
   display: grid;
   gap: 5px;
@@ -780,6 +937,7 @@
   width: 100%;
 }
 .mbiz-shot:disabled { opacity: .5; }
+.mbiz-biz-actions { display: grid; gap: 8px; grid-template-columns: 1fr 1fr; }
 
 /* El historial de un cliente: plegado, porque no es una tarea. Pero es donde
    se viene cuando alguien dice «yo ya te pague». */
@@ -893,6 +1051,154 @@
  * «¿Como va el mes?» tiene una respuesta, y exigia abrir las tarjetas una
  * por una y sumar a mano.
  */
+/*
+ * G2 · EN QUE DIVISA SE MIRA EL NEGOCIO.
+ *
+ * Lo que pagas esta en dolares y lo que cobras en pesos. Pequenito y a la
+ * derecha: es un ajuste de como miras, no una pestana mas.
+ */
+.mbiz-cur {
+  background: var(--m-surface);
+  border: 1px solid var(--m-border);
+  border-radius: 99px;
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+  padding: 2px;
+  width: fit-content;
+}
+.mbiz-cur button {
+  background: transparent;
+  border: 0;
+  border-radius: 99px;
+  color: var(--m-muted);
+  font-size: 12px;
+  font-weight: 800;
+  min-height: 30px;
+  min-width: 42px;
+  padding: 0 10px;
+}
+.mbiz-cur button.on { background: var(--m-surface-2); color: var(--m-text); }
+
+/* El equivalente en la otra divisa: para no cambiar ida y vuelta solo por
+   comprobar una cifra. */
+.mbiz-also {
+  color: var(--m-muted);
+  display: block;
+  font-size: 12px;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  margin-top: -1px;
+}
+
+/*
+ * N1 · UNA ACCION PRINCIPAL Y UN MENU.
+ *
+ * Eran tres enlaces azules de texto: no parecian botones, y los tres del
+ * mismo color decian que las tres cosas pesan igual. Agregar un cliente lo
+ * haces cada semana; agrupar y cobro suelto, una vez al mes.
+ */
+.mbiz-head-btns button.primary {
+  background: color-mix(in oklab, var(--m-primary) 20%, transparent);
+  border-radius: 10px;
+  color: var(--m-primary);
+  min-height: 36px;
+  padding: 0 12px;
+}
+.mbiz-head-btns button.more {
+  background: var(--m-surface-2);
+  border-radius: 10px;
+  color: var(--m-muted);
+  min-height: 36px;
+  min-width: 36px;
+  padding: 0;
+}
+
+.mbiz-menu {
+  background: var(--m-surface);
+  border: 1px solid var(--m-border);
+  border-radius: 13px;
+  display: grid;
+  gap: 2px;
+  overflow: hidden;
+  padding: 5px;
+}
+.mbiz-menu button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 9px;
+  color: var(--m-text);
+  display: flex;
+  font-size: 13.5px;
+  font-weight: 700;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 11px;
+  text-align: left;
+  width: 100%;
+}
+.mbiz-menu button > svg { color: var(--m-muted); flex: none; }
+.mbiz-menu button em { color: var(--m-income); font-style: normal; margin-left: auto; }
+.mbiz-menu button:active { background: var(--m-surface-2); }
+
+/*
+ * N2 · EL SERVICIO DELANTE DE SU GRUPO.
+ *
+ * Es donde ya estas mirando cuando te escribe alguien preguntando si queda
+ * cupo, asi que «4 de 6 plazas» tiene que contestarse aqui.
+ */
+.mbiz-svc-head {
+  align-items: center;
+  background: var(--m-surface);
+  border: 1px solid var(--m-border);
+  border-radius: 13px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 9px 11px;
+}
+/* El texto se estira; el logo NO: también es un <span>, y con `> span` a
+   secas salía como una barra del ancho de la tarjeta. */
+.mbiz-svc-head > span:not(.mbrand-tile) { flex: 1; min-width: 0; }
+.mbiz-svc-head b { display: block; font-size: 14px; font-weight: 800; }
+.mbiz-svc-head small { color: var(--m-muted); display: block; font-size: 11.5px; }
+.mbiz-svc-bar {
+  background: var(--m-surface-2);
+  border-radius: 99px;
+  flex-basis: 100%;
+  height: 4px;
+  overflow: hidden;
+}
+.mbiz-svc-bar i { background: var(--m-income); display: block; height: 100%; }
+
+/*
+ * N3 · EL ESTADO, EN UN PUNTO.
+ *
+ * Catorce filas sin estado se leen una por una; con estado te paras solo en
+ * las rojas. El punto va delante porque el ojo baja por el borde izquierdo.
+ */
+.mbiz-dot {
+  border-radius: 99px;
+  flex: none;
+  height: 6px;
+  width: 6px;
+}
+.mbiz-client.st-ok .mbiz-dot { background: var(--m-income); }
+.mbiz-client.st-soon .mbiz-dot { background: var(--m-warn); }
+.mbiz-client.st-late .mbiz-dot { background: var(--m-expense); }
+.mbiz-client.st-off .mbiz-dot { background: var(--m-muted); }
+/* La etiqueta bajo el monto: sin ella no se sabia si eran 600 que debe o 600
+   que paga. */
+.mbiz-client-next em {
+  color: var(--m-muted);
+  display: block;
+  font-size: 10px;
+  font-style: normal;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+}
+
 .mbiz-allsum {
   background: var(--m-surface);
   border: 1px solid var(--m-border);
@@ -944,7 +1250,7 @@
   border-radius: 11px;
   display: grid;
   gap: 9px;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto auto 1fr auto;
   min-height: 46px;
   padding: 5px 11px;
 }
@@ -1792,7 +2098,7 @@
   background: color-mix(in oklab, var(--m-income) 13%, transparent);
   border-color: var(--m-income);
 }
-.mmerge-pick > span { flex: 1; min-width: 0; }
+.mmerge-pick > span:not(.mbrand-tile) { flex: 1; min-width: 0; }
 .mmerge-pick b { display: block; font-size: 14px; font-weight: 800; }
 .mmerge-pick small { color: var(--m-muted); display: block; font-size: 11.5px; }
 .mmerge-pick em {
@@ -1807,6 +2113,198 @@
 
 /* Ordenar y archivar. Se arrastra por el asa y tambien se pulsa: los dos
    caminos llevan al mismo sitio y ninguno es el de segunda. */
+/* ══════════════════════════════════════════════════════════════════════
+   LAS CUENTAS DE UN SERVICIO.
+   `Service.accounts` y `accountOccupancy()` existian desde la 2.0 sin que
+   ninguna pantalla los llamara. Por eso una segunda cuenta de Netflix se
+   daba de alta como otro servicio.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* S3 · La marca reconocida, con lo que propone. Tono de dato: es una
+   sugerencia, no un aviso ni un acierto que celebrar. */
+.msvc-brand {
+  align-items: center;
+  background: color-mix(in oklab, var(--m-info) 11%, transparent);
+  border-radius: 12px;
+  display: flex;
+  gap: 10px;
+  padding: 10px 12px;
+}
+.msvc-brand > span:not(.mbrand-tile) { flex: 1; min-width: 0; }
+.msvc-brand b { color: var(--m-info); display: block; font-size: 13px; font-weight: 800; }
+.msvc-brand small { color: var(--m-muted); display: block; font-size: 11.5px; line-height: 1.4; }
+.msvc-brand button {
+  background: var(--m-info);
+  border: 0;
+  border-radius: 9px;
+  color: var(--m-bg);
+  flex: none;
+  font-size: 12.5px;
+  font-weight: 800;
+  min-height: 36px;
+  padding: 0 13px;
+}
+
+/* S5 · Cuando toca pagar. El boton «Pagar» estaba igual el dia 1 que el 20. */
+.msvc-next {
+  align-items: center;
+  background: color-mix(in oklab, var(--m-info) 11%, transparent);
+  border: 1px solid color-mix(in oklab, var(--m-info) 28%, transparent);
+  border-radius: 12px;
+  display: flex;
+  gap: 10px;
+  padding: 11px 13px;
+}
+.msvc-next.late {
+  background: color-mix(in oklab, var(--m-warn) 12%, transparent);
+  border-color: color-mix(in oklab, var(--m-warn) 32%, transparent);
+}
+.msvc-next > span:not(.mbrand-tile) { flex: 1; min-width: 0; }
+.msvc-next b { display: block; font-size: 13.5px; font-weight: 800; }
+.msvc-next small { color: var(--m-muted); display: block; font-size: 11.5px; }
+.msvc-next-amt { flex: none; font-size: 15px; font-variant-numeric: tabular-nums; }
+
+/*
+ * S4 · EL PRECIO POR PLAZA.
+ *
+ * Lo que decide si vale la pena no es el total: es cuanto te cuesta UNA
+ * plaza y a cuanto la vendes. Una division que se hacia de cabeza cada vez.
+ */
+.msvc-slotecon {
+  background: var(--m-surface-2);
+  border-radius: 12px;
+  padding: 11px 13px;
+}
+.msvc-slotecon-row { display: grid; gap: 8px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.msvc-slotecon-row span { display: grid; gap: 1px; min-width: 0; }
+.msvc-slotecon-row small {
+  color: var(--m-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.msvc-slotecon-row b { font-size: 14px; font-variant-numeric: tabular-nums; font-weight: 800; }
+.msvc-slotecon p { color: var(--m-muted); font-size: 11.5px; line-height: 1.45; margin: 8px 0 0; }
+
+/* S6 · Las dos salidas cuando pierde dinero. */
+.msvc-fix {
+  background: color-mix(in oklab, var(--m-warn) 11%, transparent);
+  border-radius: 12px;
+  padding: 11px 13px;
+}
+.msvc-fix b { color: var(--m-warn); display: block; font-size: 12.5px; margin-bottom: 5px; }
+.msvc-fix p { color: var(--m-text); font-size: 12.5px; line-height: 1.5; margin: 0; }
+
+/* S5 · Lo que llevas pagado. */
+.msvc-pays { display: grid; gap: 4px; }
+.msvc-pay {
+  align-items: center;
+  background: var(--m-surface-2);
+  border-radius: 9px;
+  display: flex;
+  gap: 10px;
+  min-height: 36px;
+  padding: 0 11px;
+}
+.msvc-pay span { color: var(--m-muted); flex: 1; font-size: 12px; }
+.msvc-pay b { font-size: 12.5px; font-variant-numeric: tabular-nums; font-weight: 800; }
+.msvc-pay.total { background: transparent; border-top: 1px dashed var(--m-border); border-radius: 0; }
+.msvc-pay.total span { color: var(--m-text); font-weight: 700; }
+
+.msvc-accs { display: grid; gap: 7px; }
+.msvc-acc {
+  background: var(--m-surface-2);
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 9px 11px;
+}
+/* Llena se marca: es cuando toca comprar otra, y es la unica cuenta sobre la
+   que hay que decidir algo. */
+.msvc-acc.full { border-color: color-mix(in oklab, var(--m-warn) 38%, transparent); }
+.msvc-acc-top { align-items: baseline; display: flex; gap: 8px; }
+.msvc-acc-top b { font-size: 13px; font-weight: 800; }
+.msvc-acc-top small { color: var(--m-muted); flex: 1; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.msvc-acc-top em {
+  flex: none;
+  font-size: 10.5px;
+  font-style: normal;
+  font-weight: 800;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+}
+.msvc-acc-top em.free { color: var(--m-income); }
+.msvc-acc-top em.full { color: var(--m-warn); }
+
+/*
+ * LAS PLAZAS, DIBUJADAS.
+ *
+ * Los huecos libres se ven en vez de contarse: un hueco vacio se mira y un
+ * «4 de 5» hay que leerlo y restarlo. Es la pregunta de todos los dias de
+ * quien revende — «me escribio uno nuevo, donde lo meto».
+ */
+.msvc-slots { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+.msvc-slot {
+  align-items: center;
+  border-radius: 999px;
+  display: inline-flex;
+  flex: none;
+  font-size: 10px;
+  font-weight: 800;
+  height: 30px;
+  justify-content: center;
+  width: 30px;
+}
+.msvc-slot.free {
+  background: transparent;
+  border: 1px dashed var(--m-border);
+  color: var(--m-muted);
+  font-size: 14px;
+  font-weight: 400;
+}
+.msvc-slot.free:active { background: var(--m-surface); transform: scale(.94); }
+
+/* Quien quedo sin cuenta de cuando no habia donde decirlo. */
+/* Quién puede ir en la plaza que se está llenando. */
+.msvc-pick { display: grid; gap: 4px; margin-top: 8px; }
+.msvc-pick button {
+  align-items: baseline;
+  background: var(--m-surface);
+  border: 0;
+  border-radius: 9px;
+  color: var(--m-text);
+  display: flex;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 11px;
+  text-align: left;
+}
+.msvc-pick b { flex: 1; font-size: 13px; font-weight: 700; min-width: 0; }
+.msvc-pick small { color: var(--m-muted); flex: none; font-size: 11px; }
+
+.msvc-unassigned {
+  color: var(--m-warn);
+  font-size: 11.5px;
+  line-height: 1.45;
+  margin: 7px 0 0;
+}
+
+.msvc-add-acc {
+  align-items: center;
+  background: var(--m-surface-2);
+  border: 1px dashed var(--m-border);
+  border-radius: 11px;
+  color: var(--m-text);
+  display: flex;
+  font-size: 12.5px;
+  font-weight: 800;
+  gap: 6px;
+  justify-content: center;
+  min-height: 42px;
+  width: 100%;
+}
+.msvc-add-acc:active { transform: translateY(1px) scale(.99); }
+
 .morg-list { display: grid; gap: 6px; }
 .morg-row {
   align-items: center;
@@ -1816,8 +2314,11 @@
   gap: 7px;
   min-height: 52px;
   padding: 0 9px;
-  touch-action: none;
+  /* La fila deja desplazar la lista; solo el asa se arrastra. Con `none` en la
+     fila entera, con muchos negocios no había por dónde bajar. */
+  touch-action: pan-y;
 }
+.morg-grip { touch-action: none; padding: 8px 4px; margin: -8px 0; }
 .morg-row.off { opacity: .5; }
 .morg-grip { color: var(--m-muted); cursor: grab; flex: none; }
 .morg-id { flex: 1; min-width: 0; }
@@ -1866,7 +2367,7 @@
   min-height: 42px;
   padding: 0 11px;
 }
-.mcli-svc > span { flex: 1; font-size: 13.5px; font-weight: 700; min-width: 0; }
+.mcli-svc > span:not(.mbrand-tile) { flex: 1; font-size: 13.5px; font-weight: 700; min-width: 0; }
 .mcli-svc > b { font-size: 13.5px; font-variant-numeric: tabular-nums; font-weight: 800; }
 
 .mcli-top { display: grid; gap: 8px; grid-template-columns: 1.3fr 1fr; }
@@ -2134,7 +2635,7 @@
   min-height: 42px;
   padding: 0 7px 0 11px;
 }
-.mcap-done-row > span { flex: 1; min-width: 0; }
+.mcap-done-row > span:not(.mbrand-tile) { flex: 1; min-width: 0; }
 .mcap-done-row b { font-size: 13px; font-variant-numeric: tabular-nums; font-weight: 800; }
 .mcap-done-row > span b { display: block; }
 .mcap-done-row small { color: var(--m-muted); display: block; font-size: 10.5px; }
@@ -2233,3 +2734,863 @@
 .mcap-cat-bar { background: var(--m-surface-2); border-radius: 99px; height: 5px; overflow: hidden; }
 .mcap-cat-bar i { border-radius: 99px; display: block; height: 100%; }
 .mcap-cat small { color: var(--m-muted); font-size: 11px; }
+
+/* ══ LA FICHA DE CLIENTE ════════════════════════════════════════════
+   Empieza como un contacto —avatar y nombre en grande— y sigue con la cifra
+   que importa. Lo demás va en tarjetas con título, en vez de catorce campos
+   iguales en fila con la etiqueta encima. */
+.mcf-hero {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  padding: 4px 0 2px;
+}
+.mcf-ava {
+  align-items: center;
+  border-radius: 50%;
+  display: inline-flex;
+  font-size: 24px;
+  font-weight: 850;
+  height: 68px;
+  justify-content: center;
+  letter-spacing: .02em;
+  transition: background var(--m-duration) var(--m-ease), color var(--m-duration) var(--m-ease);
+  width: 68px;
+}
+.mcf-name {
+  background: transparent;
+  border: 0;
+  border-bottom: 1.5px solid var(--m-border);
+  color: var(--m-text);
+  font: inherit;
+  font-size: 20px;
+  font-weight: 800;
+  min-height: 44px;
+  outline: none;
+  text-align: center;
+  transition: border-color var(--m-duration) var(--m-ease);
+  width: 100%;
+}
+.mcf-name::placeholder { color: var(--m-muted); font-weight: 600; opacity: .7; }
+.mcf-name:focus { border-bottom-color: var(--m-primary); }
+
+.mcf-amount {
+  background: var(--m-surface);
+  border: 1px solid var(--m-border);
+  border-radius: var(--m-radius);
+  box-shadow: var(--m-filo);
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  padding: 14px 14px 12px;
+}
+/* La fila ocupa el ancho de la tarjeta y centra por dentro: centrada como
+   elemento, no podía encogerse y con letra grande se salía por la derecha. */
+.mcf-amount-row { align-items: center; display: flex; gap: 6px; justify-content: center; justify-self: stretch; min-width: 0; }
+.mcf-cur {
+  align-items: center;
+  background: var(--m-surface-2);
+  border: 1px solid var(--m-border);
+  border-radius: 999px;
+  color: var(--m-text);
+  display: inline-flex;
+  flex: none;
+  font-size: 15px;
+  font-weight: 800;
+  gap: 3px;
+  min-height: 36px;
+  padding: 0 10px;
+}
+.mcf-cur.on { border-color: var(--m-primary); }
+.mcf-amount-input {
+  -moz-appearance: textfield;
+  appearance: textfield;
+  background: transparent;
+  border: 0;
+  color: var(--m-text);
+  font: inherit;
+  font-size: 34px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 850;
+  letter-spacing: -.02em;
+  flex: 0 1 7ch;
+  min-width: 0;
+  outline: none;
+  text-align: left;
+  width: 7ch;
+}
+.mcf-amount-input::-webkit-inner-spin-button,
+.mcf-amount-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.mcf-amount-input::placeholder { color: var(--m-muted); opacity: .5; }
+/* El foco se ve en el borde de la tarjeta, no como una caja dentro de ella. */
+.mcf-amount-input:focus,
+.mcf-amount-input:focus-visible { border: 0; box-shadow: none; outline: none; }
+.mcf-amount:focus-within { border-color: var(--m-primary); }
+.mcf-amount-sub { color: var(--m-muted); font-size: 12px; font-weight: 650; text-align: center; }
+.mcf-cur-list { padding-top: 4px; width: 100%; }
+.mcf-cur-list .mbizs-chips { justify-content: center; }
+
+.mcf-sec {
+  background: var(--m-surface);
+  border: 1px solid var(--m-border);
+  border-radius: var(--m-radius);
+  display: grid;
+  gap: 12px;
+  padding: 13px 13px 14px;
+}
+.mcf-sec-title {
+  align-items: center;
+  color: var(--m-text);
+  display: flex;
+  font-size: 13.5px;
+  font-weight: 800;
+  gap: 7px;
+  margin: 0;
+}
+.mcf-sec-title svg { color: var(--m-primary); }
+.mcf-sec .mbizs-chips button,
+.mcf-sec .mbizs-days button { background: var(--m-surface-2); }
+.mcf-sec .mbizs-chips button.on { background: color-mix(in oklab, var(--m-primary) 20%, transparent); }
+.mcf-sec .mbizs-toggle { background: var(--m-surface-2); }
+.mcf-next {
+  align-items: center;
+  color: var(--m-muted);
+  display: flex;
+  font-size: 12.5px;
+  font-weight: 650;
+  gap: 6px;
+  margin: 0;
+}
+
+.mcf-dots button { align-items: center; display: inline-flex; gap: 7px; }
+.mcf-dots button i { border-radius: 50%; flex: none; height: 8px; width: 8px; }
+
+.mcf-svcs { display: grid; gap: 6px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.mcf-svcs button {
+  align-items: center;
+  background: var(--m-surface-2);
+  border: 1px solid var(--m-border);
+  border-radius: 13px;
+  color: var(--m-text);
+  display: flex;
+  font-size: 13px;
+  font-weight: 700;
+  gap: 8px;
+  min-height: 44px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  padding: 6px 9px;
+  text-align: left;
+}
+.mcf-svcs button.on {
+  background: color-mix(in oklab, var(--m-primary) 16%, transparent);
+  border-color: var(--m-primary);
+}
+.mcf-svc-none {
+  align-items: center;
+  background: var(--m-surface-3);
+  border-radius: 8px;
+  color: var(--m-muted);
+  display: inline-flex;
+  flex: none;
+  height: 26px;
+  justify-content: center;
+  width: 26px;
+}
+
+.mcf-rows {
+  background: var(--m-surface-2);
+  border-radius: 14px;
+  display: grid;
+  overflow: hidden;
+}
+.mcf-row {
+  align-items: flex-start;
+  display: flex;
+  gap: 11px;
+  padding: 10px 12px;
+}
+.mcf-row + .mcf-row { border-top: 1px solid var(--m-border); }
+.mcf-row > svg { color: var(--m-muted); flex: none; margin-top: 15px; }
+.mcf-row > span { display: grid; flex: 1; gap: 2px; min-width: 0; }
+.mcf-row small { color: var(--m-muted); font-size: 11px; font-weight: 700; }
+.mcf-row input,
+.mcf-row textarea {
+  background: transparent;
+  border: 0;
+  color: var(--m-text);
+  font: inherit;
+  font-size: 14.5px;
+  min-height: 26px;
+  outline: none;
+  padding: 0;
+  resize: vertical;
+  width: 100%;
+}
+.mcf-row input::placeholder { color: var(--m-muted); opacity: .7; }
+.mcf-row:focus-within > svg { color: var(--m-primary); }
+
+@media (prefers-reduced-motion: reduce) {
+  .mcf-ava, .mcf-name { transition: none; }
+}
+
+/* ══ NEGOCIO A FONDO ══════════════════════════════════════════════════
+   Clientes, Cobros y Ganancia; la ficha y la pantalla de servicio; los
+   pagos solos, las estrellas y crear sin salir. Mismos tokens que el resto
+   de Negocio: nada aquí tiene un color que solo funcione en un tema. */
+
+/* E1 · Tres pestañas, con el número de lo atrasado en Cobros. */
+.mbiz-tabs-3 { grid-template-columns: repeat(3, 1fr); }
+.mbiz-tabs button { position: relative; }
+.mbiz-tab-badge {
+  background: var(--m-expense);
+  border-radius: 99px;
+  color: var(--m-bg);
+  display: inline-block;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 900;
+  line-height: 16px;
+  margin-left: 5px;
+  min-width: 16px;
+  padding: 0 4px;
+  text-align: center;
+}
+
+/* ── Menús con nombre (⋯) ────────────────────────────────── */
+.mmenu { display: grid; gap: 4px; }
+.mmenu > button {
+  align-items: center;
+  background: var(--m-surface);
+  border: 1px solid var(--m-border);
+  border-radius: 13px;
+  color: var(--m-text);
+  display: flex;
+  gap: 12px;
+  min-height: 52px;
+  padding: 9px 13px;
+  text-align: left;
+  width: 100%;
+}
+.mmenu > button > svg { color: var(--m-muted); flex: none; }
+.mmenu > button > span { display: grid; gap: 1px; min-width: 0; }
+.mmenu > button b { font-size: 14px; font-weight: 750; }
+.mmenu > button small { color: var(--m-muted); font-size: 11.5px; line-height: 1.35; }
+.mmenu > button:disabled { opacity: .45; }
+.mmenu > button.danger { border-color: color-mix(in oklab, var(--m-expense) 35%, var(--m-border)); }
+.mmenu > button.danger, .mmenu > button.danger > svg { color: var(--m-expense); }
+.mmenu-sep { background: var(--m-border); height: 1px; margin: 4px 2px; }
+
+/* ── L1 · Borrar, con sus tres salidas ───────────────────── */
+.mdel-opts { display: grid; gap: 7px; }
+.mdel-opts > button {
+  background: var(--m-surface);
+  border: 1px solid var(--m-border);
+  border-radius: 14px;
+  color: var(--m-text);
+  display: grid;
+  gap: 2px;
+  padding: 12px 14px;
+  text-align: left;
+}
+.mdel-opts > button b { font-size: 14px; font-weight: 800; }
+.mdel-opts > button small { color: var(--m-muted); font-size: 12px; line-height: 1.35; }
+.mdel-opts > button.best { border-color: var(--m-primary); background: color-mix(in oklab, var(--m-primary) 10%, var(--m-surface)); }
+.mdel-opts > button.danger b { color: var(--m-expense); }
+.mdel-opts > button.ghost { background: transparent; }
+.mbizs-danger-link {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: var(--m-expense);
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 750;
+  gap: 6px;
+  justify-self: start;
+  padding: 6px 2px;
+}
+
+/* ── La ficha del cliente ────────────────────────────────── */
+.mcc-hero { align-items: center; display: grid; gap: 5px; justify-items: center; padding: 2px 0 4px; text-align: center; }
+.mcc-ava {
+  align-items: center;
+  border-radius: 50%;
+  display: inline-flex;
+  font-size: 24px;
+  font-weight: 850;
+  height: 68px;
+  justify-content: center;
+  position: relative;
+  width: 68px;
+}
+.mcc-ava-stars {
+  background: var(--m-warn);
+  border: 2px solid var(--m-bg);
+  border-radius: 99px;
+  bottom: -4px;
+  color: var(--m-bg);
+  font-size: 10.5px;
+  font-style: normal;
+  font-weight: 900;
+  padding: 1px 6px;
+  position: absolute;
+  right: -6px;
+}
+.mcc-name { color: var(--m-text); font-size: 19px; font-weight: 850; letter-spacing: -.01em; overflow-wrap: anywhere; }
+.mcc-sub { align-items: center; color: var(--m-muted); display: inline-flex; flex-wrap: wrap; font-size: 12.5px; gap: 6px; justify-content: center; }
+.mcc-ref { align-items: center; color: var(--m-warn); display: inline-flex; font-size: 12px; font-weight: 700; gap: 5px; }
+
+.mcc-trio { display: grid; gap: 6px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.mcc-trio > div {
+  background: var(--m-surface);
+  border: 1px solid var(--m-border);
+  border-radius: 13px;
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 9px 10px;
+}
+.mcc-trio small { color: var(--m-muted); font-size: 11px; font-weight: 700; }
+.mcc-trio b { color: var(--m-text); font-size: 14px; font-variant-numeric: tabular-nums; font-weight: 850; overflow-wrap: anywhere; }
+.mcc-trio > div.due { border-color: color-mix(in oklab, var(--m-expense) 45%, var(--m-border)); }
+.mcc-trio > div.due b, .mcc-trio b.expense { color: var(--m-expense); }
+.mcc-trio > div.paid b { color: var(--m-income); }
+.mcli-meta s { color: var(--m-muted); margin-right: 3px; }
+
+/* Las estrellas: las que tiene encendidas, las que le faltan apagadas. */
+.mcc-stars {
+  background: color-mix(in oklab, var(--m-warn) 8%, var(--m-surface));
+  border: 1px solid color-mix(in oklab, var(--m-warn) 30%, var(--m-border));
+  border-radius: 16px;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+.mcc-stars-top { align-items: center; display: flex; gap: 11px; }
+.mcc-stars-row { display: inline-flex; flex: none; gap: 1px; }
+.mcc-stars-row i { color: color-mix(in oklab, var(--m-muted) 45%, transparent); font-size: 17px; font-style: normal; line-height: 1; }
+.mcc-stars-row i.on { color: var(--m-warn); }
+.mcc-stars-txt { display: grid; gap: 2px; min-width: 0; }
+.mcc-stars-txt b { color: var(--m-text); font-size: 13.5px; font-weight: 800; }
+.mcc-stars-txt small { color: var(--m-muted); font-size: 12px; line-height: 1.35; }
+.mcc-stars-acts { display: flex; flex-wrap: wrap; gap: 6px; }
+.mcc-stars-acts button {
+  align-items: center;
+  background: var(--m-surface);
+  border: 1px solid var(--m-border);
+  border-radius: 99px;
+  color: var(--m-text);
+  display: inline-flex;
+  font-size: 12.5px;
+  font-weight: 750;
+  gap: 5px;
+  min-height: 34px;
+  padding: 0 12px;
+}
+.mcc-stars-acts button.ghost { background: transparent; color: var(--m-muted); }
+.mcc-stars-list { display: grid; gap: 4px; list-style: none; margin: 0; padding: 0; }
+.mcc-stars-list li { align-items: center; display: flex; font-size: 12.5px; gap: 8px; }
+.mcc-stars-list li span { color: var(--m-text); flex: 1; min-width: 0; }
+.mcc-stars-list li small { color: var(--m-muted); }
+.mcc-stars-list li.old { opacity: .55; }
+.mcc-stars-list li button { background: transparent; border: 0; color: var(--m-muted); padding: 4px; }
+
+.mcc-acts { display: grid; gap: 6px; grid-template-columns: 1fr 1fr auto; }
+.mcc-acts button, .mcc-acts-full {
+  align-items: center;
+  background: var(--m-surface-2);
+  border: 0;
+  border-radius: 12px;
+  color: var(--m-text);
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 800;
+  gap: 6px;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 12px;
+}
+.mcc-acts button.primary { background: var(--m-primary); color: var(--m-primary-text); }
+.mcc-acts button.more { width: 44px; }
+.mcc-acts-full { width: 100%; }
+
+/* Su historia: una línea con un punto por momento. */
+.mcc-tl { border-left: 2px solid var(--m-border); display: grid; gap: 12px; list-style: none; margin: 0 0 0 6px; padding: 2px 0 2px 16px; }
+.mcc-tl li { align-items: center; display: flex; gap: 8px; position: relative; }
+.mcc-tl li > i {
+  background: var(--m-income);
+  border: 2px solid var(--m-bg);
+  border-radius: 50%;
+  height: 11px;
+  left: -23.5px;
+  position: absolute;
+  top: 4px;
+  width: 11px;
+}
+.mcc-tl li.k-late-paid > i, .mcc-tl li.k-partial > i { background: var(--m-warn); }
+.mcc-tl li.k-waived > i { background: var(--m-expense); }
+.mcc-tl li.k-price > i { background: var(--m-primary); }
+.mcc-tl li.k-star > i, .mcc-tl li.k-referred > i { background: var(--m-warn); }
+.mcc-tl li.k-joined > i { background: var(--m-muted); }
+.mcc-tl li > span { display: grid; flex: 1; gap: 1px; min-width: 0; }
+.mcc-tl li b { color: var(--m-text); font-size: 13px; font-weight: 700; }
+.mcc-tl li small { color: var(--m-muted); font-size: 11.5px; }
+
+/* Elegir a una persona de una lista (a quién trajo, quién lo recomendó). */
+/* Sin scroll propio: la hoja entera se desliza (ver más abajo). */
+.mcc-pick { display: grid; gap: 4px; }
+.mcc-pick > button {
+  align-items: center;
+  background: var(--m-surface);
+  border: 1px solid var(--m-border);
+  border-radius: 12px;
+  color: var(--m-text);
+  display: flex;
+  font-size: 13.5px;
+  font-weight: 700;
+  gap: 10px;
+  min-height: 46px;
+  padding: 6px 11px;
+  text-align: left;
+}
+.mcc-pick > button > span:nth-child(2) { flex: 1; min-width: 0; }
+.mcc-pick > button.on { border-color: var(--m-primary); background: color-mix(in oklab, var(--m-primary) 12%, var(--m-surface)); }
+.mcc-pick > button em { color: var(--m-warn); font-size: 12px; font-style: normal; font-weight: 800; }
+
+/* El formulario de cliente: la fila de «quién lo recomendó». */
+.mcf-row-btn { background: transparent; border: 0; color: inherit; text-align: left; width: 100%; }
+.mcf-row-btn b { color: var(--m-text); font-size: 14.5px; font-weight: 600; }
+.mcf-row-btn b.empty { color: var(--m-muted); font-weight: 500; }
+.mcf-row-btn > svg:last-child { align-self: center; margin-top: 0; }
+.mcf-svcs button.add {
+  border-style: dashed;
+  border-color: var(--m-primary);
+  color: var(--m-primary);
+  justify-content: center;
+}
+
+/* ── K1 · K2 · Crear ahí mismo ───────────────────────────── */
+.mpick-add {
+  align-items: center;
+  border-style: dashed !important;
+  border-color: var(--m-primary) !important;
+  color: var(--m-primary) !important;
+  display: inline-flex;
+  gap: 4px;
+}
+.mpick-colors { display: flex; flex-wrap: wrap; gap: 9px; }
+.mpick-colors button {
+  border: 2px solid transparent;
+  border-radius: 50%;
+  height: 32px;
+  width: 32px;
+}
+.mpick-colors button.on { border-color: var(--m-text); box-shadow: 0 0 0 2px var(--m-bg) inset; }
+
+/* K3 · Las dos categorías propias, propuestas. */
+.mbizs-propose {
+  background: color-mix(in oklab, var(--m-primary) 9%, var(--m-surface));
+  border: 1px solid color-mix(in oklab, var(--m-primary) 40%, var(--m-border));
+  border-radius: 15px;
+  display: grid;
+  gap: 7px;
+  padding: 12px;
+}
+.mbizs-propose > b { color: var(--m-text); font-size: 13.5px; font-weight: 800; }
+.mbizs-propose > span { align-items: center; color: var(--m-text); display: flex; font-size: 13.5px; font-weight: 700; gap: 8px; }
+.mbizs-propose > span small { color: var(--m-muted); font-size: 11.5px; font-weight: 600; margin-left: auto; }
+.mbizs-propose > span i {
+  align-items: center;
+  border-radius: 50%;
+  display: inline-flex;
+  font-style: normal;
+  font-weight: 900;
+  height: 22px;
+  justify-content: center;
+  width: 22px;
+}
+.mbizs-propose i.in { background: color-mix(in oklab, var(--m-income) 20%, transparent); color: var(--m-income); }
+.mbizs-propose i.out { background: color-mix(in oklab, var(--m-expense) 20%, transparent); color: var(--m-expense); }
+.mbizs-propose > p { color: var(--m-muted); font-size: 12px; line-height: 1.4; margin: 0; }
+.mbizs-propose > button {
+  background: var(--m-primary);
+  border: 0;
+  border-radius: 11px;
+  color: var(--m-primary-text);
+  font-size: 13.5px;
+  font-weight: 800;
+  min-height: 42px;
+}
+.mbizs-stars { display: grid; gap: 10px; }
+
+/* ── E2 · La lista de clientes ───────────────────────────── */
+.mcl-search {
+  align-items: center;
+  background: var(--m-surface);
+  border: 1px solid var(--m-border);
+  border-radius: 13px;
+  color: var(--m-muted);
+  display: flex;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 12px;
+}
+.mcl-search:focus-within { border-color: var(--m-primary); }
+.mcl-search input { background: transparent; border: 0; color: var(--m-text); flex: 1; font: inherit; font-size: 14px; min-width: 0; outline: none; }
+.mcl-search button { background: transparent; border: 0; color: var(--m-muted); padding: 4px; }
+.mcl-filters { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+.mcl-filters::-webkit-scrollbar { display: none; }
+.mcl-filters button {
+  background: var(--m-surface);
+  border: 1px solid var(--m-border);
+  border-radius: 99px;
+  color: var(--m-muted);
+  flex: none;
+  font-size: 12.5px;
+  font-weight: 700;
+  min-height: 34px;
+  padding: 0 12px;
+}
+.mcl-filters button b { color: var(--m-text); font-variant-numeric: tabular-nums; margin-left: 3px; }
+.mcl-filters button.on { background: color-mix(in oklab, var(--m-primary) 18%, transparent); border-color: var(--m-primary); color: var(--m-text); }
+.mcl-sort { background: var(--m-surface); border-radius: 11px; display: grid; gap: 2px; grid-template-columns: repeat(4, 1fr); padding: 3px; }
+.mcl-sort button { background: transparent; border: 0; border-radius: 8px; color: var(--m-muted); font-size: 11.5px; font-weight: 750; min-height: 32px; padding: 0 4px; }
+.mcl-sort button.on { background: var(--m-surface-2); color: var(--m-text); }
+.mcl-tip { color: var(--m-muted); font-size: 11.5px; line-height: 1.4; margin: 2px 0 0; text-align: center; }
+.mbiz-star { color: var(--m-warn); font-size: 11px; font-style: normal; font-weight: 900; margin-left: 6px; }
+.mbiz-client.sel { border-color: var(--m-primary); background: color-mix(in oklab, var(--m-primary) 12%, var(--m-surface)); }
+.mbiz-client.sel .mbiz-ava { background: var(--m-primary); color: var(--m-primary-text); }
+
+/* L3 · Deslizar hacia los dos lados: cada fondo sale por su lado. */
+.mbiz-swipe-row { z-index: 1; }
+.mbiz-swipe-bg.remind {
+  background: color-mix(in oklab, var(--m-primary) 85%, transparent);
+  justify-content: flex-end;
+  opacity: 0;
+  padding-left: 0;
+  padding-right: 14px;
+}
+.mbiz-swipe-row.m-swipe-left ~ .mbiz-swipe-bg.remind { opacity: 1; }
+.mbiz-swipe-row.m-swipe-left ~ .mbiz-swipe-bg.pay { opacity: 0; }
+
+/* L2 · La barra de la selección, fija abajo por encima de la navegación. */
+.mcl-selbar {
+  background: var(--m-surface);
+  border: 1px solid var(--m-border);
+  border-radius: 18px;
+  bottom: calc(86px + env(safe-area-inset-bottom, 0px));
+  box-shadow: var(--m-elevation);
+  display: grid;
+  gap: 8px;
+  left: 12px;
+  padding: 10px;
+  position: fixed;
+  right: 12px;
+  z-index: 30;
+}
+.mcl-selbar-top { align-items: center; display: flex; gap: 8px; }
+.mcl-selbar-top b { color: var(--m-text); flex: 1; font-size: 14px; font-weight: 800; }
+.mcl-selbar-top button { background: transparent; border: 0; color: var(--m-muted); padding: 4px; }
+.mcl-selbar-top button.link { color: var(--m-primary); font-size: 13px; font-weight: 750; }
+.mcl-selbar-acts { display: grid; gap: 5px; grid-template-columns: repeat(4, 1fr); }
+.mcl-selbar-acts button {
+  align-items: center;
+  background: var(--m-surface-2);
+  border: 0;
+  border-radius: 11px;
+  color: var(--m-text);
+  display: grid;
+  font-size: 11.5px;
+  font-weight: 750;
+  gap: 3px;
+  justify-items: center;
+  min-height: 52px;
+}
+.mcl-selbar-acts button:disabled { opacity: .45; }
+.mcl-selbar-acts button.danger { color: var(--m-expense); }
+
+/* ── E3 · Cobros ─────────────────────────────────────────── */
+.mcol-month {
+  background: var(--m-surface);
+  border: 1px solid var(--m-border);
+  border-radius: 15px;
+  display: grid;
+  gap: 4px 10px;
+  grid-template-columns: 1fr 1fr;
+  padding: 11px 13px;
+}
+.mcol-month span { display: grid; gap: 1px; }
+.mcol-month span.right { text-align: right; }
+.mcol-month small { color: var(--m-muted); font-size: 11px; font-weight: 700; }
+.mcol-month b { color: var(--m-text); font-size: 15px; font-variant-numeric: tabular-nums; font-weight: 850; }
+.mcol-month b.income { color: var(--m-income); }
+.mcol-bar { background: var(--m-surface-2); border-radius: 99px; grid-column: 1 / -1; height: 6px; margin-top: 4px; overflow: hidden; }
+.mcol-bar i { background: var(--m-income); border-radius: inherit; display: block; height: 100%; transition: width var(--m-duration-slow) var(--m-ease); }
+
+.mcol-ask {
+  align-items: center;
+  background: color-mix(in oklab, var(--m-warn) 9%, var(--m-surface));
+  border: 1px solid color-mix(in oklab, var(--m-warn) 35%, var(--m-border));
+  border-radius: 15px;
+  display: grid;
+  gap: 9px 10px;
+  grid-template-columns: auto 1fr;
+  padding: 11px 12px;
+}
+.mcol-ask-id { display: grid; gap: 1px; min-width: 0; }
+.mcol-ask-id b { color: var(--m-text); font-size: 13.5px; font-weight: 800; }
+.mcol-ask-id small { color: var(--m-muted); font-size: 12px; }
+.mcol-ask-acts { display: flex; gap: 6px; grid-column: 1 / -1; }
+.mcol-ask-acts button {
+  background: var(--m-surface-2);
+  border: 0;
+  border-radius: 10px;
+  color: var(--m-text);
+  font-size: 12.5px;
+  font-weight: 800;
+  min-height: 38px;
+  padding: 0 12px;
+}
+.mcol-ask-acts button.go { background: var(--m-primary); color: var(--m-primary-text); flex: 1; }
+.mcol-ask-acts button.ghost { background: transparent; color: var(--m-muted); }
+
+.mcol-group-head { align-items: center; display: flex; gap: 8px; }
+.mcol-group-head > .mbiz-group-head { flex: 1; min-width: 0; }
+.mcol-batch {
+  background: color-mix(in oklab, var(--m-income) 18%, transparent);
+  border: 0;
+  border-radius: 99px;
+  color: var(--m-income);
+  flex: none;
+  font-size: 12px;
+  font-weight: 850;
+  min-height: 30px;
+  padding: 0 11px;
+}
+.mbiz-group-head > em { font-size: 12px; font-style: normal; font-variant-numeric: tabular-nums; font-weight: 800; margin-left: auto; }
+.mbiz-group-head > em.income { color: var(--m-income); }
+.mbiz-group-head > em + svg { margin-left: 8px; }
+.mcol-done-label { margin-top: 6px; }
+.mcol-batch-list { display: grid; gap: 2px; }
+.mcol-batch-list > div {
+  border-bottom: 1px solid var(--m-border);
+  display: flex;
+  font-size: 13.5px;
+  justify-content: space-between;
+  padding: 9px 2px;
+}
+.mcol-batch-list b { font-variant-numeric: tabular-nums; }
+
+/* ── S1 · La pantalla de un servicio ─────────────────────── */
+.msvs-head { align-items: center; display: flex; gap: 12px; }
+.msvs-head > span:not(.mbrand-tile) { display: grid; flex: 1; gap: 2px; min-width: 0; }
+.msvs-head b { color: var(--m-text); font-size: 18px; font-weight: 850; overflow-wrap: anywhere; }
+.msvs-head small { color: var(--m-muted); font-size: 12px; }
+.msvs-archived { background: var(--m-surface-2); border-radius: 99px; color: var(--m-muted); font-size: 10.5px; font-style: normal; font-weight: 800; justify-self: start; padding: 2px 8px; }
+.msvs-more { background: var(--m-surface-2); border: 0; border-radius: 12px; color: var(--m-text); flex: none; height: 42px; width: 42px; }
+.msvs-tabs { background: var(--m-surface); border-radius: 12px; display: grid; gap: 2px; grid-template-columns: repeat(4, 1fr); padding: 3px; }
+.msvs-tabs button { background: transparent; border: 0; border-radius: 9px; color: var(--m-muted); font-size: 12px; font-weight: 750; min-height: 34px; }
+.msvs-tabs button.on { background: var(--m-surface-2); color: var(--m-text); }
+.msvs-big {
+  background: color-mix(in oklab, var(--m-income) 9%, var(--m-surface));
+  border-radius: 16px;
+  display: grid;
+  gap: 2px;
+  padding: 14px;
+}
+.msvs-big.neg { background: color-mix(in oklab, var(--m-expense) 9%, var(--m-surface)); }
+.msvs-big small { color: var(--m-muted); font-size: 11.5px; font-weight: 700; }
+.msvs-big b { color: var(--m-income); font-size: 28px; font-variant-numeric: tabular-nums; font-weight: 900; letter-spacing: -.02em; }
+.msvs-big.neg b { color: var(--m-expense); }
+.msvs-big span { color: var(--m-muted); font-size: 12px; }
+.msvs-pay-row {
+  align-items: center;
+  background: var(--m-surface);
+  border: 1px solid var(--m-border);
+  border-radius: 14px;
+  color: var(--m-text);
+  display: flex;
+  gap: 11px;
+  padding: 11px 13px;
+  text-align: left;
+  width: 100%;
+}
+.msvs-pay-row > svg:first-child { color: var(--m-primary); flex: none; }
+.msvs-pay-row > span { display: grid; flex: 1; gap: 1px; min-width: 0; }
+.msvs-pay-row b { font-size: 13.5px; font-weight: 800; }
+.msvs-pay-row small { color: var(--m-muted); font-size: 12px; }
+.msvs-suggest {
+  background: color-mix(in oklab, var(--m-primary) 9%, var(--m-surface));
+  border: 1px solid color-mix(in oklab, var(--m-primary) 35%, var(--m-border));
+  border-radius: 15px;
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+}
+.msvs-suggest b { color: var(--m-text); font-size: 13.5px; font-weight: 800; }
+.msvs-suggest small { color: var(--m-muted); font-size: 12px; line-height: 1.4; }
+.msvs-suggest button {
+  background: var(--m-primary);
+  border: 0;
+  border-radius: 10px;
+  color: var(--m-primary-text);
+  font-size: 13px;
+  font-weight: 800;
+  justify-self: start;
+  min-height: 38px;
+  padding: 0 14px;
+}
+.msvs-suggest-acts { display: flex; gap: 6px; }
+.msvs-suggest-acts button.ghost { background: transparent; color: var(--m-muted); }
+.msvs-preview {
+  background: var(--m-surface);
+  border: 1px dashed var(--m-border);
+  border-radius: 14px;
+  display: grid;
+  gap: 3px;
+  padding: 12px;
+}
+.msvs-preview b { color: var(--m-text); font-size: 13.5px; font-weight: 800; }
+.msvs-preview small { color: var(--m-muted); font-size: 12px; line-height: 1.4; }
+.msvs-preview small.warn { color: var(--m-warn); }
+.msvs-clients { display: grid; gap: 5px; }
+.msvs-clients > button {
+  align-items: center;
+  background: var(--m-surface);
+  border: 1px solid var(--m-border);
+  border-radius: 13px;
+  color: var(--m-text);
+  display: flex;
+  gap: 10px;
+  padding: 9px 11px;
+  text-align: left;
+}
+.msvs-clients > button.neg { border-color: color-mix(in oklab, var(--m-expense) 40%, var(--m-border)); }
+.msvs-c-id { display: grid; flex: 1; gap: 1px; min-width: 0; }
+.msvs-c-id b { font-size: 13.5px; font-weight: 750; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.msvs-c-id small { color: var(--m-muted); font-size: 11.5px; }
+.msvs-c-amt { color: var(--m-income); flex: none; font-size: 14px; font-variant-numeric: tabular-nums; font-weight: 850; }
+.msvs-clients > button.neg .msvs-c-amt { color: var(--m-expense); }
+
+/* S5 · La cuadrícula de logos. */
+.msvc-brands { display: grid; gap: 8px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.msvc-brands button {
+  align-items: center;
+  background: var(--m-surface);
+  border: 1px solid var(--m-border);
+  border-radius: 14px;
+  color: var(--m-text);
+  display: grid;
+  gap: 5px;
+  justify-items: center;
+  min-width: 0;
+  padding: 10px 4px 8px;
+}
+.msvc-brands small { color: var(--m-muted); font-size: 10.5px; font-weight: 700; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.msvc-acc-top { background: transparent; border: 0; color: inherit; text-align: left; width: 100%; }
+.msvc-acc-top > svg { color: var(--m-muted); flex: none; }
+.msvc-slot { border: 0; }
+.msvc-acc-profit { color: var(--m-income); font-size: 12px; font-weight: 700; margin: 0; }
+.msvc-acc-profit.neg { color: var(--m-expense); }
+
+/* ── P4 · Cómo se paga ───────────────────────────────────── */
+.mpay-modes { display: grid; gap: 6px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.mpay-modes button {
+  background: var(--m-surface);
+  border: 1px solid var(--m-border);
+  border-radius: 14px;
+  color: var(--m-text);
+  display: grid;
+  gap: 3px;
+  padding: 11px 9px;
+  text-align: left;
+}
+.mpay-modes button b { font-size: 13.5px; font-weight: 850; }
+.mpay-modes button small { color: var(--m-muted); font-size: 11px; line-height: 1.35; }
+.mpay-modes button.on { background: color-mix(in oklab, var(--m-primary) 14%, var(--m-surface)); border-color: var(--m-primary); }
+
+/* ── Ganancia: tarjetas de abajo ─────────────────────────── */
+.mprof-card {
+  background: var(--m-surface);
+  border: 1px solid var(--m-border);
+  border-radius: var(--m-radius);
+  display: grid;
+  gap: 10px;
+  padding: 13px;
+}
+.mprof-card-head { align-items: center; color: var(--m-text); display: flex; font-size: 13.5px; font-weight: 850; gap: 7px; }
+.mprof-card-head svg { color: var(--m-primary); }
+.mprof-pay {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--m-border);
+  color: var(--m-text);
+  display: flex;
+  font-size: 13px;
+  gap: 9px;
+  padding: 7px 0;
+  text-align: left;
+}
+.mprof-pay span { flex: 1; min-width: 0; }
+.mprof-pay b { font-variant-numeric: tabular-nums; }
+.mprof-chart { align-items: flex-end; display: flex; gap: 6px; height: 74px; padding-bottom: 16px; }
+.mprof-chart > span { align-items: center; display: flex; flex: 1; flex-direction: column; height: 100%; justify-content: flex-end; position: relative; }
+.mprof-chart > span > i { background: color-mix(in oklab, var(--m-income) 60%, transparent); border-radius: 5px 5px 2px 2px; display: block; width: 100%; }
+.mprof-chart > span > i.neg { background: color-mix(in oklab, var(--m-expense) 65%, transparent); }
+.mprof-chart > span.weak > i { background: var(--m-warn); }
+.mprof-chart u { bottom: -16px; color: var(--m-muted); font-size: 10px; position: absolute; text-decoration: none; text-transform: capitalize; }
+.mprof-rows { display: grid; gap: 0; }
+.mprof-rows > div { align-items: baseline; border-bottom: 1px solid var(--m-border); display: grid; gap: 2px 8px; grid-template-columns: 1fr auto; padding: 6px 0; }
+.mprof-rows span { color: var(--m-text); display: block; font-size: 13px; }
+.mprof-rows span::first-letter { text-transform: uppercase; }
+.mprof-rows small { color: var(--m-muted); font-size: 11px; font-variant-numeric: tabular-nums; grid-column: 1; }
+.mprof-rows b { font-size: 13.5px; font-variant-numeric: tabular-nums; grid-column: 2; grid-row: 1 / span 2; }
+.mprof-rows b.expense { color: var(--m-expense); }
+.mprof-rows > div.weak span { color: var(--m-warn); font-weight: 800; }
+.mbiz-archived-link { background: transparent; border: 0; color: var(--m-muted); font-size: 12px; font-weight: 700; justify-self: start; padding: 4px 2px; }
+.mbiz-svc.archived { opacity: .6; }
+
+@media (prefers-reduced-motion: reduce) {
+  .mcol-bar i { transition: none; }
+}
+
+/* ══ LAS HOJAS DE NEGOCIO SE DESLIZAN ENTERAS ════════════════════════
+   Eran las únicas de la app que se desplazaban en una caja INTERIOR (el
+   cuerpo), y en el teléfono el dedo no la movía: no se podía bajar al editar
+   un cliente ni pasar del día del mes. Todas las demás hojas, que sí se
+   deslizan, lo hacen en la propia hoja. Ahora estas también: la hoja entera
+   se desplaza, la cabecera se queda pegada arriba y los botones abajo, así
+   que se ven igual pero el scroll es el mismo que funciona en el resto.
+   Más específico que `.mobile-detail-sheet section` a propósito. */
+.mobile-detail-sheet .mbizs {
+  display: block;
+  max-height: 92dvh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y pinch-zoom;
+}
+.mobile-detail-sheet .mbizs > .mbizs-head {
+  background: var(--m-bg);
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+.mobile-detail-sheet .mbizs > .mbizs-body {
+  /* Una columna del ancho de la hoja, nunca más: sin el scroll propio, la
+     cuadrícula se ensanchaba con el campo más ancho y cortaba los lados con
+     letra grande en pantallas estrechas. */
+  grid-template-columns: minmax(0, 1fr);
+  min-height: auto;
+  min-width: 0;
+  overflow: visible;
+}
+.mobile-detail-sheet .mbizs > .mbizs-actions {
+  bottom: 0;
+  position: sticky;
+  z-index: 3;
+}

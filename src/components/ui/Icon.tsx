@@ -24,6 +24,7 @@ import {
   Banknote, Coins, HandCoins, Landmark, Receipt,
   // Iconos de los temas: cada uno tiene que decir SU ambiente de un vistazo.
   Moon, Waves, Sunrise, CircleDot, Wifi,
+  GripVertical, Pin, Pause, Copy, Menu,
 } from 'lucide-react'
 import type { IconName } from '@/types'
 
@@ -137,6 +138,11 @@ const MAP: Partial<Record<IconName, LucideIcon>> = {
   handCoins:   HandCoins,
   landmark:    Landmark,
   receipt:     Receipt,
+  grip:        GripVertical,
+  pin:         Pin,
+  pause:       Pause,
+  copy:        Copy,
+  menu:        Menu,
 }
 
 interface IconProps {

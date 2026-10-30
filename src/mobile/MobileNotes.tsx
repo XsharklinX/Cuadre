@@ -1,9 +1,10 @@
 import { useMemo, useRef, useState } from 'react'
+import { IconTile } from '@/components/ui/Phrase'
 import { Icon } from '@/components/ui/Icon'
 import { toast } from '@/components/ui/Toast'
 import { useDialogs } from '@/components/ui/DialogProvider'
 import { localToday, transactionsForTotals, txForMonth } from '@/data/helpers'
-import { budgetLeft, budgetState, itemLineTotal, itemPriceLabel, noteProgress, noteShareText, noteTotals, orderedItems, type Note, type NoteItem, type NoteType } from '@/data/notes'
+import { budgetLeft, budgetState, itemLineTotal, itemPriceLabel, noteProgress, noteShareText, noteTotals, orderedItems, parseQuickItem, type Note, type NoteItem, type NoteType } from '@/data/notes'
 import { buildPriceMemory, suggestPrice } from '@/data/notePrices'
 import { useNotes } from '@/store/notes'
 import { deleteWithUndo } from '@/lib/undoDelete'
@@ -248,63 +249,39 @@ function NoteCard({ note, money, onOpen, onLongPress }: {
     onPointerCancel: () => window.clearTimeout(press.current.timer),
   }
 
-  const ring = note.type !== 'note' && totals.totalCount > 0
-  const R = 15, CIRC = 2 * Math.PI * R
+  /*
+   * L2 · UNA FILA LIMPIA, SIN CHIPS NI CÍRCULOS.
+   * Antes: icono en un cuadro, chips con cada artículo, «Comprado / Falta» y
+   * un círculo de porcentaje. Ahora: el título, una línea gris con lo que
+   * falta en texto y, a la derecha, lo que queda por gastar o «2/4».
+   */
+  const pendientes = note.items.filter(i => !i.done).map(i => i.text)
+  const linea = note.type === 'note'
+    ? (typeof preview === 'string' ? preview : '')
+    : pendientes.length === 0
+      ? (note.items.length ? t('nxlAllDone') : t('noItemsYet'))
+      : pendientes.length <= 2
+        ? pendientes.join(', ')
+        : t('nxlAndMore').replace('{items}', pendientes.slice(0, 2).join(', ')).replace('{n}', String(pendientes.length - 2))
 
   return (
     <button
-      className={`mnote-card${note.pinned ? ' pinned' : ''}${pct >= 100 && totals.totalCount > 0 ? ' done' : ''}`}
-      style={{ '--note': note.color } as React.CSSProperties}
+      className={`nxl-card${pct >= 100 && totals.totalCount > 0 ? ' done' : ''}`}
       {...pressHandlers}
       onClick={() => { if (press.current.fired) return; onOpen() }}
     >
-      <span className="mnote-card-strip" style={{ background: note.color }} />
-      <div className="mnote-card-top">
-        <span className="mnote-chip" style={{ background: `color-mix(in oklab, ${note.color} 16%, transparent)`, color: note.color }}>
-          <Icon name={note.icon} size={18} />
+      <IconTile icon={note.icon} color={note.color} />
+      <span className="nxl-card-main">
+        <b>
+          {note.pinned && <Icon name="pin" size={12} className="nxl-pin" />}
+          {note.title || t('untitledList')}
+        </b>
+        <small>{linea}{note.type === 'note' && (note.body ?? '').length > 80 ? '…' : ''}</small>
+      </span>
+      {note.type !== 'note' && totals.totalCount > 0 && (
+        <span className="nxl-card-side">
+          {showMoney && totals.remaining > 0 ? money(totals.remaining) : `${totals.boughtCount}/${totals.totalCount}`}
         </span>
-        <span className="mnote-card-body">
-          <b>
-            {note.pinned && <Icon name="star" size={12} className="mnote-pin-star" />}
-            {note.title || t('untitledList')}
-          </b>
-          <small>
-            {note.type === 'note'
-              ? t('noteTypeNote')
-              : t('itemsProgress').replace('{done}', String(totals.boughtCount)).replace('{total}', String(totals.totalCount))}
-          </small>
-        </span>
-        {showMoney ? (
-          <span className="mnote-card-tot">{money(totals.total)}<small>{t('estimatedLabel')}</small></span>
-        ) : ring ? (
-          <span className="mnote-card-ring">
-            <svg width="38" height="38" viewBox="0 0 38 38" aria-hidden="true">
-              <circle cx="19" cy="19" r={R} fill="none" stroke="color-mix(in oklab, var(--m-text) 10%, transparent)" strokeWidth="4" />
-              <circle cx="19" cy="19" r={R} fill="none" stroke={note.color} strokeWidth="4" strokeLinecap="round"
-                strokeDasharray={CIRC} strokeDashoffset={CIRC * (1 - pct / 100)} transform="rotate(-90 19 19)" />
-            </svg>
-            <em>{pct}%</em>
-          </span>
-        ) : null}
-      </div>
-      {/* Vista previa: reconocer la lista sin abrirla. Los ítems marcados van
-          tachados; el texto de una nota se muestra recortado. */}
-      {Array.isArray(preview) && preview.length > 0 && (
-        <div className="mnote-card-prev">
-          {preview.map(item => (
-            <span key={item.id} className={item.done ? 'done' : ''}>{item.text}</span>
-          ))}
-          {note.items.length > 4 && <span className="more">+{note.items.length - 4}</span>}
-        </div>
-      )}
-      {typeof preview === 'string' && preview && (
-        <div className="mnote-card-prev"><span className="note-body">{preview}{(note.body ?? '').length > 80 ? '…' : ''}</span></div>
-      )}
-      {showMoney && totals.totalCount > 0 && (
-        <div className="mnote-card-meta">
-          <span>{t('boughtLabel')} {money(totals.bought)}</span>
-          <span>{t('remainingLabel')} {money(totals.remaining)}</span>
-        </div>
       )}
     </button>
   )
@@ -422,10 +399,13 @@ function NoteDetail({ note, money, spent, onClose }: {
   const addNewItem = () => {
     const text = newText.trim()
     if (!text) return
-    const remembered = suggestPrice(priceMemory, text)
+    // L1 · «3 leche 95» → Leche × 3 a RD$95 cada una. Sin campos aparte.
+    const parsed = parseQuickItem(text)
+    const remembered = parsed.price === undefined ? suggestPrice(priceMemory, parsed.text) : null
     addItem(note.id, {
-      text,
-      ...(remembered && !remembered.stale ? { price: remembered.price } : {}),
+      text: parsed.text,
+      ...(parsed.qty && parsed.qty > 1 ? { qty: parsed.qty } : {}),
+      ...(parsed.price !== undefined ? { price: parsed.price } : remembered && !remembered.stale ? { price: remembered.price } : {}),
     })
     setNewText('')
     // Mantener el foco en el campo para escribir el siguiente ítem sin tener
@@ -483,6 +463,12 @@ function NoteDetail({ note, money, spent, onClose }: {
             />
             <button aria-label={t('close')} onClick={onClose}><Icon name="close" size={18} /></button>
           </header>
+          {!isNote && totals.totalCount > 0 && (
+            <p className="nxl-sub">
+              {t('itemsProgress').replace('{done}', String(totals.boughtCount)).replace('{total}', String(totals.totalCount))}
+              {hasMoney && totals.remaining > 0 && ` · ${t('nxlLeft').replace('{amount}', money(totals.remaining))}`}
+            </p>
+          )}
 
           <div className="mnote-detail-body">
             {isNote ? (
@@ -519,7 +505,7 @@ function NoteDetail({ note, money, spent, onClose }: {
                   <input
                     ref={addItemRef}
                     value={newText}
-                    placeholder={t('addItemPlaceholder')}
+                    placeholder={t('nxlAddHint')}
                     enterKeyHint="done"
                     onChange={e => setNewText(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addNewItem() } }}

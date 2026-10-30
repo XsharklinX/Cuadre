@@ -5,7 +5,7 @@ import { useDialogs } from '@/components/ui/DialogProvider'
 import { backupNeedsAttention, daysSinceBackup } from '@/data/backupSchedule'
 import { getDataHealthStatus } from '@/data/dataHealth'
 import { BUSINESS_ISSUE_KEY, businessHealth, isAutoFixable } from '@/data/businessHealth'
-import { accountCurrency, accountMovementsTotal, accountSecondaryMovementsTotal, dateLocale } from '@/data/helpers'
+import { accountCurrency, accountMovementsTotal, accountSecondaryMovementsTotal, contributionDelta, dateLocale } from '@/data/helpers'
 import { useFmt } from '@/hooks/useFmt'
 import { useT } from '@/i18n'
 import { playSuccessHaptic } from '@/lib/sound'
@@ -178,7 +178,7 @@ export function MobileDataHealth({ onClose }: { onClose: () => void }) {
       if (goal.openingSaved === undefined) return []
       const contributed = state.goalContributions
         .filter(c => c.goalId === goal.id)
-        .reduce((sum, c) => sum + c.amount, 0)
+        .reduce((sum, c) => sum + contributionDelta(c), 0)
       const diff = (goal.openingSaved + contributed) - goal.saved
       return Math.abs(diff) > 0.005 ? [{ goal, diff }] : []
     })

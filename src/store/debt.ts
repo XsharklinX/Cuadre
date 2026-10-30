@@ -143,6 +143,8 @@ export interface PayoffResult {
   months: number
   totalInterest: number
   order: string[]
+  /** En qué mes (contando desde 1) queda saldada cada deuda: para la línea de tiempo. */
+  finishedAt?: Record<string, number>
 }
 
 export function simulatePayoff(all: Debt[], monthlyExtra: number, method: PayoffMethod): PayoffResult {
@@ -154,6 +156,7 @@ export function simulatePayoff(all: Debt[], monthlyExtra: number, method: Payoff
   const balances = new Map<string, number>(debts.map(d => [d.id, Math.max(0, d.balance)]))
   let extra = monthlyExtra
   const order: string[] = []
+  const finishedAt: Record<string, number> = {}
   let months = 0
   let totalInterest = 0
 
@@ -176,6 +179,7 @@ export function simulatePayoff(all: Debt[], monthlyExtra: number, method: Payoff
       balances.set(debt.id, newBal)
       if (newBal < 0.01 && !order.includes(debt.id)) {
         order.push(debt.id)
+        finishedAt[debt.id] = months
         freed += debt.minPayment
       }
     }
@@ -196,6 +200,7 @@ export function simulatePayoff(all: Debt[], monthlyExtra: number, method: Payoff
         rem -= payment
         if (newBal < 0.01 && !order.includes(d.id)) {
           order.push(d.id)
+          finishedAt[d.id] = months
           freed += d.minPayment
         }
       }
@@ -204,7 +209,7 @@ export function simulatePayoff(all: Debt[], monthlyExtra: number, method: Payoff
     extra += freed
   }
 
-  return { months, totalInterest, order }
+  return { months, totalInterest, order, finishedAt }
 }
 
 // Compartido entre MobileDebt (calculadora completa) y MobileProfile (tarjeta

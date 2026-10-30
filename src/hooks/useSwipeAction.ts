@@ -29,10 +29,20 @@ const MAX_PX = 104
 export function useSwipeAction<T extends HTMLElement>(
   onAction: () => void,
   active = true,
+  /**
+   * L3 · LA IZQUIERDA, si hay algo que hacer con ella.
+   * En la lista de clientes, deslizar a la izquierda prepara el recordatorio.
+   * Sin esto la fila no se mueve hacia ese lado: un gesto que no hace nada
+   * confundiría.
+   */
+  onLeft?: () => void,
 ) {
   const ref = useRef<T>(null)
   const accion = useRef(onAction)
   accion.current = onAction
+  const izquierda = useRef(onLeft)
+  izquierda.current = onLeft
+  const conIzquierda = !!onLeft
 
   useEffect(() => {
     if (!active) return
@@ -47,7 +57,7 @@ export function useSwipeAction<T extends HTMLElement>(
     let pid = -1
 
     const limpiar = () => {
-      el.classList.remove('m-swiping', 'm-swipe-armed')
+      el.classList.remove('m-swiping', 'm-swipe-armed', 'm-swipe-left')
       el.style.removeProperty('--m-swipe')
       activo = false
       avisado = false
@@ -68,21 +78,21 @@ export function useSwipeAction<T extends HTMLElement>(
       const cy = Math.abs(e.clientY - y0)
       // Si baja más de lo que cruza, es un scroll y la fila no se mueve.
       if (cy > Math.abs(cx)) { if (dx !== 0) limpiar(); return }
-      // Solo hacia la derecha: la izquierda está libre para otra acción y
-      // moverse en las dos sin que la segunda exista confundiría.
-      if (cx <= 0) { if (dx !== 0) limpiar(); return }
+      // A la izquierda solo si hay algo que hacer allí.
+      if (cx <= 0 && !conIzquierda) { if (dx !== 0) limpiar(); return }
 
-      dx = Math.min(cx, MAX_PX)
+      dx = Math.max(-MAX_PX, Math.min(cx, MAX_PX))
       el.classList.add('m-swiping')
+      el.classList.toggle('m-swipe-left', dx < 0)
       el.style.setProperty('--m-swipe', `${dx}px`)
 
       // El aviso táctil AL CRUZAR el umbral, una sola vez: así se sabe que
       // soltar ahí hace algo, antes de soltar.
-      if (dx >= TRIGGER_PX && !avisado) {
+      if (Math.abs(dx) >= TRIGGER_PX && !avisado) {
         avisado = true
         el.classList.add('m-swipe-armed')
         playSoftHaptic()
-      } else if (dx < TRIGGER_PX && avisado) {
+      } else if (Math.abs(dx) < TRIGGER_PX && avisado) {
         avisado = false
         el.classList.remove('m-swipe-armed')
       }
@@ -90,9 +100,11 @@ export function useSwipeAction<T extends HTMLElement>(
 
     const suelta = (e: PointerEvent) => {
       if (!activo || e.pointerId !== pid) return
-      const cruzado = dx >= TRIGGER_PX
+      const derecha = dx >= TRIGGER_PX
+      const izq = dx <= -TRIGGER_PX
       limpiar()
-      if (cruzado) accion.current()
+      if (derecha) accion.current()
+      else if (izq) izquierda.current?.()
     }
 
     el.addEventListener('pointerdown', abajo, { passive: true })
@@ -107,7 +119,7 @@ export function useSwipeAction<T extends HTMLElement>(
       el.removeEventListener('pointercancel', limpiar)
       limpiar()
     }
-  }, [active])
+  }, [active, conIzquierda])
 
   return ref
 }

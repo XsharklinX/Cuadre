@@ -10,6 +10,9 @@
 @import './mobile-components.css';
 @import './mobile-accounts.css';
 @import './mobile-business.css';
+/* 2.5: formularios que caben, metas nuevas y tacto. Vigilado por theme-safety.
+   Justo antes del jugo, que tiene que seguir siendo el último. */
+@import './mobile-tacto.css';
 /* El último: solo añade tacto encima de lo ya maquetado (animaciones de
    entrada, inclinación del carrusel, el tirón de la lista). Va al final para
    poder ganarle a las reglas base sin usar `!important`. */

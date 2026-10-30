@@ -18,13 +18,17 @@ import { join } from 'node:path'
 const SRC = join(__dirname, '..')
 const leer = (rel: string) => readFileSync(join(SRC, rel), 'utf8')
 
-const pantalla = leer('mobile/MobileBusiness.tsx')
+// Negocio se partió en un armazón, sus tres pestañas y la pantalla de cada
+// servicio: «la pantalla» es la suma de todos, que es lo que ve el usuario.
+const pantalla = ['mobile/MobileBusiness.tsx', 'mobile/business/ClientsTab.tsx', 'mobile/business/CollectTab.tsx',
+  'mobile/business/ProfitTab.tsx', 'mobile/business/ServiceScreen.tsx'].map(leer).join('\n')
 const ficha = leer('mobile/business/ClientCard.tsx')
 const cobroSuelto = leer('mobile/business/NewChargeSheet.tsx')
 
 describe('la pantalla abre con UNA cifra, no con tres', () => {
   it('usa collectFocus para decidir el titular', () => {
-    expect(pantalla).toMatch(/collectFocus\(charges, clients, today\)/)
+    // Sobre los cobros con cliente vivo: `vivos` (ver el recuento, abajo).
+    expect(pantalla).toMatch(/collectFocus\(vivos, clients, today\)/)
     expect(pantalla).toContain('mbiz-focus')
   })
 
@@ -57,13 +61,16 @@ describe('la lista va agrupada por estado', () => {
 
   it('el recuento solo cuenta cobros que se pueden pintar', () => {
     // Si no, la cabecera dice «3» encima de dos filas.
-    expect(pantalla).toMatch(/groupCharges\(\s*charges\.filter\(c => clientMap\.has\(c\.clientId\)\)/)
+    expect(pantalla).toContain('const vivos = useMemo(() => charges.filter(c => clientMap.has(c.clientId))')
+    expect(pantalla).toMatch(/groupCharges\(vivos, today\)/)
   })
 })
 
 describe('tocar un cliente abre su FICHA, no su formulario', () => {
   it('la lista de clientes abre ClientCard', () => {
-    expect(pantalla).toContain('setClientCardId(client.id)')
+    // La fila avisa con `onOpenClient`, y el armazón abre la ficha con eso.
+    expect(pantalla).toContain('onOpenClient(client.id)')
+    expect(pantalla).toContain('setClientCardId(id)')
     expect(pantalla).toContain('<ClientCard')
   })
 
@@ -78,12 +85,15 @@ describe('tocar un cliente abre su FICHA, no su formulario', () => {
      * nombre—. Cualquier otro `clientId=` desde aquí es la regresión.
      */
     const aperturas = pantalla.match(/<ClientSheet clientId=\{[^}]*\}/g) ?? []
+    // Dos veces sin id: crear desde Negocio, y crear dentro de un servicio
+    // desde su pantalla. Las dos son para crear.
     expect(aperturas.sort()).toEqual([
       '<ClientSheet clientId={editId}',
       '<ClientSheet clientId={null}',
+      '<ClientSheet clientId={null}',
     ])
     // Y la fila de la lista abre la ficha, no el formulario.
-    expect(pantalla).toContain('setClientCardId(client.id)')
+    expect(pantalla).toContain('onOpenClient(client.id)')
     expect(ficha).toContain('<ClientSheet clientId={client.id}')
   })
 
@@ -97,7 +107,7 @@ describe('tocar un cliente abre su FICHA, no su formulario', () => {
 
   it('la ficha enseña el historial que la app ya tenía y no mostraba', () => {
     expect(ficha).toContain('clientHistory(')
-    for (const clave of ['bizCliPaidYou', 'bizCliOwes', 'bizCliNext']) {
+    for (const clave of ['cliPaidShort', 'bizCliOwes', 'bizCliNext']) {
       expect(ficha, clave).toContain(`'${clave}'`)
     }
   })
@@ -105,7 +115,8 @@ describe('tocar un cliente abre su FICHA, no su formulario', () => {
   it('la ficha se cierra si borran al cliente', () => {
     // El borrado va con deshacer: el cliente desaparece un rato DESPUÉS de
     // cerrarse el formulario, y sin esto queda una hoja invisible encima.
-    expect(ficha).toMatch(/useEffect\(\(\) => \{ if \(!client\) onClose\(\) \}/)
+    // También si lo borran guardando su historial: sigue existiendo, borrado.
+    expect(ficha).toMatch(/useEffect\(\(\) => \{ if \(!client \|\| client\.deletedAt\) onClose\(\) \}/)
   })
 })
 
@@ -140,12 +151,14 @@ describe('la ganancia se lee, no se adivina', () => {
     // El monto solo no dice si el negocio es bueno: subir de 1,000 a 1,200
     // puede ser porque vendiste más o porque te subieron el coste.
     expect(pantalla).toContain('marginPct(runRate.collected, runRate.profit)')
-    expect(pantalla).toContain("t('bizMarginPct')")
+    // 2.8: el margen va en el anillo, como el progreso de una meta.
+    expect(pantalla).toContain('n28-ring')
   })
 
   it('enseña de dónde sale la cifra grande sin abrir la tarjeta', () => {
-    expect(pantalla).toContain('mbiz-biz-three')
-    expect(pantalla).toContain('mbiz-biz-big')
+    // 2.8: «te dejó · cobraste X, costó Y», debajo de la cifra.
+    expect(pantalla).toContain("'n28LeftLine'")
+    expect(pantalla).toContain('n28-hero')
   })
 
   it('la gráfica del año lleva meses y media', () => {

@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { NetWorthCard } from './analytics/NetWorthCard'
 import { useCarouselTilt } from '@/hooks/useCarouselTilt'
 import { Icon } from '@/components/ui/Icon'
 import { toast } from '@/components/ui/Toast'
 import { AnimatedMoney } from '@/components/ui/AnimatedMoney'
+import { useCreateRequest } from '@/store/createRequest'
 import { CatBadge } from '@/views/shared'
 import { ACCENT_COLORS } from '@/constants'
 import { accountActivity, accountBalanceInBase, accountCurrency, dateLocale, fmt, getAccount, getCategory, localToday, monthlyAccountSeries } from '@/data/helpers'
@@ -74,8 +76,10 @@ function CardsRow({ carousel, children }: { carousel: boolean; children: React.R
   )
 }
 
-export function MobileAccounts({ mkey, createRequest, onEditTx, onDeleteTx }: {
+export function MobileAccounts({ mkey, createRequest, onEditTx, onDeleteTx, onImport }: {
   mkey: string
+  /** Importar un extracto del banco: se mudó aquí desde Compartir de Análisis (2.8). */
+  onImport?: () => void
   createRequest?: ViewProps['createRequest']
   onEditTx: (transaction: Transaction) => void
   onDeleteTx?: (id: string) => void
@@ -102,6 +106,15 @@ export function MobileAccounts({ mkey, createRequest, onEditTx, onDeleteTx }: {
   useEffect(() => {
     if (createRequest?.target === 'account') setEditingAccount('new')
   }, [createRequest])
+
+  // «Nueva cuenta» desde el «+» grande de la barra.
+  const newAccountAsk = useCreateRequest(s => s.newAccount)
+  const lastNewAccount = useRef(newAccountAsk)
+  useEffect(() => {
+    if (newAccountAsk === lastNewAccount.current) return
+    lastNewAccount.current = newAccountAsk
+    setEditingAccount('new')
+  }, [newAccountAsk])
 
   const saveAccount = (fields: Omit<Account, 'id'>) => {
     if (!fields.name.trim() || !fields.short.trim()) {
@@ -192,6 +205,8 @@ export function MobileAccounts({ mkey, createRequest, onEditTx, onDeleteTx }: {
           )}
         </button>
       )}
+
+      <NetWorthCard />
 
       {accounts.length === 0 ? (
         <div className="sacc-empty">
@@ -444,6 +459,11 @@ export function MobileAccounts({ mkey, createRequest, onEditTx, onDeleteTx }: {
           <button className="sacc-add" onClick={() => setEditingAccount('new')}>
             <Icon name="plus" size={16} /> {t('addAccountLabel')}
           </button>
+          {onImport && (
+            <button className="sacc-add sacc-import" onClick={onImport}>
+              <Icon name="upload" size={16} /> {t('importBankStatement')}
+            </button>
+          )}
         </>
       )}
 

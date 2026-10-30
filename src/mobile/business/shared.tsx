@@ -4,6 +4,7 @@ import { CYCLE_KEY, CYCLE_ORDER, type BillingCycle } from '@/data/billing'
 import { CURRENCIES } from '@/data/seed'
 import { useT, type LangKey } from '@/i18n'
 import { useSheetDrag } from '@/hooks/useSheetDrag'
+import { playWarningHaptic } from '@/lib/sound'
 import { useDialogA11y } from '../useDialogA11y'
 import { useMobileBackDismiss } from '../useMobileBackDismiss'
 import { sheetRoot } from '../SheetPortal'
@@ -22,13 +23,19 @@ import type { CurrencyCode } from '@/types'
  */
 
 export function BizSheet({
-  title, onClose, onSave, saveLabel, canSave = true, onDelete, deleteLabel, children,
+  title, onClose, onSave, saveLabel, canSave = true, missing, onDelete, deleteLabel, children,
 }: {
   title: string
   onClose: () => void
   onSave?: () => void
   saveLabel?: string
   canSave?: boolean
+  /**
+   * Qué falta para poder guardar («el nombre», «el monto»). Con esto el botón
+   * deja de ser un gris mudo: dice qué falta y, al tocarlo, lleva al primer
+   * campo marcado con `data-needs` y lo resalta.
+   */
+  missing?: string | null
   onDelete?: () => void
   deleteLabel?: string
   children: React.ReactNode
@@ -55,11 +62,28 @@ export function BizSheet({
             </button>
           )}
           <button className="mbizs-cancel" onClick={onClose}>{t('cancel')}</button>
-          {onSave && (
+          {onSave && (!canSave && missing ? (
+            <button
+              className="mbizs-save form-save-missing"
+              onClick={e => {
+                const body = (e.currentTarget.closest('section') as HTMLElement | null)?.querySelector<HTMLElement>('.mbizs-body')
+                const target = body?.querySelector<HTMLElement>('[data-needs="true"]')
+                if (!target) return
+                playWarningHaptic()
+                target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                target.classList.remove('form-needs-flash')
+                void target.offsetWidth
+                target.classList.add('form-needs-flash')
+                target.querySelector<HTMLElement>('input, textarea, button')?.focus({ preventScroll: true })
+              }}
+            >
+              {t('missingFieldLabel').replace('{field}', missing)}
+            </button>
+          ) : (
             <button className="mbizs-save" disabled={!canSave} onClick={onSave}>
               {saveLabel ?? t('save')}
             </button>
-          )}
+          ))}
         </div>
       </section>
     </div>,
@@ -68,9 +92,15 @@ export function BizSheet({
 }
 
 /** Una fila de formulario con su etiqueta. */
-export function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+export function Field({ label, hint, needs, children }: {
+  label: string
+  hint?: string
+  /** Es el campo que falta: el botón de guardar lleva aquí. */
+  needs?: boolean
+  children: React.ReactNode
+}) {
   return (
-    <label className="mbizs-field">
+    <label className="mbizs-field" data-needs={needs ? 'true' : undefined}>
       <span className="mbizs-field-label">{label}</span>
       {children}
       {hint && <small className="mbizs-field-hint">{hint}</small>}

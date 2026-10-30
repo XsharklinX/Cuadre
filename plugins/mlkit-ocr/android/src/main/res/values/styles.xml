@@ -5,9 +5,10 @@
          preview llegue a los bordes. -->
     <style name="Theme.MlkitScanner" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="android:windowBackground">@android:color/black</item>
-        <item name="android:windowLayoutInDisplayCutoutMode" tools:targetApi="o_mr1">shortEdges</item>
-        <item name="android:statusBarColor">@android:color/transparent</item>
-        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <!-- Sin `statusBarColor`, `navigationBarColor` ni el modo `shortEdges`:
+             son los parametros obsoletos desde Android 15 que Play Console
+             avisaba. El borde a borde lo pone `enableEdgeToEdge()` en
+             ScannerActivity, y los margenes los aplica `applyEdgeToEdgeInsets`. -->
         <item name="android:windowLightStatusBar">false</item>
     </style>
 </resources>

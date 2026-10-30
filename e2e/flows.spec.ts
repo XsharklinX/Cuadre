@@ -122,7 +122,7 @@ test('crear una meta y aportarle refleja el saldo', async ({ page }) => {
    * mañana no debe volver a romper esto.
    */
   await page.locator('.mobile-topbar-menu').click()
-  await page.locator('.mobile-tools-row', { hasText: 'Metas' }).first().click()
+  await page.locator('.mtm-tile-main', { hasText: 'Metas' }).first().click()
   // MobileGoals se carga bajo demanda (lazy): esperar a que la vista aparezca.
   await expect(page.locator('.mgl-root').first()).toBeVisible({ timeout: 10_000 })
 
@@ -132,21 +132,26 @@ test('crear una meta y aportarle refleja el saldo', async ({ page }) => {
       await page.getByRole('button', { name: label }).first().click(); break
     }
   }
-  await page.locator('.mgl-preset-card').first().click()
-  await page.locator('.mgl-input').first().fill('Meta test')
-  await page.locator('.mgl-amount-tap').first().click()
-  for (const k of ['1', '0', '0', '0', '0']) await page.locator('.mgl-numpad-key', { hasText: new RegExp(`^${k}$`) }).first().click()
-  await page.locator('.mgl-numpad-done').click()
+  // Paso 1: para qué. Paso 2: cuánto. Paso 3: cómo (a mano por defecto).
+  await page.locator('.mgn-preset').first().click()
+  await page.locator('#goal-name').fill('Meta test')
+  await page.locator('.mgl-btn-save').click()
+  await page.locator('.mgn-amount-big').click()
+  for (const k of ['1', '0', '0', '0', '0']) await page.locator('.mamt-keypad .mobile-keypad-compact button', { hasText: new RegExp(`^${k}$`) }).first().click()
+  await page.locator('.mamt-keypad .mobile-done-button').click()
+  await page.locator('.mgl-btn-save').click()
+  await page.getByRole('button', { name: 'A mano' }).click()
   await page.locator('.mgl-btn-save').click()
 
   const card = page.locator('.mgl-card', { hasText: 'Meta test' })
   await expect(card).toHaveCount(1)
 
-  // Aportar 200 y verificar que el saldo de la meta lo refleja.
-  await page.locator('.mgl-action-btn', { hasText: 'Aportar' }).first().click()
+  // Aportar 200 desde el «+» de la tarjeta, con «Otro…».
+  await card.locator('.mgn-card-add').click()
+  await page.locator('.mgn-chip', { hasText: 'Otro' }).click()
   for (const k of ['2', '0', '0']) await page.locator('.mamt-keypad .mobile-keypad-compact button', { hasText: new RegExp(`^${k}$`) }).first().click()
   await page.locator('.mamt-keypad .mobile-done-button').click()
-  await page.locator('.mgl-btn-save', { hasText: 'Aportar' }).first().click()
+  await page.locator('.mgn-sheet-cta', { hasText: 'Aportar' }).click()
 
   await expect(card.locator('.mgl-card-amounts')).toContainText('200')
   await expect(page.getByText(ERROR_BOUNDARY)).toHaveCount(0)
@@ -160,24 +165,28 @@ test('crear un presupuesto lo muestra en la lista', async ({ page }) => {
   // herramienta nueva al menú el test empezó a abrir otra pantalla y a fallar
   // por un cambio que no tenía nada que ver con los presupuestos.
   await page.locator('.mobile-topbar-menu').click()
-  await page.locator('.mobile-tools-row', { hasText: /Presupuestos|Budgets/ }).first().click()
+  await page.locator('.mtm-tile-main', { hasText: /Presupuestos|Budgets/ }).first().click()
   await expect(page.locator('.mbud-root')).toBeVisible()
 
-  await page.locator('.mbud-add-btn, .mbud-empty button').first().click()
-  await page.locator('.mbud-input').first().fill('Presupuesto test')
-  await page.locator('.mdebt-amount-row').click()
+  // 2.7: se crea con una frase, «Quiero gastar como máximo [monto] al mes
+  // en [nombre]»; cada hueco abre su teclado.
+  await page.locator('.nx-label button, .mbud-empty button').first().click()
+  await page.locator('.nx-sheet .nx-tk').nth(0).click()
   for (const k of ['3', '0', '0', '0']) await page.locator('.mamt-keypad .mobile-keypad-compact button', { hasText: new RegExp(`^${k}$`) }).first().click()
   await page.locator('.mamt-keypad .mobile-done-button').click()
-  await page.locator('.mbud-btn-save').click()
+  await page.locator('.nx-sheet .nx-tk').nth(1).click()
+  await page.locator('.mtxt-input').fill('Presupuesto test')
+  await page.locator('.mtxt-done').click()
+  await page.locator('.nx-sheet-foot .nx-btn.pri').click()
 
-  await expect(page.locator('.mbud-row', { hasText: 'Presupuesto test' })).toHaveCount(1)
+  await expect(page.locator('.nxb-row', { hasText: 'Presupuesto test' })).toHaveCount(1)
   await expect(page.getByText(ERROR_BOUNDARY)).toHaveCount(0)
 })
 
 test('las herramientas del menú ☰ abren sin caer en el error boundary', async ({ page }) => {
   await boot(page)
   await page.locator('.mobile-topbar-menu').click()
-  const rowCount = await page.locator('.mobile-tools-row').count()
+  const rowCount = await page.locator('.mtm-tile-main').count()
   expect(rowCount).toBeGreaterThan(0)
 
   // Presupuestos, Metas, Listas, Conversor. Entre cada una: cerrar overlays
@@ -187,8 +196,8 @@ test('las herramientas del menú ☰ abren sin caer en el error boundary', async
     await nav(page, 'Movimientos').catch(() => {})
     await page.waitForTimeout(200)
     await page.locator('.mobile-topbar-menu').click()
-    await expect(page.locator('.mobile-tools-row').nth(i)).toBeVisible()
-    await page.locator('.mobile-tools-row').nth(i).click()
+    await expect(page.locator('.mtm-tile-main').nth(i)).toBeVisible()
+    await page.locator('.mtm-tile-main').nth(i).click()
     await page.waitForTimeout(350)
     await expect(page.getByText(ERROR_BOUNDARY), `herramienta #${i}`).toHaveCount(0)
   }
@@ -218,14 +227,18 @@ test('registrar un cliente y cobrarle crea el ingreso en el libro', async ({ pag
   await page.locator('.mbiz-empty button').first().click()
   await expect(page.locator('.mbizs')).toBeVisible()
 
-  await page.locator('.mbizs-input').first().fill('Juan Perez')
-  // El monto es el cuarto campo de texto (nombre, concepto, telefono, monto).
-  await page.locator('.mbizs-input[type="number"]').first().fill('250')
+  await page.locator('.mcf-name').fill('Juan Perez')
+  // El nombre arriba; el monto, en grande, se toca y sale el teclado (2.8).
+  await page.locator('.f28-amount > button').click()
+  for (const k of ['2', '5', '0']) await page.locator('.mamt-keypad .mobile-keypad-compact button', { hasText: new RegExp(`^${k}$`) }).first().click()
+  await page.locator('.mamt-keypad .mobile-done-button').click()
   await page.locator('.mbizs-save').click()
   await expect(page.locator('.mbizs')).toHaveCount(0)
 
   // El cliente aparece, y con el su cobro del ciclo en curso.
   await expect(page.locator('.mbiz-client', { hasText: 'Juan Perez' })).toHaveCount(1)
+  // Los clientes y sus cobros viven en pestañas distintas desde la 2.4.0.
+  await page.getByRole('tab', { name: /^Cobros/ }).click()
   const cobro = page.locator('.mbiz-charge').first()
   await expect(cobro).toBeVisible()
 
@@ -285,14 +298,13 @@ test('marcar un gasto como capricho lo lleva al bote', async ({ page }) => {
    * El bote existe y lleva el monto del gasto.
    *
    * La herramienta se llama Caprichos desde la 2.2.0 — «El bote» y
-   * «Caprichos» eran dos nombres para una cosa — y el bote es una de sus tres
-   * pestañas, que ahora abren en Antojos.
+   * «Caprichos» eran dos nombres para una cosa. Desde la 2.7 es una sola
+   * pantalla: el frasco arriba con lo que falta por recuperar.
    */
   await page.locator('.mobile-topbar-menu').click()
-  await page.locator('.mobile-tools-row', { hasText: /Caprichos|Splurges/ }).first().click()
-  await page.locator('.mcap-tabs button', { hasText: /El bote|The jar/ }).click()
-  await expect(page.locator('.mcap-hero')).toBeVisible()
-  await expect(page.locator('.mcap-hero strong')).toContainText('3,200')
+  await page.locator('.mtm-tile-main', { hasText: /Caprichos|Splurges/ }).first().click()
+  await expect(page.locator('.nxk-hero')).toBeVisible()
+  await expect(page.locator('.nxk-hero .nx-big')).toContainText('3,200')
 
   await expect(page.getByText(ERROR_BOUNDARY)).toHaveCount(0)
 
@@ -305,37 +317,30 @@ test('marcar un gasto como capricho lo lleva al bote', async ({ page }) => {
   expect(botes[0].amount).toBe(3200)
 })
 
-test('las tarjetas Explorar del Perfil abren sin caer en el error boundary', async ({ page }) => {
+test('las utilidades del menú ☰ abren sin caer en el error boundary', async ({ page }) => {
   await boot(page)
-  await goProfile(page)
-  await expect(page.locator('.mpr-explore-tile').first()).toBeVisible({ timeout: 8000 })
-  const tiles = await page.locator('.mpr-explore-tile').count()
-  expect(tiles).toBeGreaterThan(0)
-
-  // Suscripciones, Reporte anual, Calendario. Cada tarjeta abre una sub-vista;
-  // se vuelve tocando Perfil en la cabecera.
-  for (let i = 0; i < tiles; i++) {
-    await goProfile(page)
-    await expect(page.locator('.mpr-explore-tile').nth(i)).toBeVisible()
-    await page.locator('.mpr-explore-tile').nth(i).click()
-    await page.waitForTimeout(350)
-    await expect(page.getByText(ERROR_BOUNDARY), `explore #${i}`).toHaveCount(0)
+  // Desde la 2.6, Calendario y compañía viven en «Utilidades» del ☰, no en Perfil.
+  for (const name of ['Calendario', 'Listas', 'Conversor', 'Exportar']) {
+    await page.locator('.mobile-topbar-menu').click()
+    await page.locator('.mtm-utils button', { hasText: name }).first().click()
+    await page.waitForTimeout(400)
+    await expect(page.getByText(ERROR_BOUNDARY), name).toHaveCount(0)
+    for (let k = 0; k < 2; k++) { await page.keyboard.press('Escape').catch(() => {}); await page.waitForTimeout(150) }
+    await nav(page, 'Movimientos').catch(() => {})
+    await page.waitForTimeout(250)
   }
 })
 
-test('Deudas y Flujo de caja (KPI del Perfil) abren sin caer en el error boundary', async ({ page }) => {
+test('Suscripciones, Deudas y Flujo de caja (menú ☰) abren sin caer en el error boundary', async ({ page }) => {
   await boot(page)
-  await goProfile(page)
-  await expect(page.locator('.mpr-kpi-card').first()).toBeVisible({ timeout: 8000 })
-  const cards = await page.locator('.mpr-kpi-card').count()
-  expect(cards).toBeGreaterThanOrEqual(2)
-
-  // Las dos primeras tarjetas KPI abren Deudas y Flujo de caja (vistas lazy).
-  for (let i = 0; i < 2; i++) {
-    await goProfile(page)
-    await expect(page.locator('.mpr-kpi-card').nth(i)).toBeVisible()
-    await page.locator('.mpr-kpi-card').nth(i).click()
+  // Desde la 2.5 viven en el menú ☰, grupo «Compromisos», no en Perfil.
+  for (const name of ['Suscripciones', 'Deudas', 'Flujo de caja']) {
+    await page.locator('.mobile-topbar-menu').click()
+    await expect(page.locator('.mtm-group', { hasText: 'Compromisos' })).toBeVisible()
+    await page.locator('.mtm-tile-main', { hasText: name }).first().click()
     await page.waitForTimeout(400)
-    await expect(page.getByText(ERROR_BOUNDARY), `kpi #${i}`).toHaveCount(0)
+    await expect(page.getByText(ERROR_BOUNDARY), name).toHaveCount(0)
+    await nav(page, 'Movimientos').catch(() => {})
+    await page.waitForTimeout(250)
   }
 })

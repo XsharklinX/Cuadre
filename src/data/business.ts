@@ -91,6 +91,31 @@ export interface Business {
    */
   archivedAt?: number
   createdAt: number
+  /** Cuánto vale cada estrella de un cliente. Ausente = las de siempre. */
+  referral?: ReferralRules
+  /** Meta de cobro al mes («quiero cobrar RD$15,000»). En «Hoy» el anillo mide contra ella. */
+  monthlyGoal?: number
+}
+
+/**
+ * EL PROGRAMA DE RECOMENDADOS DE UN NEGOCIO.
+ *
+ * Cada estrella de un cliente es alguien que te trajo, y cada una le baja el
+ * precio un porcentaje. Con tope: sin él, quien te trae a veinte acabaría
+ * usando el servicio gratis y pagándolo tú.
+ */
+export interface ReferralRules {
+  /** Lo que baja cada estrella, en %. `0` = el programa está apagado. */
+  pctPerStar: number
+  /** El descuento máximo, en %, por muchas estrellas que tenga. */
+  maxPct: number
+  /**
+   * Meses que dura una estrella. `0` o ausente = no caduca.
+   *
+   * Que caduquen es lo que hace que sigan recomendando: una estrella de hace
+   * dos años ya se cobró en descuentos.
+   */
+  expiresMonths?: number
 }
 
 /**
@@ -121,7 +146,26 @@ export interface ServiceAccount {
   capacity?: number
   /** Cuándo se dio de baja. `0` = activa. Las de baja no cuestan ni cuentan. */
   closedAt?: number
+  /**
+   * El día que se paga ESTA cuenta, si no es el del servicio.
+   *
+   * Dos cuentas de Netflix compradas en meses distintos se cobran en días
+   * distintos, y el pago automático tiene que crear cada una el suyo.
+   */
+  payDay?: number
 }
+
+/**
+ * CÓMO SE PAGA UN SERVICIO.
+ *
+ *  · `auto`   — ese día la app registra el gasto sola.
+ *  · `ask`    — ese día te pregunta, y un toque lo registra.
+ *  · `manual` — como siempre: lo pagas tú desde el botón Pagar.
+ *
+ * Se elige servicio por servicio: Netflix nunca falla y se puede dejar solo;
+ * un hosting que cambia de precio cada mes mejor que pregunte.
+ */
+export type PayMode = 'auto' | 'ask' | 'manual'
 
 /** Algo que revendes o alquilas: lo que te cuesta y a quién se lo das. */
 export interface Service {
@@ -166,6 +210,44 @@ export interface Service {
    */
   accounts?: ServiceAccount[]
   createdAt: number
+  /** Cómo se paga. Ausente = a mano, que es como funcionaba. */
+  payMode?: PayMode
+  /**
+   * Día del pago: del mes para los ciclos de meses, de la semana (0 domingo)
+   * para el semanal. Sin él no hay fecha y no se automatiza nada.
+   */
+  payDay?: number
+  /**
+   * El primer pago, `YYYY-MM-DD`, para los ciclos de varios meses y el
+   * quincenal: un anual de marzo y uno de octubre tienen el mismo día 15.
+   */
+  payAnchor?: string
+  /**
+   * Desde cuándo se automatiza. Nunca se registra nada antes: configurar el
+   * pago hoy no puede crear de golpe los doce Netflix del año pasado.
+   */
+  payFrom?: string
+  /** De qué cuenta sale. */
+  payAccountId?: string
+  /** En qué categoría de gasto entra. */
+  payCategoryId?: string
+  /**
+   * Los pagos ya resueltos, `cuenta|fecha`: registrados solos, marcados a
+   * mano o descartados. Es lo que hace que nada se registre dos veces.
+   */
+  payHandled?: string[]
+  /** «Mañana»: hasta cuándo no se vuelve a preguntar por ese pago. */
+  paySnooze?: Record<string, string>
+  /**
+   * Lo que cobras por cada plaza. Cada cliente nuevo de este servicio sale
+   * con este precio puesto, y si se le cambia, solo ese queda distinto.
+   */
+  slotPrice?: number
+  /**
+   * Archivado: ya no lo vendes. No cuesta en la ganancia al mes ni se paga
+   * solo, y su historial sigue contando. Igual que archivar un negocio.
+   */
+  archivedAt?: number
 }
 
 /**
@@ -214,24 +296,51 @@ function cents(n: number): number {
 }
 
 /**
+ * De quién es un movimiento (ver `attribution.ts`). Se declara aquí con la
+ * forma mínima para no importar ese módulo, que ya importa de este.
+ */
+type Owner = (tx: Transaction) => { businessId: string } | null
+
+/**
+ * Si un movimiento es de este negocio.
+ *
+ * Con `owner`, manda la marca del movimiento —el servicio que pagó, el
+ * cliente que cobró— y la categoría solo para lo que no tiene marca. Sin él,
+ * por categoría a secas, que es como funcionaba y como lo siguen usando las
+ * pruebas de siempre.
+ */
+function esDe(business: Business, owner: Owner | undefined, ingresos: Set<string>, gastos: Set<string>) {
+  return (tx: Transaction): 'income' | 'expense' | null => {
+    if (tx.type === 'transfer') return null
+    if (owner) {
+      const quien = owner(tx)
+      return quien && quien.businessId === business.id ? tx.type : null
+    }
+    if (!tx.categoryId) return null
+    if (tx.type === 'income' && ingresos.has(tx.categoryId)) return 'income'
+    if (tx.type === 'expense' && gastos.has(tx.categoryId)) return 'expense'
+    return null
+  }
+}
+
+/**
  * La ganancia de un negocio en un mes.
  *
  * Los montos tienen que llegar YA convertidos a la divisa base: mezclar pesos
  * y dólares en una resta daría una cifra sin significado. Quien llama usa
  * `convertTxAmountsToBase`, como el resto de la app.
  */
-export function businessMonth(business: Business, txns: Transaction[], mkey: string): BusinessPeriod {
-  const ingresos = new Set(business.incomeCategoryIds)
-  const gastos = new Set(business.expenseCategoryIds)
+export function businessMonth(business: Business, txns: Transaction[], mkey: string, owner?: Owner): BusinessPeriod {
+  const tipo = esDe(business, owner, new Set(business.incomeCategoryIds), new Set(business.expenseCategoryIds))
   let collected = 0, costs = 0, incomeCount = 0
 
   for (const tx of txns) {
-    if (tx.type === 'transfer' || !tx.categoryId) continue
     if (monthKey(tx.date) !== mkey) continue
-    if (tx.type === 'income' && ingresos.has(tx.categoryId)) {
+    const t = tipo(tx)
+    if (t === 'income') {
       collected += tx.amount
       incomeCount += 1
-    } else if (tx.type === 'expense' && gastos.has(tx.categoryId)) {
+    } else if (t === 'expense') {
       costs += tx.amount
     }
   }
@@ -261,9 +370,9 @@ function yearBuckets(
   business: Business,
   txns: Transaction[],
   year: number,
+  owner?: Owner,
 ): Map<string, BusinessPeriod> {
-  const ingresos = new Set(business.incomeCategoryIds)
-  const gastos = new Set(business.expenseCategoryIds)
+  const tipo = esDe(business, owner, new Set(business.incomeCategoryIds), new Set(business.expenseCategoryIds))
   const prefijo = `${year}-`
 
   const crudo = new Map<string, { collected: number; costs: number; incomeCount: number }>()
@@ -272,16 +381,16 @@ function yearBuckets(
   }
 
   for (const tx of txns) {
-    if (tx.type === 'transfer' || !tx.categoryId) continue
     // El año se descarta por el prefijo de la fecha, sin construir su clave:
     // la mayoría de los movimientos de un libro viejo no son de este año.
     if (!tx.date.startsWith(prefijo)) continue
     const casilla = crudo.get(monthKey(tx.date))
     if (!casilla) continue
-    if (tx.type === 'income' && ingresos.has(tx.categoryId)) {
+    const t = tipo(tx)
+    if (t === 'income') {
       casilla.collected += tx.amount
       casilla.incomeCount += 1
-    } else if (tx.type === 'expense' && gastos.has(tx.categoryId)) {
+    } else if (t === 'expense') {
       casilla.costs += tx.amount
     }
   }
@@ -308,11 +417,11 @@ export interface BusinessYear extends BusinessPeriod {
 }
 
 /** La ganancia del año, y la media por mes con actividad. */
-export function businessYear(business: Business, txns: Transaction[], year: number): BusinessYear {
+export function businessYear(business: Business, txns: Transaction[], year: number, owner?: Owner): BusinessYear {
   const byMonth: Array<{ mkey: string; profit: number }> = []
   let collected = 0, costs = 0, incomeCount = 0, activeMonths = 0
 
-  for (const [mkey, mes] of yearBuckets(business, txns, year)) {
+  for (const [mkey, mes] of yearBuckets(business, txns, year, owner)) {
     byMonth.push({ mkey, profit: mes.profit })
     collected += mes.collected
     costs += mes.costs
@@ -427,8 +536,10 @@ export function accountOccupancy(
   service: Service,
   clients: Client[],
 ): Array<{ account: ServiceAccount; used: number; free: number | null; full: boolean }> {
+  const dondeEsta = placeClients(service, clients)
   return serviceAccounts(service).map(account => {
-    const used = clients.filter(c => c.active && c.serviceAccountId === account.id).length
+    let used = 0
+    for (const accountId of dondeEsta.values()) if (accountId === account.id) used += 1
     const tope = account.capacity && account.capacity > 0 ? account.capacity : null
     return {
       account,
@@ -437,6 +548,51 @@ export function accountOccupancy(
       full: tope !== null && used >= tope,
     }
   })
+}
+
+/**
+ * S2 · EN QUÉ CUENTA ESTÁ CADA CLIENTE, aunque no se le haya dicho.
+ *
+ * ── EL FALLO QUE ARREGLA ──────────────────────────────────────────────
+ * Las cuentas contaban solo a los clientes con `serviceAccountId`. Los que ya
+ * tenías no lo tienen —se crearon antes de que hubiera cuentas—, así que la
+ * Cuenta 1 salía con todas las plazas libres aunque estuviera llena, y un
+ * aviso de «sin cuenta» debajo.
+ *
+ * Ahora los que no tienen cuenta (o la suya se cerró) se colocan en orden de
+ * llegada: primero en la cuenta con sitio, y si todas están llenas, en la
+ * última. Es determinista —el mismo cliente cae siempre en el mismo sitio—, y
+ * la pantalla de cuentas lo guarda en cuanto se abre, para que mover a uno no
+ * baraje a los demás.
+ *
+ * Devuelve cliente → cuenta, solo de los clientes activos del servicio.
+ */
+export function placeClients(service: Service, clients: Client[]): Map<string, string> {
+  const cuentas = serviceAccounts(service)
+  const fuera = new Map<string, string>()
+  if (!cuentas.length) return fuera
+  const ids = new Set(cuentas.map(a => a.id))
+  const suyos = clients
+    .filter(c => c.active && !c.deletedAt && isOnService(c, service.id))
+    .sort((a, b) => a.createdAt - b.createdAt)
+
+  const usadas = new Map(cuentas.map(a => [a.id, 0]))
+  const sinSitio: Client[] = []
+  for (const c of suyos) {
+    if (c.serviceAccountId && ids.has(c.serviceAccountId)) {
+      fuera.set(c.id, c.serviceAccountId)
+      usadas.set(c.serviceAccountId, (usadas.get(c.serviceAccountId) ?? 0) + 1)
+    } else {
+      sinSitio.push(c)
+    }
+  }
+  for (const c of sinSitio) {
+    const libre = cuentas.find(a => !a.capacity || a.capacity <= 0 || (usadas.get(a.id) ?? 0) < a.capacity)
+    const destino = libre ?? cuentas[cuentas.length - 1]
+    fuera.set(c.id, destino.id)
+    usadas.set(destino.id, (usadas.get(destino.id) ?? 0) + 1)
+  }
+  return fuera
 }
 
 /**
@@ -482,10 +638,13 @@ export function businessRunRate(
   txns: Transaction[],
   mkey: string,
   base?: CurrencyCode,
+  owner?: Owner,
 ): BusinessRunRate {
-  const suyos = services.filter(s => s.businessId === business.id)
+  // Un servicio archivado ya no se paga: contarlo al mes sería un coste que
+  // no existe.
+  const suyos = services.filter(s => s.businessId === business.id && !s.archivedAt)
   const monthlyCost = cents(suyos.reduce((sum, s) => sum + serviceCostPerMonth(s, base), 0))
-  const { collected } = businessMonth(business, txns, mkey)
+  const { collected } = businessMonth(business, txns, mkey, owner)
   return {
     collected,
     monthlyCost,
@@ -507,11 +666,12 @@ export function runRateSeries(
   txns: Transaction[],
   year: number,
   base?: CurrencyCode,
+  owner?: Owner,
 ): Array<{ mkey: string; profit: number }> {
-  const suyos = services.filter(s => s.businessId === business.id)
+  const suyos = services.filter(s => s.businessId === business.id && !s.archivedAt)
   const monthlyCost = cents(suyos.reduce((sum, s) => sum + serviceCostPerMonth(s, base), 0))
   const fuera: Array<{ mkey: string; profit: number }> = []
-  for (const [mkey, { collected }] of yearBuckets(business, txns, year)) {
+  for (const [mkey, { collected }] of yearBuckets(business, txns, year, owner)) {
     // Un mes sin NADA cobrado se deja en cero en vez de en -coste: un negocio
     // que todavia no habia empezado no estaba perdiendo dinero.
     fuera.push({ mkey, profit: collected > 0 ? cents(collected - monthlyCost) : 0 })

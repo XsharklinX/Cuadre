@@ -15,6 +15,7 @@ export function MobileTopBar({
   title,
   onBack,
   onMenu,
+  menuBadge,
   onSelectMonth,
   onAvatar,
   onCurrency,
@@ -29,6 +30,8 @@ export function MobileTopBar({
   title?:       string
   onBack?:      () => void
   onMenu?:      () => void
+  /** H3 · Cuántas herramientas del ☰ piden atención (pinta un punto). */
+  menuBadge?:   number
   onSelectMonth: (key: string) => void
   /**
    * Abre «mis cosas»: perfil, avisos y ajustes.
@@ -91,8 +94,9 @@ export function MobileTopBar({
               <Icon name="arrowUp" size={20} style={{ transform: 'rotate(-90deg)' }} />
             </button>
           ) : onMenu ? (
-            <button className="mobile-icon-btn mobile-topbar-menu" aria-label={t('toolsLabel')} onClick={onMenu}>
-              <Icon name="list" size={22} />
+            <button className="mobile-icon-btn mobile-topbar-menu" aria-label={menuBadge ? `${t('toolsLabel')} · ${t('toolsNeedsAttention')}` : t('toolsLabel')} onClick={onMenu}>
+              <Icon name="menu" size={22} />
+              {menuBadge ? <i className="mtm-menu-dot" aria-hidden="true" /> : null}
             </button>
           ) : null}
           {/* Izquierda: moverse y encontrar, y nada mas. El calendario se fue

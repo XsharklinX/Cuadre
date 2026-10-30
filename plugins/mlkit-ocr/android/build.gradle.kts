@@ -40,7 +40,7 @@ dependencies {
 
     // Pantalla de cámara en vivo (Fase 1 del roadmap de escaneo de recibos).
     implementation("androidx.appcompat:appcompat:1.7.1")
-    implementation("androidx.activity:activity-ktx:1.10.1")
+    implementation("androidx.activity:activity-ktx:1.13.0")
     // CameraX 1.4.2: su libimage_processing_util_jni.so está alineada a 16 KB
     // (verificado); la 1.3.4 estaba a 4 KB y era la ÚNICA .so que Play rechazaba.
     // API compatible con el uso del escáner (preview + análisis + captura).

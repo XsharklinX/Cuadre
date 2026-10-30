@@ -137,6 +137,8 @@ const GoalSchema = z.object({
   deadline: dateSchema.optional(),
   openingSaved: z.number().finite().optional(),
   autoContribute: GoalAutoContributeSchema.optional(),
+  autoPaused: z.boolean().optional(),
+  achievedAt: dateSchema.optional(),
 })
 
 const TxSplitSchema = z.object({
@@ -164,6 +166,8 @@ const TransactionSchema = z.object({
   serviceId: nonEmptyText.optional(),
   resoldAs: nonEmptyText.optional(),
   paidService: nonEmptyText.optional(),
+  paidAccount: nonEmptyText.optional(),
+  autoPaid: z.boolean().optional(),
   generatedFrom: nonEmptyText.optional(),
   tags: z.array(nonEmptyText).optional(),
 })
@@ -175,6 +179,7 @@ const GoalContributionSchema = z.object({
   fromAccountId: nonEmptyText,
   date: dateSchema,
   note: z.string().optional(),
+  withdraw: z.boolean().optional(),
 })
 
 function assertUniqueIds(items: { id: string }[], label: string, ctx: z.RefinementCtx): void {

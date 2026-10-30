@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Icon } from '@/components/ui/Icon'
 import { toast } from '@/components/ui/Toast'
 import { useDialogs } from '@/components/ui/DialogProvider'
 import { isDuplicateTransaction } from '@/data/bankCsv'
-import { accountCurrency, dateLocale, fmt } from '@/data/helpers'
+import { accountCurrency, dateLocale, fmt, localToday } from '@/data/helpers'
 import { buildTxEntry, readTxEntry, routeTx } from '@/data/txCurrency'
 import { CURRENCIES as CURRENCY_METAS, getCurrencyMeta } from '@/data/currencies'
 import { CURRENCIES } from '@/data/seed'
@@ -20,6 +20,9 @@ import { useSubmitGuard } from '@/mobile/useSubmitGuard'
 import { SheetPortal } from '@/mobile/SheetPortal'
 import type { CurrencyCode, IconName, RecurrenceFrequency, Transaction, TxSplit, TxType } from '@/types'
 import { MobileDescriptionSheet } from '@/mobile/MobileDescriptionSheet'
+import { useMissingField } from '@/mobile/useMissingField'
+import { setCloseGuard } from '@/mobile/closeGuard'
+import { takeTxFormIntent } from '@/mobile/txFormIntent'
 
 function currencyPrefix(c: CurrencyCode): string {
   return CURRENCIES[c].symbol
@@ -27,6 +30,8 @@ function currencyPrefix(c: CurrencyCode): string {
 
 type Sub = 'amount' | 'note' | 'account' | 'category' | 'date' | 'recurEnd' | 'fromAccount' | 'toAccount' | null
 type SplitSub = { kind: 'amount' | 'category'; index: number } | null
+/** Campos que pueden faltar para guardar, en el orden en que se ven. */
+type Field = 'amount' | 'note' | 'account' | 'category' | 'from' | 'to' | 'splits'
 
 const ACCT_ICONS: Record<string, IconName> = {
   cash: 'wallet', debit: 'cards', savings: 'piggy', credit: 'cards',
@@ -78,9 +83,18 @@ export function TransactionForm({ value, mkey, onClose, onDelete }: {
   const [splits,         setSplits]         = useState<TxSplit[]>([])
   const [splitSub,       setSplitSub]       = useState<SplitSub>(null)
   const { submitting, beginSubmit, endSubmit } = useSubmitGuard()
+  const [moreOpen,       setMoreOpen]       = useState(false)
+  const [compact,        setCompact]        = useState(false)
+  // Al crear no hay nada que cargar; al editar, el efecto de abajo lo marca.
+  const [loaded,         setLoaded]         = useState(!editing)
+  const reach = useMissingField<Field>()
 
   useEffect(() => {
     if (!editing) return
+    setLoaded(true)
+    // «Mas detalles» se abre solo si el movimiento ya trae algo de ahi dentro:
+    // si no, quien lo edita no sabria que tiene descripcion o que se repite.
+    setMoreOpen(!!(value.description || value.recurring || (value.splits && value.splits.length >= 2)))
     if (value.type === 'transfer') {
       setAmount(value.amount)
       setNote(value.note)
@@ -259,6 +273,61 @@ export function TransactionForm({ value, mkey, onClose, onDelete }: {
       .then(ok => { if (ok) { playDeleteSound(); if (onDelete) onDelete(value.id); else { deleteTx(value.id); toast(t('movementDeleted'), { icon: 'trash' }) }; onClose() } })
   }
 
+  /*
+   * CAMBIOS SIN GUARDAR.
+   *
+   * La X y el atras cerraban sin preguntar aunque hubieras cambiado cinco
+   * cosas. Se compara con la foto tomada justo despues de cargar: si difiere,
+   * se pregunta antes de descartar. Sin cambios, cierra directo como siempre.
+   */
+  const snapshot = JSON.stringify([type, amount, entryCurrency, note, description, date, accountId, categoryId,
+    fromAccount, toAccount, recurring, recurFreq, recurringEnd, splitOn, splits])
+  const baseline = useRef<string | null>(null)
+  useEffect(() => {
+    if (loaded && baseline.current === null) baseline.current = snapshot
+  }, [loaded, snapshot])
+
+  // «Dividir» o «Hacer recurrente» desde el menú rápido: se aplican DESPUÉS de
+  // tomar la foto, para que cuenten como cambio y cerrar pregunte.
+  const intentDone = useRef(false)
+  useEffect(() => {
+    if (intentDone.current || baseline.current === null) return
+    intentDone.current = true
+    const intent = takeTxFormIntent()
+    if (intent === 'split' && !isTransfer && type === 'expense') {
+      setSplits(current => current.length >= 2 ? current : [{ categoryId: categoryId || '', amount }, { categoryId: '', amount: 0 }])
+      setSplitOn(true)
+      setMoreOpen(true)
+    } else if (intent === 'recurring' && !isTransfer) {
+      setRecurring(true)
+      setMoreOpen(true)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded, snapshot])
+  const dirtyRef = useRef(false)
+  dirtyRef.current = baseline.current !== null && baseline.current !== snapshot
+
+  const requestClose = useCallback(() => {
+    if (!dirtyRef.current) { onClose(); return }
+    void confirm({
+      title: t('discardChangesTitle'),
+      description: t('discardChangesDesc'),
+      confirmLabel: t('discardLabel'),
+      cancelLabel: t('keepEditingLabel'),
+      tone: 'danger',
+    }).then(ok => { if (ok) onClose() })
+  }, [confirm, onClose, t])
+
+  // El atras lo maneja App: le decimos que pregunte aqui antes de cerrar.
+  useEffect(() => {
+    setCloseGuard(() => {
+      if (!dirtyRef.current) return false
+      requestClose()
+      return true
+    })
+    return () => setCloseGuard(null)
+  }, [requestClose])
+
   const arrow = <Icon name="arrowUp" size={12} style={{ transform: 'rotate(90deg)', color: 'var(--m-muted)', flexShrink: 0 }} />
   // El monto se registra en la divisa de la cuenta seleccionada (origen, si es transferencia)
   // MISMA decision que el flujo de crear (`data/txCurrency.ts`): cuando cada
@@ -270,77 +339,130 @@ export function TransactionForm({ value, mkey, onClose, onDelete }: {
     : routing.typedCurrency
   const pfx = currencyPrefix(txCurrency)
 
+  /*
+   * LA FECHA ESTABA DEBAJO DEL PIE.
+   *
+   * Era la ultima fila, despues del monto gigante, la divisa, el concepto, la
+   * descripcion, la cuenta y la categoria. En un movil de pantalla corta, o con
+   * la letra o el «tamaño de pantalla» de Android en grande, quedaba tapada por
+   * el pie y nada decia que la hoja seguia: para esa persona la fecha no
+   * existia. Ahora va arriba, en chips, y lo opcional se pliega en «Mas
+   * detalles». La prueba `e2e/form-reach.spec.ts` vigila que no vuelva a pasar.
+   */
+  const todayISO = localToday()
+  const yesterdayISO = (() => {
+    const d = new Date(`${todayISO}T00:00:00`)
+    d.setDate(d.getDate() - 1)
+    return localToday(d)
+  })()
+  const otherDay = date !== todayISO && date !== yesterdayISO
+
+  // ── Lo que falta para poder guardar, en el orden en que aparece ──
+  const splitsInvalid = splitsActive && (() => {
+    const clean = splits.filter(split => split.categoryId && split.amount > 0)
+    return clean.length < 2 || Math.abs(clean.reduce((total, split) => total + split.amount, 0) - amount) >= 0.01
+  })()
+  const missing: Field | null = isTransfer
+    ? (!amount ? 'amount' : !fromAccount ? 'from' : (!toAccount || toAccount === fromAccount) ? 'to' : null)
+    : (!amount ? 'amount'
+      : !accountId ? 'account'
+      : !splitsActive && !categoryId ? 'category'
+      : !note.trim() ? 'note'
+      : splitsInvalid ? 'splits'
+      : null)
+  const fieldLabel: Record<Field, string> = {
+    amount: t('amount'), note: t('conceptLabel'), account: t('account'), category: t('category'),
+    from: t('sourceAccount'), to: t('destinationAccount'), splits: t('splitToggleLabel'),
+  }
+  const fieldSheet: Partial<Record<Field, Sub>> = {
+    amount: 'amount', note: 'note', account: 'account', category: 'category', from: 'fromAccount', to: 'toAccount',
+  }
+  const onSavePress = () => {
+    if (!missing) { submit(); return }
+    if (missing === 'splits') setMoreOpen(true)
+    reach.goTo(missing)
+    const sheet = fieldSheet[missing]
+    // Primero se ve el campo resaltado; luego se abre su selector.
+    if (sheet) setTimeout(() => setSub(sheet), 450)
+  }
+
+  const amountColor = amount > 0 ? (isTransfer ? 'var(--m-primary)' : typeColor) : 'var(--m-muted)'
+  const amountText = amount > 0
+    ? `${pfx} ${amount.toLocaleString('en-US', { minimumFractionDigits: CURRENCIES[txCurrency].decimals, maximumFractionDigits: CURRENCIES[txCurrency].decimals })}`
+    : `${pfx} 0`
+
   return (
     <>
       {/* ── Full-screen overlay ── */}
-      <div className="txf-overlay" role="dialog" aria-modal="true">
+      <div className="txf-overlay" role="dialog" aria-modal="true" aria-label={isTransfer ? t('transfer') : editing ? t('editMovement') : t('newMovement')}>
 
         <header className="mpr-editor-header">
-          <div className="mpr-editor-header-icon" style={{ background: (isTransfer ? '#ffdd3d' : typeColor) + '28', color: isTransfer ? '#ffdd3d' : typeColor }}>
+          <div className="mpr-editor-header-icon" style={{ background: `color-mix(in oklab, ${isTransfer ? 'var(--m-primary)' : typeColor} 16%, transparent)`, color: isTransfer ? 'var(--m-primary)' : typeColor }}>
             <Icon name={isTransfer ? 'repeat' : type === 'income' ? 'arrowUp' : 'arrowDn'} size={18} />
           </div>
           <span className="mpr-editor-name-input" style={{ cursor: 'default' }}>
             {isTransfer ? t('transfer') : editing ? t('editMovement') : t('newMovement')}
           </span>
-          <button className="mpr-editor-close" onClick={onClose}>
+          <button className="mpr-editor-close" aria-label={t('close')} onClick={requestClose}>
             <Icon name="close" size={18} />
           </button>
         </header>
 
-        <div className="txf-body">
+        <div className="txf-body" onScroll={e => setCompact(e.currentTarget.scrollTop > 24)}>
 
-          {/* Type */}
-          {!isTransfer && (
-            <div className="mpr-form-section">
-              <button
-                className={`mpr-type-pill${type === 'expense' ? ' on' : ''}`}
-                style={type === 'expense' ? { borderColor: '#f65574', background: '#f6557420', color: '#f65574' } : {}}
-                onClick={() => setType('expense')}
-              >
-                <Icon name="arrowDn" size={14} /> {t('expense')}
-              </button>
-              <button
-                className={`mpr-type-pill${type === 'income' ? ' on' : ''}`}
-                style={type === 'income' ? { borderColor: '#35d0a2', background: '#35d0a220', color: '#35d0a2' } : {}}
-                onClick={() => setType('income')}
-              >
-                <Icon name="arrowUp" size={14} /> {t('income')}
-              </button>
-            </div>
-          )}
-
-          {/* Amount hero */}
-          <button className="txf-amount-hero" onClick={() => setSub('amount')}>
-            <span className="txf-amount-label">{isTransfer ? t('amount') : type === 'expense' ? t('totalExpenseLabel') : t('totalIncomeLabel')}</span>
-            <span className="txf-amount-value" style={{ color: amount > 0 ? (isTransfer ? '#ffdd3d' : typeColor) : 'var(--m-muted)' }}>
-              {amount > 0 ? `${pfx} ${amount.toLocaleString('en-US', { minimumFractionDigits: CURRENCIES[txCurrency].decimals, maximumFractionDigits: CURRENCIES[txCurrency].decimals })}` : `${pfx} 0`}
-            </span>
-            <span className="txf-amount-tap">{t('tapToEditLabel')}</span>
-          </button>
-
-          {/* Divisa del movimiento. Solo fuera de transferencias: ahi la divisa
-              la fijan las dos cuentas y `toAmount` ya resuelve el cruce. */}
-          {!isTransfer && (
-            <div className="txf-currency-row">
-              <button
-                type="button"
-                className={`txf-currency-chip${routing.typedCurrency !== (activeAccount ? accountCurrency(activeAccount, currency) : currency) ? ' foreign' : ''}`}
-                onClick={() => setCurrencyPicker(true)}
-                aria-label={t('currency')}
-              >
-                <span>{getCurrencyMeta(routing.typedCurrency).flag}</span>
-                {routing.typedCurrency}
-              </button>
-              {routing.toSecondary && (
-                <span className="txf-currency-note">{t('goesToSecondLine')}</span>
+          {/* Tipo + monto en una sola franja que se encoge al desplazar */}
+          <div className={`txf-top${compact ? ' compact' : ''}`}>
+            <div className="txf-top-row">
+              {!isTransfer && (
+                <div className="txf-type-seg">
+                  <button
+                    className={type === 'expense' ? 'on expense' : ''}
+                    aria-pressed={type === 'expense'}
+                    onClick={() => setType('expense')}
+                  >
+                    {t('expense')}
+                  </button>
+                  <button
+                    className={type === 'income' ? 'on income' : ''}
+                    aria-pressed={type === 'income'}
+                    onClick={() => setType('income')}
+                  >
+                    {t('income')}
+                  </button>
+                </div>
               )}
-              {!routing.toSecondary && routing.typedCurrency !== routing.targetCurrency && amount > 0 && (
-                <span className="txf-currency-note">
-                  ≈ {fmt(buildTxEntry(amount, routing).amount, routing.targetCurrency)}
-                </span>
+              {/* Divisa del movimiento. Solo fuera de transferencias: ahi la divisa
+                  la fijan las dos cuentas y `toAmount` ya resuelve el cruce. */}
+              {!isTransfer && (
+                <button
+                  type="button"
+                  className={`txf-currency-chip${routing.typedCurrency !== (activeAccount ? accountCurrency(activeAccount, currency) : currency) ? ' foreign' : ''}`}
+                  onClick={() => setCurrencyPicker(true)}
+                  aria-label={t('currency')}
+                >
+                  <span>{getCurrencyMeta(routing.typedCurrency).flag}</span>
+                  {routing.typedCurrency}
+                </button>
               )}
             </div>
-          )}
+            <button
+              ref={reach.register('amount')}
+              className={`txf-amount-btn${reach.flashClass('amount')}`}
+              aria-label={`${t('amount')}: ${amountText}`}
+              onClick={() => setSub('amount')}
+            >
+              <span className="txf-amount-value" style={{ color: amountColor }}>{amountText}</span>
+              <Icon name="edit" size={14} style={{ color: 'var(--m-muted)', flexShrink: 0 }} />
+            </button>
+            {!isTransfer && routing.toSecondary && (
+              <span className="txf-currency-note">{t('goesToSecondLine')}</span>
+            )}
+            {!isTransfer && !routing.toSecondary && routing.typedCurrency !== routing.targetCurrency && amount > 0 && (
+              <span className="txf-currency-note">
+                ≈ {fmt(buildTxEntry(amount, routing).amount, routing.targetCurrency)}
+              </span>
+            )}
+          </div>
 
           {currencyPicker && (
             <div className="mobile-detail-sheet" style={{ zIndex: 430 }} role="dialog" aria-modal="true" onClick={() => setCurrencyPicker(false)}>
@@ -375,32 +497,28 @@ export function TransactionForm({ value, mkey, onClose, onDelete }: {
             </div>
           )}
 
-          {/* Detail rows */}
+          {/* Fecha: siempre a la vista, justo debajo del monto */}
+          <div className="txf-date">
+            <span className="txf-section-label">{t('date')}</span>
+            <div className="txf-date-chips">
+              <button className={`txf-chip${date === todayISO ? ' on' : ''}`} aria-pressed={date === todayISO} onClick={() => setDate(todayISO)}>
+                {t('today')}
+              </button>
+              <button className={`txf-chip${date === yesterdayISO ? ' on' : ''}`} aria-pressed={date === yesterdayISO} onClick={() => setDate(yesterdayISO)}>
+                {t('yesterday')}
+              </button>
+              <button className={`txf-chip${otherDay ? ' on' : ''}`} aria-pressed={otherDay} onClick={() => setSub('date')}>
+                <Icon name="calendar" size={13} />
+                {otherDay ? fmtDate(date, locale) : t('pickDayLabel')}
+              </button>
+            </div>
+          </div>
+
+          {/* Lo de siempre: cuenta, categoria y concepto */}
           <div className="mpr-form-rows txf-rows">
-            {/* CONCEPTO, no "Descripcion": es el texto corto que se ve en la
-                lista. La descripcion larga es la fila de abajo, y llamar
-                "Descripcion" a las dos dejaba al usuario sin saber cual
-                rellenaba. */}
-            <button className="mpr-form-row" onClick={() => setSub('note')}>
-              <Icon name="edit" size={16} style={{ color: 'var(--m-muted)', flexShrink: 0 }} />
-              <span className="mpr-form-row-label">{t('conceptLabel')}</span>
-              <span className={note ? 'mpr-form-row-val' : 'mpr-form-row-dim'}>{note || t('requiredLabel')}</span>
-              {arrow}
-            </button>
-
-            {/* La descripcion larga: opcional siempre. */}
-            <button className="mpr-form-row" onClick={() => setDescOpen(true)}>
-              <Icon name="clipboard" size={16} style={{ color: 'var(--m-muted)', flexShrink: 0 }} />
-              <span className="mpr-form-row-label">{t('descriptionLabel')}</span>
-              <span className={description ? 'mpr-form-row-val txf-desc-preview' : 'mpr-form-row-dim'}>
-                {description || t('optionalLabel')}
-              </span>
-              {arrow}
-            </button>
-
             {isTransfer ? (
               <>
-                <button className="mpr-form-row" onClick={() => setSub('fromAccount')}>
+                <button ref={reach.register('from')} className={`mpr-form-row${reach.flashClass('from')}`} onClick={() => setSub('fromAccount')}>
                   <Icon
                     name={fromAccountObj ? ACCT_ICONS[fromAccountObj.type] : 'wallet'}
                     size={16}
@@ -412,7 +530,7 @@ export function TransactionForm({ value, mkey, onClose, onDelete }: {
                   </span>
                   {arrow}
                 </button>
-                <button className="mpr-form-row" onClick={() => setSub('toAccount')}>
+                <button ref={reach.register('to')} className={`mpr-form-row${reach.flashClass('to')}`} onClick={() => setSub('toAccount')}>
                   <Icon
                     name={toAccountObj ? ACCT_ICONS[toAccountObj.type] : 'wallet'}
                     size={16}
@@ -426,7 +544,7 @@ export function TransactionForm({ value, mkey, onClose, onDelete }: {
                 </button>
               </>
             ) : (
-              <button className="mpr-form-row" onClick={() => setSub('account')}>
+              <button ref={reach.register('account')} className={`mpr-form-row${reach.flashClass('account')}`} onClick={() => setSub('account')}>
                 <Icon
                   name={activeAccount ? ACCT_ICONS[activeAccount.type] : 'wallet'}
                   size={16}
@@ -441,7 +559,7 @@ export function TransactionForm({ value, mkey, onClose, onDelete }: {
             )}
 
             {!isTransfer && !splitsActive && (
-              <button className="mpr-form-row" onClick={() => setSub('category')}>
+              <button ref={reach.register('category')} className={`mpr-form-row${reach.flashClass('category')}`} onClick={() => setSub('category')}>
                 <Icon
                   name={(activeCategory?.icon as IconName | undefined) ?? 'tag'}
                   size={16}
@@ -455,108 +573,138 @@ export function TransactionForm({ value, mkey, onClose, onDelete }: {
               </button>
             )}
 
-            <button className="mpr-form-row" onClick={() => setSub('date')}>
-              <Icon name="calendar" size={16} style={{ color: 'var(--m-muted)', flexShrink: 0 }} />
-              <span className="mpr-form-row-label">{t('date')}</span>
-              <span className="mpr-form-row-val">{fmtDate(date, locale)}</span>
+            {/* CONCEPTO, no "Descripcion": es el texto corto que se ve en la
+                lista. La descripcion larga vive en «Mas detalles». */}
+            <button ref={reach.register('note')} className={`mpr-form-row${reach.flashClass('note')}`} onClick={() => setSub('note')}>
+              <Icon name="edit" size={16} style={{ color: 'var(--m-muted)', flexShrink: 0 }} />
+              <span className="mpr-form-row-label">{t('conceptLabel')}</span>
+              <span className={note ? 'mpr-form-row-val' : 'mpr-form-row-dim'}>{note || t('requiredLabel')}</span>
               {arrow}
             </button>
           </div>
 
-          {/* Split entre categorías (solo gastos) */}
-          {!isTransfer && type === 'expense' && (
-            <button
-              className={`mobile-create-recurring-toggle${splitOn ? ' active' : ''}`}
-              onClick={toggleSplit}
-            >
-              <span className="mobile-recur-icon"><Icon name="scissors" size={15} /></span>
-              <span className="mobile-recur-label">{t('splitToggleLabel')}</span>
-              <span className={`mobile-recur-switch${splitOn ? ' on' : ''}`} />
-            </button>
-          )}
-
-          {splitsActive && (
-            <div className="mpr-form-rows txf-rows txf-splits">
-              {splits.map((split, index) => {
-                const cat = visibleCats.find(c => c.id === split.categoryId) ?? null
-                return (
-                  <div className="mpr-form-row txf-split-row" key={index}>
-                    <button className="txf-split-cat" onClick={() => setSplitSub({ kind: 'category', index })}>
-                      <Icon
-                        name={(cat?.icon as IconName | undefined) ?? 'tag'}
-                        size={16}
-                        style={{ color: cat?.color ?? 'var(--m-muted)', flexShrink: 0 }}
-                      />
-                      <span className={cat ? 'mpr-form-row-val' : 'mpr-form-row-dim'}>
-                        {cat?.name ?? t('selectLabel')}
-                      </span>
-                    </button>
-                    <button className="txf-split-amount" onClick={() => setSplitSub({ kind: 'amount', index })}>
-                      {split.amount > 0 ? fmt(split.amount, txCurrency) : `${pfx} 0`}
-                    </button>
-                    {splits.length > 2 && (
-                      <button
-                        className="txf-split-remove"
-                        aria-label={t('delete')}
-                        onClick={() => setSplits(current => current.filter((_, i) => i !== index))}
-                      >
-                        <Icon name="close" size={14} />
-                      </button>
-                    )}
-                  </div>
-                )
-              })}
-              <div className="txf-split-footer">
-                <button className="txf-split-add" onClick={() => setSplits(current => [...current, { categoryId: '', amount: 0 }])}>
-                  <Icon name="plus" size={13} /> {t('splitAddPart')}
-                </button>
-                <span className={`txf-split-remaining${Math.abs(splitsRemaining) < 0.01 ? ' ok' : ''}`}>
-                  {Math.abs(splitsRemaining) < 0.01
-                    ? t('splitBalanced')
-                    : t('splitRemaining').replace('{amount}', fmt(splitsRemaining, txCurrency))}
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* Recurring (no aplica a transferencias) */}
-          {!isTransfer && (
+          {/* Lo opcional, plegado. Se abre solo si el movimiento ya trae algo. */}
           <button
-            className={`mobile-create-recurring-toggle${recurring ? ' active' : ''}`}
-            onClick={() => setRecurring(r => !r)}
+            className={`txf-more-toggle${moreOpen ? ' open' : ''}`}
+            aria-expanded={moreOpen}
+            onClick={() => setMoreOpen(open => !open)}
           >
-            <span className="mobile-recur-icon"><Icon name="repeat" size={15} /></span>
-            <span className="mobile-recur-label">{t('scheduleRecurrenceLabel')}</span>
-            <span className={`mobile-recur-switch${recurring ? ' on' : ''}`} />
+            <Icon name="dots" size={16} style={{ color: 'var(--m-muted)', flexShrink: 0 }} />
+            <span className="txf-more-title">{t('moreDetailsLabel')}</span>
+            <small>{isTransfer ? t('descriptionLabel') : t('moreDetailsHint')}</small>
+            <Icon name="arrowUp" size={12} className="txf-more-chev" />
           </button>
-          )}
 
-          {!isTransfer && recurring && (
-            <div className="mpr-form-rows txf-rows">
-              <div className="mpr-form-row">
-                <Icon name="repeat" size={16} style={{ color: 'var(--m-muted)', flexShrink: 0 }} />
-                <span className="mpr-form-row-label">{t('frequencyLabel')}</span>
-                <div className="mpr-pill-row" style={{ flex: 1, justifyContent: 'flex-end' }}>
-                  {(['weekly', 'monthly'] as RecurrenceFrequency[]).map(f => (
-                    <button
-                      key={f}
-                      className={`mpr-pill${recurFreq === f ? ' on' : ''}`}
-                      style={recurFreq === f ? { borderColor: 'var(--m-text)', color: 'var(--m-text)' } : {}}
-                      onClick={() => setRecurFreq(f)}
-                    >
-                      {f === 'weekly' ? t('weekly') : t('monthly')}
-                    </button>
-                  ))}
-                </div>
+          {moreOpen && (
+            <div className="txf-more">
+              {/* La descripcion larga: opcional siempre. */}
+              <div className="mpr-form-rows txf-rows">
+                <button className="mpr-form-row" onClick={() => setDescOpen(true)}>
+                  <Icon name="clipboard" size={16} style={{ color: 'var(--m-muted)', flexShrink: 0 }} />
+                  <span className="mpr-form-row-label">{t('descriptionLabel')}</span>
+                  <span className={description ? 'mpr-form-row-val txf-desc-preview' : 'mpr-form-row-dim'}>
+                    {description || t('optionalLabel')}
+                  </span>
+                  {arrow}
+                </button>
               </div>
-              <button className="mpr-form-row" onClick={() => setSub('recurEnd')}>
-                <Icon name="calendar" size={16} style={{ color: 'var(--m-muted)', flexShrink: 0 }} />
-                <span className="mpr-form-row-label">{t('until')}</span>
-                <span className={recurringEnd ? 'mpr-form-row-val' : 'mpr-form-row-dim'}>
-                  {recurringEnd ? fmtDate(recurringEnd, locale) : t('noEndDate')}
-                </span>
-                {arrow}
-              </button>
+
+              {/* Split entre categorías (solo gastos) */}
+              {!isTransfer && type === 'expense' && (
+                <button
+                  className={`mobile-create-recurring-toggle${splitOn ? ' active' : ''}`}
+                  onClick={toggleSplit}
+                >
+                  <span className="mobile-recur-icon"><Icon name="scissors" size={15} /></span>
+                  <span className="mobile-recur-label">{t('splitToggleLabel')}</span>
+                  <span className={`mobile-recur-switch${splitOn ? ' on' : ''}`} />
+                </button>
+              )}
+
+              {splitsActive && (
+                <div ref={reach.register('splits')} className={`mpr-form-rows txf-rows txf-splits${reach.flashClass('splits')}`}>
+                  {splits.map((split, index) => {
+                    const cat = visibleCats.find(c => c.id === split.categoryId) ?? null
+                    return (
+                      <div className="mpr-form-row txf-split-row" key={index}>
+                        <button className="txf-split-cat" onClick={() => setSplitSub({ kind: 'category', index })}>
+                          <Icon
+                            name={(cat?.icon as IconName | undefined) ?? 'tag'}
+                            size={16}
+                            style={{ color: cat?.color ?? 'var(--m-muted)', flexShrink: 0 }}
+                          />
+                          <span className={cat ? 'mpr-form-row-val' : 'mpr-form-row-dim'}>
+                            {cat?.name ?? t('selectLabel')}
+                          </span>
+                        </button>
+                        <button className="txf-split-amount" onClick={() => setSplitSub({ kind: 'amount', index })}>
+                          {split.amount > 0 ? fmt(split.amount, txCurrency) : `${pfx} 0`}
+                        </button>
+                        {splits.length > 2 && (
+                          <button
+                            className="txf-split-remove"
+                            aria-label={t('delete')}
+                            onClick={() => setSplits(current => current.filter((_, i) => i !== index))}
+                          >
+                            <Icon name="close" size={14} />
+                          </button>
+                        )}
+                      </div>
+                    )
+                  })}
+                  <div className="txf-split-footer">
+                    <button className="txf-split-add" onClick={() => setSplits(current => [...current, { categoryId: '', amount: 0 }])}>
+                      <Icon name="plus" size={13} /> {t('splitAddPart')}
+                    </button>
+                    <span className={`txf-split-remaining${Math.abs(splitsRemaining) < 0.01 ? ' ok' : ''}`}>
+                      {Math.abs(splitsRemaining) < 0.01
+                        ? t('splitBalanced')
+                        : t('splitRemaining').replace('{amount}', fmt(splitsRemaining, txCurrency))}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Recurring (no aplica a transferencias) */}
+              {!isTransfer && (
+                <button
+                  className={`mobile-create-recurring-toggle${recurring ? ' active' : ''}`}
+                  onClick={() => setRecurring(r => !r)}
+                >
+                  <span className="mobile-recur-icon"><Icon name="repeat" size={15} /></span>
+                  <span className="mobile-recur-label">{t('scheduleRecurrenceLabel')}</span>
+                  <span className={`mobile-recur-switch${recurring ? ' on' : ''}`} />
+                </button>
+              )}
+
+              {!isTransfer && recurring && (
+                <div className="mpr-form-rows txf-rows">
+                  <div className="mpr-form-row">
+                    <Icon name="repeat" size={16} style={{ color: 'var(--m-muted)', flexShrink: 0 }} />
+                    <span className="mpr-form-row-label">{t('frequencyLabel')}</span>
+                    <div className="mpr-pill-row" style={{ flex: 1, justifyContent: 'flex-end' }}>
+                      {(['weekly', 'monthly'] as RecurrenceFrequency[]).map(f => (
+                        <button
+                          key={f}
+                          className={`mpr-pill${recurFreq === f ? ' on' : ''}`}
+                          style={recurFreq === f ? { borderColor: 'var(--m-text)', color: 'var(--m-text)' } : {}}
+                          onClick={() => setRecurFreq(f)}
+                        >
+                          {f === 'weekly' ? t('weekly') : t('monthly')}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <button className="mpr-form-row" onClick={() => setSub('recurEnd')}>
+                    <Icon name="calendar" size={16} style={{ color: 'var(--m-muted)', flexShrink: 0 }} />
+                    <span className="mpr-form-row-label">{t('until')}</span>
+                    <span className={recurringEnd ? 'mpr-form-row-val' : 'mpr-form-row-dim'}>
+                      {recurringEnd ? fmtDate(recurringEnd, locale) : t('noEndDate')}
+                    </span>
+                    {arrow}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -564,13 +712,18 @@ export function TransactionForm({ value, mkey, onClose, onDelete }: {
 
         <div className="mpr-editor-actions">
           {editing && (
-            <button className="mpr-del-btn" onClick={remove}>
-              <Icon name="trash" size={15} /> {t('delete')}
+            <button className="mpr-del-btn txf-del-icon" aria-label={t('delete')} onClick={remove}>
+              <Icon name="trash" size={16} />
             </button>
           )}
-          <button className="mpr-btn-cancel" onClick={onClose}>{t('cancel')}</button>
-          <button className="mpr-btn-save" disabled={submitting} style={{ background: 'var(--m-primary, #ffdd3d)' }} onClick={submit}>
-            {editing ? t('save') : t('add')}
+          <button
+            className={`mpr-btn-save${missing ? ' form-save-missing' : ''}`}
+            disabled={submitting}
+            onClick={onSavePress}
+          >
+            {missing
+              ? t('missingFieldLabel').replace('{field}', fieldLabel[missing])
+              : editing ? t('saveChangesLabel') : t('add')}
           </button>
         </div>
 

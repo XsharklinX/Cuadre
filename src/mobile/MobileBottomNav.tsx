@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { Icon } from '@/components/ui/Icon'
 import { useT } from '@/i18n'
 import { playOpenSound, playSoftHaptic } from '@/lib/sound'
+import { useCreateRequest } from '@/store/createRequest'
 import { useMobileBackDismiss } from './useMobileBackDismiss'
 
 /*
@@ -13,7 +14,10 @@ import { useMobileBackDismiss } from './useMobileBackDismiss'
  * enrutado entero para ganar nada.
  */
 export type MobileRoute = 'home' | 'analysis' | 'add' | 'reports' | 'profile' | 'business'
-export type QuickAddMode = 'expense' | 'income'
+export type QuickAddMode = 'expense' | 'income' | 'transfer'
+/** Lo que el «+» grande ofrece según la pantalla en la que estás. */
+export type FabContext = 'goals' | 'accounts'
+export type FabAction = 'contributeMain' | 'newGoal' | 'transfer' | 'newAccount' | 'movement'
 
 type NavItem = { route: Exclude<MobileRoute, 'add'>; icon: Parameters<typeof Icon>[0]['name']; labelKey: 'movementsLabel' | 'analysisTab' | 'accounts' | 'bizTitle' }
 
@@ -50,13 +54,19 @@ export const ROUTE_ORDER: MobileRoute[] = ITEMS.map(i => i.route)
 
 const LONG_PRESS_MS = 420
 
-export function MobileBottomNav({ route, onRoute, onQuickAdd }: {
+export function MobileBottomNav({ route, onRoute, onQuickAdd, fabContext, mainGoalName, onFabAction }: {
   route: MobileRoute
   onRoute: (route: MobileRoute) => void
   onQuickAdd?: (mode: QuickAddMode) => void
+  fabContext?: FabContext | null
+  /** Nombre de la meta principal, para «Aportar a …». */
+  mainGoalName?: string | null
+  onFabAction?: (action: FabAction) => void
 }) {
   const t = useT()
   const [quickMenu, setQuickMenu] = useState(false)
+  const [contextMenu, setContextMenu] = useState(false)
+  useMobileBackDismiss(contextMenu, () => setContextMenu(false))
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressed = useRef(false)
   useMobileBackDismiss(quickMenu, () => setQuickMenu(false))
@@ -77,8 +87,43 @@ export function MobileBottomNav({ route, onRoute, onQuickAdd }: {
     cancelPress()
     if (!longPressed.current) {
       playOpenSound()
-      onRoute('add')
+      /*
+       * En Negocio, el + ofrece lo de Negocio. Era el botón más grande de la
+       * app y en esa pantalla no hacía nada que tuviera que ver con ella. El
+       * movimiento de siempre sigue dentro, como última opción.
+       */
+      if (route === 'business') useCreateRequest.getState().askBusinessMenu()
+      /*
+       * EL «+» OFRECE LO DE LA PANTALLA.
+       *
+       * Igual que en Negocio: en Metas propone aportar a la meta principal o
+       * crear otra; en Cuentas, transferir o abrir una cuenta. El movimiento
+       * de siempre sigue dentro, como última opción.
+       */
+      else if (fabContext && onFabAction) setContextMenu(true)
+      else onRoute('add')
     }
+  }
+
+  const contextItems: { key: FabAction; icon: Parameters<typeof Icon>[0]['name']; label: string }[] =
+    fabContext === 'goals'
+      ? [
+          ...(mainGoalName ? [{ key: 'contributeMain' as const, icon: 'plus' as const, label: t('fabContributeMain').replace('{name}', mainGoalName) }] : []),
+          { key: 'newGoal', icon: 'target', label: t('newGoal') },
+          { key: 'movement', icon: 'list', label: t('fabMovement') },
+        ]
+      : fabContext === 'accounts'
+        ? [
+            { key: 'transfer', icon: 'repeat', label: t('transfer') },
+            { key: 'newAccount', icon: 'wallet', label: t('fabNewAccount') },
+            { key: 'movement', icon: 'list', label: t('fabMovement') },
+          ]
+        : []
+  const pickContext = (action: FabAction) => {
+    setContextMenu(false)
+    playOpenSound()
+    if (action === 'movement') onRoute('add')
+    else onFabAction?.(action)
   }
 
   const pickQuick = (mode: QuickAddMode) => {
@@ -99,6 +144,18 @@ export function MobileBottomNav({ route, onRoute, onQuickAdd }: {
       ))}
 
       <div className="mobile-add-fab-wrap">
+        {contextMenu && (
+          <>
+            <div className="mobile-fab-menu-backdrop" onClick={() => setContextMenu(false)} />
+            <div className="mobile-fab-menu mobile-fab-menu-context" role="menu">
+              {contextItems.map(item => (
+                <button key={item.key} role="menuitem" onClick={() => pickContext(item.key)}>
+                  <Icon name={item.icon} size={15} /> {item.label}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
         {quickMenu && (
           <>
             <div className="mobile-fab-menu-backdrop" onClick={() => setQuickMenu(false)} />

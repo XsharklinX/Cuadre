@@ -6,6 +6,11 @@ export type AnalyticsSectionId = 'metrics' | 'trends' | 'evolution' | 'networth'
 
 interface AnalyticsSectionsState {
   open: Partial<Record<AnalyticsSectionId, boolean>>
+  /**
+   * Cuántas veces se ha ABIERTO cada una. Es lo que ordena los acordeones:
+   * los que más usas arriba, en vez de un orden fijo que no sabe nada de ti.
+   */
+  opens: Partial<Record<AnalyticsSectionId, number>>
   toggle: (id: AnalyticsSectionId) => void
   isOpen: (id: AnalyticsSectionId) => boolean
 }
@@ -23,7 +28,15 @@ export const useAnalyticsSections = create<AnalyticsSectionsState>()(
   persist(
     (set, get) => ({
       open: {},
-      toggle: (id) => set(state => ({ open: { ...state.open, [id]: !state.open[id] } })),
+      opens: {},
+      toggle: (id) => set(state => {
+        const abriendo = !state.open[id]
+        return {
+          open: { ...state.open, [id]: abriendo },
+          // Solo cuenta ABRIR: cerrar no dice que te interese.
+          opens: abriendo ? { ...state.opens, [id]: (state.opens[id] ?? 0) + 1 } : state.opens,
+        }
+      }),
       isOpen: (id) => get().open[id] === true,
     }),
     {

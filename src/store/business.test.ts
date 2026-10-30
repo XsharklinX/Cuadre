@@ -541,3 +541,68 @@ describe('ordenar y archivar', () => {
     expect(useBusiness.getState().businesses[0].archivedAt).toBeUndefined()
   })
 })
+
+describe('Negocio a fondo: las acciones nuevas', () => {
+  beforeEach(limpiar)
+
+  it('quien recomendó gana su estrella sola al crear al cliente', () => {
+    const madrina = nuevoCliente({ name: 'Maria' })
+    const nueva = nuevoCliente({ name: 'Rosa', referredBy: madrina })
+    const m = useBusiness.getState().clients.find(c => c.id === madrina)!
+    expect(m.stars).toHaveLength(1)
+    expect(m.stars![0].referredId).toBe(nueva)
+  })
+
+  it('las estrellas bajan el cobro que se genera', () => {
+    nuevoCliente({ amount: 300, stars: [{ at: Date.now() }, { at: Date.now() }] })
+    useBusiness.getState().syncCharges(HOY)
+    const cobros = useBusiness.getState().charges
+    expect(cobros.length).toBeGreaterThan(0)
+    expect(cobros.every(c => c.amount === 270 && c.discountPct === 10)).toBe(true)
+  })
+
+  it('borrar guardando el historial conserva lo pagado y quita lo pendiente', () => {
+    const id = nuevoCliente()
+    useBusiness.setState(s => ({
+      charges: [
+        { id: 'pagado', clientId: id, dueDate: '2026-10-05', amount: 250, paid: 250, txIds: ['t'], paidAt: 1 },
+        { id: 'pendiente', clientId: id, dueDate: '2026-11-05', amount: 250, paid: 0, txIds: [], paidAt: 0 },
+        ...s.charges.filter(c => c.clientId !== id),
+      ],
+    }))
+    useBusiness.getState().softDeleteClient(id)
+    const st = useBusiness.getState()
+    expect(st.clients.find(c => c.id === id)?.deletedAt).toBeGreaterThan(0)
+    expect(st.charges.map(c => c.id)).toEqual(['pagado'])
+    // Y sobrevive a recargar: el saneado no lo descarta.
+    const recargado = sanitizeBusinessData(JSON.parse(JSON.stringify(st)))
+    expect(recargado.charges.map(c => c.id)).toEqual(['pagado'])
+  })
+
+  it('borrar todo se lleva el cliente y sus cobros', () => {
+    const id = nuevoCliente()
+    useBusiness.setState(s => ({ charges: [...s.charges, { id: 'x', clientId: id, dueDate: '2026-10-05', amount: 1, paid: 1, txIds: ['t'], paidAt: 1 }] }))
+    useBusiness.getState().purgeClient(id)
+    expect(useBusiness.getState().clients).toEqual([])
+    expect(useBusiness.getState().charges).toEqual([])
+  })
+
+  it('cerrar una cuenta pasa a sus clientes a otra', () => {
+    const svc = useBusiness.getState().addService({ businessId: 'b', name: 'Netflix', cost: 600, costCycle: 'monthly', accounts: [{ id: 'a', cost: 600 }, { id: 'b2', cost: 600 }] })
+    const c = nuevoCliente({ serviceId: svc, serviceAccountId: 'a' })
+    useBusiness.getState().closeAccount(svc, 'a', 'b2')
+    expect(useBusiness.getState().clients.find(x => x.id === c)?.serviceAccountId).toBe('b2')
+    expect(useBusiness.getState().services[0].accounts?.find(a => a.id === 'a')?.closedAt).toBeGreaterThan(0)
+  })
+
+  it('el saneado guarda lo nuevo y descarta lo raro', () => {
+    const r = sanitizeBusinessData({
+      businesses: [{ id: 'b', name: 'N', referral: { pctPerStar: 10, maxPct: 300 } }],
+      services: [{ id: 's', businessId: 'b', name: 'S', payMode: 'auto', payDay: 12, payHandled: ['a|2026-10-12', 'raro'], payMode2: 1, slotPrice: 350 }],
+      clients: [{ id: 'c', name: 'C', stars: [{ at: 5 }, { at: 0 }], autoCollect: true, referredBy: 'x' }],
+    })
+    expect(r.businesses[0].referral).toEqual({ pctPerStar: 10, maxPct: 100, expiresMonths: undefined })
+    expect(r.services[0]).toMatchObject({ payMode: 'auto', payDay: 12, payHandled: ['a|2026-10-12'], slotPrice: 350 })
+    expect(r.clients[0]).toMatchObject({ stars: [{ at: 5 }], autoCollect: true, referredBy: 'x' })
+  })
+})

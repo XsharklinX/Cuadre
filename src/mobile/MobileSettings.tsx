@@ -11,6 +11,7 @@ import { useT, type LangKey } from '@/i18n'
 import type { IconName } from '@/types'
 import { useMobileBackDismiss } from './useMobileBackDismiss'
 import { SettingsRow, SettingsSheet, type Sheet } from './settings/shared'
+import { SEARCH_INDEX, normalize, type SearchEntry } from './settings/searchIndex'
 import { SettingsAppearance } from './settings/SettingsAppearance'
 import { SettingsCategories } from './settings/SettingsCategories'
 import { SettingsData } from './settings/SettingsData'
@@ -57,42 +58,6 @@ const SHEET_CATEGORY: Partial<Record<Sheet, Category>> = {
   comments: 'about', about: 'about', privacy: 'about', terms: 'about',
 }
 
-interface SearchEntry {
-  sheet: Sheet
-  icon: IconName
-  color: string
-  labelKey: LangKey
-  crumbKey: LangKey
-  keywords: string
-  tauriOnly?: boolean
-}
-const SEARCH_INDEX: SearchEntry[] = [
-  { sheet: 'currency',     icon: 'dollar',   color: '#35d0a2', labelKey: 'currency',              crumbKey: 'financeSection',     keywords: 'moneda currency divisa dop usd eur peso dolar' },
-  { sheet: 'overdraft',    icon: 'alert',    color: '#f59e0b', labelKey: 'overdraft',             crumbKey: 'financeSection',     keywords: 'sobregiro overdraft saldo negativo limite' },
-  { sheet: 'fxAlert',      icon: 'trend',    color: '#5bc0ff', labelKey: 'fxAlertLabel',          crumbKey: 'financeSection',     keywords: 'tasa cambio exchange rate alerta divisa' },
-  { sheet: 'anomalyAlert', icon: 'alert',    color: '#ff6b8a', labelKey: 'anomalyAlertLabel',     crumbKey: 'financeSection',     keywords: 'gasto inusual anomaly alerta anomalia deteccion' },
-  { sheet: 'theme',        icon: 'palette',  color: '#a78bfa', labelKey: 'theme',                 crumbKey: 'appearanceSection',  keywords: 'tema theme oscuro claro dark light amoled apariencia' },
-  { sheet: 'accent',       icon: 'palette',  color: '#5bc0ff', labelKey: 'accentColor',           crumbKey: 'appearanceSection',  keywords: 'acento color accent' },
-  { sheet: 'density',      icon: 'sliders',  color: '#35d0a2', labelKey: 'density',               crumbKey: 'appearanceSection',  keywords: 'densidad density compacto espaciado tamano' },
-  { sheet: 'language',     icon: 'user',     color: '#ffdd3d', labelKey: 'language',              crumbKey: 'appearanceSection',  keywords: 'idioma language english espanol lenguaje' },
-  { sheet: 'soundProfile', icon: 'bell',     color: '#ff6b8a', labelKey: 'soundProfile',          crumbKey: 'soundHapticsSection', keywords: 'sonido sound haptico vibracion volumen audio' },
-  { sheet: 'categories',   icon: 'tag',      color: '#a78bfa', labelKey: 'categorySettings',      crumbKey: 'categorySettings',   keywords: 'categoria category presupuesto icono color' },
-  { sheet: 'categoryRules', icon: 'sliders', color: '#5bc0ff', labelKey: 'categoryRulesLabel',    crumbKey: 'categorySettings',   keywords: 'regla rule aprendida categorizacion automatica' },
-  { sheet: 'export',       icon: 'download', color: '#35d0a2', labelKey: 'exportData',            crumbKey: 'dataSection',        keywords: 'exportar export backup respaldo json excel pdf descargar' },
-  { sheet: 'backupSchedule', icon: 'fileJson', color: '#a78bfa', labelKey: 'weeklyBackupLastLabel', crumbKey: 'dataSection',      keywords: 'backup semanal respaldo automatico carpeta weekly', tauriOnly: true },
-  { sheet: 'reset',        icon: 'trash',    color: '#ff6b8a', labelKey: 'deleteAllData',         crumbKey: 'dataSection',        keywords: 'borrar delete eliminar reiniciar datos todo' },
-  { sheet: 'pin',          icon: 'key',      color: '#ffdd3d', labelKey: 'appLock',               crumbKey: 'securitySection',    keywords: 'bloqueo lock pin patron biometria huella seguridad' },
-  { sheet: 'bankNotifications', icon: 'bell', color: '#5bc0ff', labelKey: 'transactionDetection', crumbKey: 'notificationsSection', keywords: 'notificacion banco deteccion transaccion automatica recordatorio segundo plano agregar rapido', tauriOnly: true },
-  { sheet: 'comments',     icon: 'edit',     color: '#a78bfa', labelKey: 'comments',              crumbKey: 'aboutSection',       keywords: 'comentario feedback sugerencia opinion' },
-  { sheet: 'about',        icon: 'info',     color: '#5bc0ff', labelKey: 'aboutUs',               crumbKey: 'aboutSection',       keywords: 'acerca nosotros about version' },
-  { sheet: 'privacy',      icon: 'lock',     color: '#35d0a2', labelKey: 'privacyPolicy',         crumbKey: 'aboutSection',       keywords: 'privacidad privacy datos politica' },
-  { sheet: 'terms',        icon: 'fileJson', color: '#7a8296', labelKey: 'termsOfUse',            crumbKey: 'aboutSection',       keywords: 'terminos terms condiciones uso legal' },
-]
-
-function normalize(text: string): string {
-  return text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
-}
-
 export function MobileSettings({
   mkey,
   onClose,
@@ -133,10 +98,10 @@ export function MobileSettings({
     if (sheet === 'name') setNameInput(settings.displayName)
   }
   const close = () => setActiveSheet(null)
-  const openFromSearch = (sheet: Sheet) => {
-    const cat = SHEET_CATEGORY[sheet]
+  const openFromSearch = (entry: SearchEntry) => {
+    const cat = entry.sheet ? SHEET_CATEGORY[entry.sheet] : entry.section
     if (cat) setSection(cat)
-    setActiveSheet(sheet)
+    if (entry.sheet) setActiveSheet(entry.sheet)
     setQuery('')
   }
 
@@ -238,9 +203,9 @@ export function MobileSettings({
                 ) : (
                   <div className="mset-card">
                     {results.map(e => (
-                      <SettingsRow key={e.sheet} icon={e.icon} iconColor={e.color}
+                      <SettingsRow key={e.sheet ?? e.labelKey} icon={e.icon} iconColor={e.color}
                         label={t(e.labelKey)} sublabel={t(e.crumbKey)}
-                        onClick={() => openFromSearch(e.sheet)} />
+                        onClick={() => openFromSearch(e)} />
                     ))}
                   </div>
                 )}

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { SheetSelect } from '@/components/ui/SheetSelect'
 import { Icon } from '@/components/ui/Icon'
 import { toast } from '@/components/ui/Toast'
 import { setAsideAmount } from '@/data/business'
@@ -173,6 +174,7 @@ export function CollectSheet({
       onClose={onClose}
       onSave={cobrar}
       canSave={canSave}
+      missing={guardando ? null : !(monto > 0) ? t('fieldAmount') : !cuenta ? t('account') : !client.categoryId ? t('category') : null}
       saveLabel={t('bizMarkPaid')}
     >
       <div className="mbizs-hero">
@@ -195,7 +197,7 @@ export function CollectSheet({
         />
       </Field>
 
-      <Field label={t('bizAmountReceived')} hint={t('bizPartialHint')}>
+      <Field label={t('bizAmountReceived')} hint={t('bizPartialHint')} needs={!(monto > 0)}>
         <input
           className="mbizs-input"
           type="number"
@@ -215,13 +217,15 @@ export function CollectSheet({
         />
       </Field>
 
-      <Field label={t('bizDepositedIn')}>
-        <select className="mbizs-input" value={accountId} onChange={e => setAccountId(e.target.value)}>
-          <option value="">{t('selectAccount')}</option>
-          {accounts.filter(a => a.type !== 'credit').map(a => (
-            <option key={a.id} value={a.id}>{a.name}</option>
-          ))}
-        </select>
+      <Field label={t('bizDepositedIn')} needs={monto > 0 && !cuenta}>
+        <SheetSelect
+          className="mbizs-input"
+          title={t('bizDepositedIn')}
+          value={accountId}
+          placeholder={t('selectAccount')}
+          onChange={setAccountId}
+          options={accounts.filter(a => a.type !== 'credit').map(a => ({ value: a.id, label: a.name, color: a.color }))}
+        />
       </Field>
 
       {/* Si el cliente paga en otra divisa que la cuenta, se dice en cuánto

@@ -48,8 +48,22 @@ export function scopeTransactions(
   txns: Transaction[],
   businesses: Business[],
   scope: ReportScope,
+  /**
+   * De quién es cada movimiento (ver `attribution.ts`). Con él, un cobro de un
+   * cliente o un pago de servicio son del negocio aunque su categoría no lo
+   * sea: la misma frontera que usa Ganancia, para que las dos pantallas no se
+   * contradigan.
+   */
+  owner?: (tx: Transaction) => { businessId: string } | null,
 ): Transaction[] {
   if (scope === 'all') return txns
+  if (owner && businesses.length) {
+    return txns.filter(tx => {
+      if (tx.type === 'transfer') return scope === 'personal'
+      const esNegocio = owner(tx) !== null
+      return scope === 'business' ? esNegocio : !esNegocio
+    })
+  }
   const deNegocio = businessCategoryIds(businesses)
   // Sin negocios con categorías no hay frontera que trazar: «solo personal»
   // sería todo y «solo negocio» sería nada, y ninguna de las dos respuestas

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { SheetSelect } from '@/components/ui/SheetSelect'
 import { AccountPickerRow } from '@/components/ui/AccountPickerRow'
 import { Icon } from '@/components/ui/Icon'
 import { BrandLogo } from '@/components/ui/BrandLogo'
@@ -21,6 +22,9 @@ import { MobileTextSheet } from './MobileTextSheet'
 import { useMobileBackDismiss } from './useMobileBackDismiss'
 import { useDialogA11y } from './useDialogA11y'
 import { SheetPortal } from './SheetPortal'
+import { IconTile, NxSheet } from '@/components/ui/Phrase'
+import { MobileDatePicker } from './MobileDatePicker'
+import { AccountPickSheet } from './goals/GoalBits'
 import type { Account, Category, CurrencyCode, IconName, RecurrenceFrequency, Transaction } from '@/types'
 
 const today = localToday
@@ -89,9 +93,6 @@ function nextDate(tx: Transaction): string {
   return tx.recurringNext ?? tx.date
 }
 
-function nextLabel(tx: Transaction, locale: string): string {
-  return new Date(`${nextDate(tx)}T00:00:00`).toLocaleDateString(locale, { month: 'short', day: 'numeric' })
-}
 
 /** Días desde hoy hasta la fecha ISO (negativo = ya pasó). */
 function daysUntil(iso: string, todayISO: string): number {
@@ -123,16 +124,14 @@ export function MobileSubscriptions() {
   const [converting, setConverting] = useState<SubscriptionInsight | null>(null)
   const [adding, setAdding] = useState(false)
 
-  useMobileBackDismiss(!!sheet, () => setSheet(null))
-  const dialogRef = useDialogA11y<HTMLDivElement>(() => setSheet(null), !!sheet)
   const convertRef = useDialogA11y<HTMLDivElement>(() => setConverting(null), !!converting)
   useMobileBackDismiss(adding, () => setAdding(false))
   const addRef = useDialogA11y<HTMLDivElement>(() => setAdding(false), adding)
 
   // Only recurring templates (not the generated instances — those have no recurring field)
-  const recurring = transactions.filter(tx => tx.recurring)
-  const monthly   = recurring.filter(tx => tx.recurring === 'monthly')
-  const weekly    = recurring.filter(tx => tx.recurring === 'weekly')
+  // Lo cancelado («La cancelé» pone `recurringEnd`) deja de contar: su historia
+  // sigue en los movimientos, pero ya no se paga cada mes.
+  const recurring = transactions.filter(tx => tx.recurring && (!tx.recurringEnd || tx.recurringEnd >= today()))
 
   /*
    * LO QUE REVENDES NO ES GASTO TUYO.
@@ -155,7 +154,6 @@ export function MobileSubscriptions() {
   const totalMonthly = propias.reduce((s, tx) => s + monthlyEquivalent(tx), 0)
   const totalResold = revendidas.reduce((s, tx) => s + monthlyEquivalent(tx), 0)
   const totalAnnual = totalMonthly * 12
-  const nextRecurring = [...recurring].sort((a, b) => (a.recurringNext ?? a.date).localeCompare(b.recurringNext ?? b.date))[0]
 
   const dismissed = useDismissals(state => state.dismissed)
   const dismissSuggestion = useDismissals(state => state.dismiss)
@@ -246,6 +244,111 @@ export function MobileSubscriptions() {
     }
   }
 
+  // ── 2.8 · SUSCRIPCIONES CON LAS PIEZAS DE LA APP (U1–U7) ─────────────
+  const todayISO = today()
+  const [bizFor, setBizFor] = useState<SubscriptionInsight | null>(null)
+  const [reviewing, setReviewing] = useState(false)
+  const [verNegocio, setVerNegocio] = useState(false)
+  const [remind, setRemind] = useState<string[]>(readRemind)
+
+  // U1 · Qué parte de lo que entra: la media de ingresos de los tres últimos meses.
+  const incomeAvg = useMemo(() => {
+    const keys = [1, 2, 3].map(k => { const d = new Date(); d.setMonth(d.getMonth() - k); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` })
+    const total = transactions.filter(tx => tx.type === 'income' && keys.includes(tx.date.slice(0, 7))).reduce((s, tx) => s + tx.amount, 0)
+    return total / 3
+  }, [transactions])
+  const sharePct = incomeAvg > 0 ? Math.round((totalMonthly / incomeAvg) * 100) : null
+
+  // U1 · Una sola lista, por el próximo cobro.
+  const lista = useMemo(
+    () => [...propias].filter(tx => !tx.recurringEnd || nextDate(tx) <= tx.recurringEnd).sort((a, b) => nextDate(a).localeCompare(nextDate(b))),
+    [propias],
+  )
+  const enTira = lista.filter(tx => daysUntil(nextDate(tx), todayISO) >= 0 && daysUntil(nextDate(tx), todayISO) <= 31).slice(0, 6)
+
+  // U6 · La subida de precio, en la fila de su suscripción.
+  const hikeFor = (tx: Transaction) => {
+    const n = tx.note.trim().toLowerCase()
+    return priceHikes.find(h => h.merchant.trim().toLowerCase() === n)?.priceIncrease ?? null
+  }
+  const hikesSinFila = priceHikes.filter(h => !recurring.some(tx => tx.note.trim().toLowerCase() === h.merchant.trim().toLowerCase()))
+
+  // U5 · El repaso, una vez al trimestre.
+  const reviewDue = (() => {
+    if (propias.length < 2) return false
+    try {
+      const last = Number(localStorage.getItem(REVIEW_KEY) ?? 0)
+      return Date.now() - last > 90 * 86_400_000
+    } catch { return false }
+  })()
+
+  const relLabel = (iso: string): string => {
+    const d = daysUntil(iso, todayISO)
+    if (d < 0) return t('overdueLabel')
+    if (d === 0) return t('todayLabel')
+    if (d === 1) return t('tomorrowLabel')
+    return t('inDaysLabel').replace('{n}', String(d))
+  }
+
+  const fila = (tx: Transaction) => {
+    const cat = categories.find(c => c.id === tx.categoryId)
+    const acct = accounts.find(a => a.id === tx.accountId)
+    const service = tx.serviceId ? SUBSCRIPTION_CATALOG.find(c => c.id === tx.serviceId) : undefined
+    const iso = nextDate(tx)
+    const overdue = daysUntil(iso, todayISO) < 0
+    const lowFunds = !!acct && lacksFunds(acct, tx.amount)
+    const hike = hikeFor(tx)
+    return (
+      <button key={tx.id} className="u28-row" onClick={() => setSheet({ tx, confirm: false })}>
+        <RowTile item={service} fallbackColor={service?.color ?? cat?.color ?? '#888'} fallbackIcon={cat?.icon ?? 'repeat'} size={40} glyph={20} />
+        <span className="u28-row-main">
+          <b>{tx.note || (cat ? translateCategoryName(cat, lang) : '—')}</b>
+          <small className={overdue || lowFunds ? 'bad' : ''}>
+            {new Date(`${iso}T00:00:00`).toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
+            {' · '}{relLabel(iso)}
+            {lowFunds && !overdue && acct ? ` · ${t('u28NotEnough').replace('{account}', acct.short || acct.name)}` : acct ? ` · ${acct.short || acct.name}` : ''}
+          </small>
+          {hike && (
+            <small className="bad">{t('u28Hike').replace('{from}', fmt(hike.from, currency)).replace('{year}', fmt((hike.to - hike.from) * 12, currency))}</small>
+          )}
+        </span>
+        <span className="u28-row-v">
+          <b>−{fmt(tx.amount, currency)}</b>
+          <small>{freqLabel(tx, t)}</small>
+        </span>
+      </button>
+    )
+  }
+
+  const detectada = detected[0]
+
+  // U2 · «Es del negocio»: se crea ya enlazada a su servicio.
+  const asBusiness = (insight: SubscriptionInsight, serviceId: string) => {
+    const day = Number(insight.lastDate.slice(8, 10)) || null
+    const { start, next } = initialRecurringDates('monthly', null, day)
+    addTx({
+      type: 'expense',
+      amount: Math.round(insight.amount * 100) / 100,
+      date: start,
+      note: titleCase(insight.merchant),
+      categoryId: insight.categoryId,
+      accountId: insight.accountId,
+      recurring: 'monthly',
+      recurringStart: start,
+      recurringNext: next,
+      resoldAs: serviceId,
+    })
+    const svc = services.find(v => v.id === serviceId)
+    toast(t('subResoldSaved').replace('{name}', svc?.name ?? ''), { icon: 'check', type: 'ok' })
+    setBizFor(null)
+  }
+
+  const toggleRemind = (id: string) => {
+    const next = remind.includes(id) ? remind.filter(x => x !== id) : [...remind, id]
+    setRemind(next)
+    try { localStorage.setItem(REMIND_KEY, JSON.stringify(next)) } catch { /* sin almacenamiento no se recuerda */ }
+  }
+
   if (recurring.length === 0 && detected.length === 0) {
     return (
       <div className="msub-root">
@@ -266,169 +369,145 @@ export function MobileSubscriptions() {
   }
 
   return (
-    <div className="msub-root">
-      <div className="msub-header-row">
-        <button className="msub-add-btn" onClick={() => setAdding(true)}>
-          <Icon name="plus" size={16} /> {t('addSubscriptionLabel')}
-        </button>
-      </div>
-
-      {priceHikes.length > 0 && (
-        <div className="msub-hikes">
-          {priceHikes.map(hike => (
-            <div key={insightKey(hike)} className="msub-hike" role="alert">
-              <span className="msub-hike-icon"><Icon name="arrowUp" size={16} /></span>
-              <div className="msub-hike-text">
-                <b>{t('priceIncreaseTitle').replace('{name}', titleCase(hike.merchant))}</b>
-                <small>
-                  {t('priceIncreaseText')
-                    .replace('{from}', fmt(hike.priceIncrease!.from, currency))
-                    .replace('{to}', fmt(hike.priceIncrease!.to, currency))
-                    .replace('{pct}', String(hike.priceIncrease!.pct))}
-                </small>
-              </div>
-              <button className="msub-hike-dismiss" aria-label={t('ignoreSuggestionLabel')} onClick={() => dismissSuggestion(insightKey(hike))}>
-                <Icon name="close" size={14} />
-              </button>
-            </div>
-          ))}
+    <div className="msub-root u28">
+      {/* U1 · Lo que pagas, y el mes con los logos en su día. */}
+      <section className="u28-hero">
+        <div className="u28-hero-top">
+          <span className="u28-label">{t('u28PayMonthly')}</span>
+          <button className="u28-add" onClick={() => setAdding(true)}>+ {t('u28Add')}</button>
         </div>
-      )}
-
-      {/* Hero stat */}
-      {recurring.length > 0 && (
-        <div className="msub-hero">
-          <div>
-            <div className="msub-hero-label">{t('monthlyRecurringLabel')}</div>
-            <div className="msub-hero-amount">{fmt(totalMonthly, currency)}</div>
-            <div className="msub-hero-count">
-              {t(recurring.length === 1 ? 'recurringPaymentSingular' : 'recurringPaymentPlural').replace('{n}', String(recurring.length))}
-              {' · '}{t('annualEquivalentLabel').replace('{amount}', fmt(totalAnnual, currency))}
-            </div>
-            {/* Solo si hay alguna: con ninguna, esta línea solo explicaría una
-                función que el usuario no usa. */}
-            {totalResold > 0 && (
-              <div className="msub-hero-resold">
-                {t('subResoldTotal')}: <b>{fmt(totalResold, currency)}</b>
-              </div>
-            )}
+        <b className="u28-big">{fmt(totalMonthly, currency)}</b>
+        <small className="u28-sub">
+          {t(propias.length === 1 ? 'recurringPaymentSingular' : 'recurringPaymentPlural').replace('{n}', String(propias.length))}
+          {' · '}{t('annualEquivalentLabel').replace('{amount}', fmt(totalAnnual, currency))}
+          {sharePct !== null && sharePct > 0 && ` · ${t('u28OfIncome').replace('{pct}', String(sharePct))}`}
+        </small>
+        {enTira.length > 0 && (
+          <div className="u28-strip" aria-label={t('upcomingChargesTitle')}>
+            <span className="today"><b>{new Date(`${todayISO}T00:00:00`).getDate()}</b><small>{t('todayLabel')}</small></span>
+            {enTira.map(tx => {
+              const service = tx.serviceId ? SUBSCRIPTION_CATALOG.find(c => c.id === tx.serviceId) : undefined
+              const cat = categories.find(c => c.id === tx.categoryId)
+              return (
+                <button key={tx.id} onClick={() => setSheet({ tx, confirm: false })} aria-label={tx.note}>
+                  <b>{new Date(`${nextDate(tx)}T00:00:00`).getDate()}</b>
+                  <RowTile item={service} fallbackColor={service?.color ?? cat?.color ?? '#888'} fallbackIcon={cat?.icon ?? 'repeat'} size={24} glyph={13} />
+                </button>
+              )
+            })}
           </div>
-          <span className="msub-hero-icon">
-            <Icon name="repeat" size={26} />
+        )}
+      </section>
+
+      {/* U2 · Las detectadas, una pregunta a la vez. */}
+      {detectada && (
+        <section className="u28-ask">
+          <div className="u28-ask-top">
+            <IconTile icon="info" color="var(--m-primary)" size={34} />
+            <span>
+              <b>{t('u28AskTitle')}</b>
+              <small>{t('u28AskSub').replace('{n}', String(detectada.months))}{detected.length > 1 ? ` · ${t('u28AskCount').replace('{n}', String(detected.length))}` : ''}</small>
+            </span>
+          </div>
+          <div className="u28-ask-row">
+            <span className="u28-row-main"><b>{titleCase(detectada.merchant)}</b><small>{t('u28AskDay').replace('{d}', String(Number(detectada.lastDate.slice(8, 10))))}</small></span>
+            <b className="u28-ask-amt">−{fmt(detectada.amount, currency)}</b>
+          </div>
+          <div className="u28-ask-acts">
+            <button onClick={() => {
+              dismissSuggestion(insightKey(detectada))
+              toast(t('subscriptionIgnoredToast').replace('{name}', titleCase(detectada.merchant)), { icon: 'check', type: 'ok' })
+            }}>{t('u28No')}</button>
+            {services.length > 0 && <button onClick={() => setBizFor(detectada)}>{t('u28IsBusiness')}</button>}
+            <button className="pri" onClick={() => setConverting(detectada)}>{t('yes')}</button>
+          </div>
+        </section>
+      )}
+
+      {/* U5 · El repaso, una vez al trimestre. */}
+      {reviewDue && (
+        <button className="u28-review" onClick={() => setReviewing(true)}>
+          <IconTile icon="eye" color="#a78bfa" size={34} />
+          <span><b>{t('u28ReviewTitle')}</b><small>{t('u28ReviewSub')}</small></span>
+          <Icon name="arrowUp" size={13} style={{ transform: 'rotate(90deg)' }} />
+        </button>
+      )}
+
+      {hikesSinFila.map(hike => (
+        <div key={insightKey(hike)} className="u28-review" role="alert">
+          <IconTile icon="arrowUp" color="var(--m-expense)" size={34} />
+          <span>
+            <b>{t('priceIncreaseTitle').replace('{name}', titleCase(hike.merchant))}</b>
+            <small>{t('priceIncreaseText').replace('{from}', fmt(hike.priceIncrease!.from, currency)).replace('{to}', fmt(hike.priceIncrease!.to, currency)).replace('{pct}', String(hike.priceIncrease!.pct))}</small>
           </span>
+          <button className="u28-x" aria-label={t('ignoreSuggestionLabel')} onClick={() => dismissSuggestion(insightKey(hike))}><Icon name="close" size={13} /></button>
         </div>
+      ))}
+
+      {lista.length > 0 && (
+        <>
+          <p className="u28-title">{t('upcomingChargesTitle')}</p>
+          <div className="u28-card">{lista.map(fila)}</div>
+        </>
       )}
 
-      {recurring.length > 0 && (
-        <div className="msub-overview">
-          <article>
-            <small>{t('monthly')}</small>
-            <strong>{monthly.length}</strong>
-          </article>
-          <article>
-            <small>{t('weekly')}</small>
-            <strong>{weekly.length}</strong>
-          </article>
-          <article>
-            <small>{t('nextAbbrev')}</small>
-            <strong>{nextRecurring ? nextLabel(nextRecurring, locale) : '—'}</strong>
-          </article>
-        </div>
+      {/* U7 · Lo que revendes, aparte: lo cubren tus clientes. */}
+      {revendidas.length > 0 && (
+        <>
+          <button className="u28-title u28-title-btn" onClick={() => setVerNegocio(v => !v)} aria-expanded={verNegocio}>
+            {t('u28FromBusiness').replace('{amount}', fmt(totalResold, currency))}
+            <span>{verNegocio ? t('nxkHide') : t('nxkShow')}</span>
+          </button>
+          {verNegocio && <div className="u28-card">{revendidas.map(fila)}</div>}
+        </>
       )}
 
-      {/* Próximos cobros: la secuencia real de lo que viene, ordenada por fecha */}
-      {recurring.length > 0 && (
-        <UpcomingChargesSection txs={recurring} categories={categories} accounts={accounts}
-          currency={currency} locale={locale} lang={lang} t={t} onOpen={tx => setSheet({ tx, confirm: false })} />
+      {!reviewDue && propias.length >= 2 && (
+        <button className="u28-link" onClick={() => setReviewing(true)}>{t('u28ReviewLink')}</button>
       )}
 
-      {/* Detected subscriptions */}
-      {detected.length > 0 && (
-        <DetectedSection items={detected} categories={categories} accounts={accounts}
-          currency={currency} t={t} onConvert={setConverting}
-          onDismiss={item => {
-            dismissSuggestion(insightKey(item))
-            toast(t('subscriptionIgnoredToast').replace('{name}', titleCase(item.merchant)), { icon: 'check', type: 'ok' })
-          }}
-          onDismissAll={() => {
-            detected.forEach(item => dismissSuggestion(insightKey(item)))
-            toast(t('allSuggestionsDismissed'), { icon: 'check', type: 'ok' })
-          }} />
-      )}
-
-      {/* Monthly group */}
-      {monthly.length > 0 && (
-        <Section title={t('monthly')} txs={monthly} categories={categories} accounts={accounts}
-          currency={currency} locale={locale} lang={lang} t={t} onOpen={tx => setSheet({ tx, confirm: false })} />
-      )}
-
-      {weekly.length > 0 && (
-        <Section title={t('weekly')} txs={weekly} categories={categories} accounts={accounts}
-          currency={currency} locale={locale} lang={lang} t={t} onOpen={tx => setSheet({ tx, confirm: false })} />
-      )}
-
-      {/* Action sheet */}
+      {/* U3 · La ficha de una suscripción. */}
       {sheet && (
-        <SheetPortal>
-        <div ref={dialogRef} className="mobile-detail-sheet" role="dialog" aria-modal="true" aria-label={sheet.tx.note} onClick={() => setSheet(null)}>
-          <section className="msub-sheet" onClick={e => e.stopPropagation()}>
-            <header>
-              <span>{sheet.tx.note}</span>
-              <button aria-label={t('close')} onClick={() => setSheet(null)}><Icon name="close" size={18} /></button>
-            </header>
-            <div className="msub-sheet-body">
-              <div className="msub-sheet-amount">
-                {fmt(sheet.tx.amount, currency)}
-                <span>{freqLabel(sheet.tx, t)}</span>
-              </div>
-              <div className="msub-sheet-meta">
-                {t('nextColon')} <strong>{nextLabel(sheet.tx, locale)}</strong>
-              </div>
+        <SubscriptionDetail
+          tx={sheet.tx}
+          services={services}
+          remind={remind.includes(sheet.tx.id)}
+          onToggleRemind={() => toggleRemind(sheet.tx.id)}
+          onClose={() => setSheet(null)}
+          onSkip={() => handleSkipNext(sheet.tx)}
+          onEnd={() => handleEnd(sheet.tx)}
+          onDelete={() => handleDelete(sheet.tx)}
+          onResold={id => {
+            // `undefined` quita el enlace, no cadena vacía (lista blanca de normalizeTransaction).
+            updateTx(sheet.tx.id, { resoldAs: id || undefined })
+            const svc = services.find(v => v.id === id)
+            if (svc) toast(t('subResoldSaved').replace('{name}', svc.name), { icon: 'check', type: 'ok' })
+            setSheet(st => st ? { ...st, tx: { ...st.tx, resoldAs: id || undefined } } : st)
+          }}
+          onChange={patch => { updateTx(sheet.tx.id, patch); setSheet(st => st ? { ...st, tx: { ...st.tx, ...patch } } : st) }}
+        />
+      )}
 
-              {!sheet.confirm ? (
-                <>
-                  <ResoldRow
-                    tx={sheet.tx}
-                    services={services}
-                    currency={currency}
-                    t={t}
-                    onPick={id => {
-                      /*
-                       * `undefined` quita el enlace, no cadena vacía:
-                       * `normalizeTransaction` reconstruye desde una lista
-                       * blanca y una cadena vacía se guardaría como un enlace
-                       * a un servicio con id «».
-                       */
-                      updateTx(sheet.tx.id, { resoldAs: id || undefined })
-                      const svc = services.find(v => v.id === id)
-                      if (svc) toast(t('subResoldSaved').replace('{name}', svc.name), { icon: 'check', type: 'ok' })
-                      setSheet(st => st ? { ...st, tx: { ...st.tx, resoldAs: id || undefined } } : st)
-                    }}
-                  />
-                  <button className="msub-action-btn" onClick={() => handleSkipNext(sheet.tx)}>
-                    <Icon name="calendar" size={16} /> {t('skipNextOccurrence')}
-                  </button>
-                  <button className="msub-action-btn warn" onClick={() => handleEnd(sheet.tx)}>
-                    <Icon name="close" size={16} /> {t('stopFutureOccurrences')}
-                  </button>
-                  <button className="msub-action-btn danger"
-                    onClick={() => setSheet(s => s ? { ...s, confirm: true } : s)}>
-                    <Icon name="trash" size={16} /> {t('deleteTemplateLabel')}
-                  </button>
-                </>
-              ) : (
-                <div className="msub-confirm">
-                  <p>{t('deleteTemplateConfirm').replace('{name}', sheet.tx.note)}</p>
-                  <div className="msub-confirm-row">
-                    <button onClick={() => setSheet(s => s ? { ...s, confirm: false } : s)}>{t('cancel')}</button>
-                    <button className="danger" onClick={() => handleDelete(sheet.tx)}>{t('delete')}</button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </section>
-        </div>
-        </SheetPortal>
+      {bizFor && (
+        <NxSheet title={t('u28WhichService')} sub={titleCase(bizFor.merchant)} onClose={() => setBizFor(null)}>
+          <div className="nx-list">
+            {services.filter(v => !v.archivedAt).map(v => (
+              <button key={v.id} className="an28-pick" onClick={() => asBusiness(bizFor, v.id)}>
+                <span className="an28-row-main"><b>{v.name}</b></span>
+              </button>
+            ))}
+          </div>
+        </NxSheet>
+      )}
+
+      {reviewing && (
+        <ReviewSheet
+          txs={propias}
+          currency={currency}
+          onClose={() => setReviewing(false)}
+          onDone={() => { try { localStorage.setItem(REVIEW_KEY, String(Date.now())) } catch { /* nada */ } }}
+          onOpen={tx => { setReviewing(false); setSheet({ tx, confirm: false }) }}
+        />
       )}
 
       {/* Convert detected subscription to recurrence */}
@@ -443,6 +522,210 @@ export function MobileSubscriptions() {
           lang={lang} t={t} onClose={() => setAdding(false)} onConfirm={handleAddSubscription} />
       )}
     </div>
+  )
+}
+
+const REVIEW_KEY = 'cuadre-subs-review-at'
+const REMIND_KEY = 'cuadre-sub-remind'
+function readRemind(): string[] {
+  try { return JSON.parse(localStorage.getItem(REMIND_KEY) ?? '[]') as string[] } catch { return [] }
+}
+
+/*
+ * U3 · LA FICHA DE UNA SUSCRIPCIÓN (2.8).
+ *
+ * El precio en grande, lo que es al año, cuánto llevas pagándola y cómo ha
+ * cambiado su precio. Filas que se editan en el sitio y tres salidas: saltar
+ * el próximo cobro, «la cancelé» (deja de contarla y guarda su historia) o
+ * borrarla.
+ */
+function SubscriptionDetail({ tx, services, remind, onToggleRemind, onClose, onSkip, onEnd, onDelete, onResold, onChange }: {
+  tx: Transaction
+  services: Service[]
+  remind: boolean
+  onToggleRemind: () => void
+  onClose: () => void
+  onSkip: () => void
+  onEnd: () => void
+  onDelete: () => void
+  onResold: (serviceId: string) => void
+  onChange: (patch: Partial<Transaction>) => void
+}) {
+  const t = useT()
+  const { transactions, accounts, currency } = useFinance()
+  const lang = (useSettings(s => s.language) ?? 'es') as 'en' | 'es'
+  const locale = dateLocale(lang)
+  const [sub, setSub] = useState<'date' | 'account' | null>(null)
+  const [confirm, setConfirm] = useState(false)
+  const service = tx.serviceId ? SUBSCRIPTION_CATALOG.find(c => c.id === tx.serviceId) : undefined
+  const acct = accounts.find(a => a.id === tx.accountId)
+  const history = useMemo(() => priceHistory(transactions, tx), [transactions, tx])
+  const since = tx.recurringStart ?? tx.date
+  const months = Math.max(0, Math.round(daysUntil(today(), since) / 30.4))
+  const last = history[history.length - 1]
+  const first = history[0]
+  const changed = history.length > 1
+  const max = Math.max(1, ...history.map(h => h.amount))
+  const min = Math.min(...history.map(h => h.amount))
+
+  return (
+    <>
+      <NxSheet
+        title={tx.note}
+        sub={service?.name && service.name !== tx.note ? service.name : undefined}
+        onClose={onClose}
+        footer={confirm ? (
+          <>
+            <button className="nx-btn" onClick={() => setConfirm(false)}>{t('cancel')}</button>
+            <button className="nx-btn danger" onClick={onDelete}>{t('delete')}</button>
+          </>
+        ) : undefined}
+      >
+        <div className="u28-detail-top">
+          <RowTile item={service} fallbackColor={service?.color ?? '#888'} fallbackIcon="repeat" size={46} glyph={22} />
+          <span>
+            <b className="u28-big">{fmt(tx.amount, currency)}<em>{freqLabel(tx, t)}</em></b>
+            <small className="u28-sub">
+              {t('annualEquivalentLabel').replace('{amount}', fmt(monthlyEquivalent(tx) * 12, currency))}
+              {months >= 1 && ` · ${t('u28Since').replace('{n}', String(months))}`}
+            </small>
+          </span>
+        </div>
+
+        {changed && (
+          <div className="u28-history">
+            <span className="u28-label">{t('u28PriceHistory')}</span>
+            <svg viewBox="0 0 300 54" width="100%" height="54" preserveAspectRatio="none" aria-hidden="true">
+              <polyline
+                fill="none"
+                stroke="var(--m-primary)"
+                strokeWidth="2.2"
+                points={history.flatMap((h, i) => {
+                  const x0 = (i / history.length) * 300, x1 = ((i + 1) / history.length) * 300
+                  const y = 48 - ((h.amount - min) / Math.max(1, max - min)) * 40
+                  return [`${x0},${y}`, `${x1},${y}`]
+                }).join(' ')}
+              />
+            </svg>
+            <small className={last.amount > first.amount ? 'bad' : 'ok'}>
+              {t(last.amount > first.amount ? 'u28WentUp' : 'u28WentDown')
+                .replace('{from}', fmt(first.amount, currency))
+                .replace('{to}', fmt(last.amount, currency))
+                .replace('{date}', new Date(`${last.since}T00:00:00`).toLocaleDateString(locale, { month: 'short', year: 'numeric' }))}
+            </small>
+          </div>
+        )}
+
+        <div className="nx-list">
+          <button className="an28-pick" onClick={() => setSub('date')}>
+            <span className="an28-row-main"><b>{t('u28NextCharge')}</b></span>
+            <span className="u28-v">{new Date(`${nextDate(tx)}T00:00:00`).toLocaleDateString(locale, { day: 'numeric', month: 'long' })}</span>
+          </button>
+          <button className="an28-pick" onClick={() => setSub('account')}>
+            <span className="an28-row-main"><b>{t('account')}</b></span>
+            <span className="u28-v">{acct?.name ?? '—'}</span>
+          </button>
+          <button className="an28-pick" onClick={onToggleRemind} aria-pressed={remind}>
+            <span className="an28-row-main"><b>{t('u28RemindMe')}</b><small>{t('u28RemindHint')}</small></span>
+            <span className={`u28-v${remind ? ' ok' : ''}`}>{remind ? t('yes') : t('no')}</span>
+          </button>
+        </div>
+
+        <ResoldRow tx={tx} services={services} currency={currency} t={t} onPick={onResold} />
+
+        {!confirm && (
+          <div className="nx-actions">
+            <button onClick={onSkip}>{t('u28Skip')}</button>
+            <button onClick={onEnd}>{t('u28Cancelled')}</button>
+            <button className="danger" onClick={() => setConfirm(true)}>{t('delete')}</button>
+          </div>
+        )}
+        {confirm && <p className="nx-note">{t('deleteTemplateConfirm').replace('{name}', tx.note)}</p>}
+      </NxSheet>
+
+      {sub === 'date' && (
+        <MobileDatePicker value={nextDate(tx)} onChange={v => { onChange({ recurringNext: v }); setSub(null) }} onClose={() => setSub(null)} />
+      )}
+      {sub === 'account' && (
+        <AccountPickSheet title={t('account')} accounts={accounts} value={tx.accountId ?? ''} onPick={id => { onChange({ accountId: id }); setSub(null) }} onClose={() => setSub(null)} />
+      )}
+    </>
+  )
+}
+
+/** El precio de una suscripción a lo largo del tiempo, por tramos («desde» → monto). */
+export function priceHistory(transactions: Transaction[], tx: Transaction): { since: string; amount: number }[] {
+  const n = tx.note.trim().toLowerCase()
+  const cargos = transactions
+    .filter(x => x.type === 'expense' && x.note.trim().toLowerCase() === n && x.date <= today())
+    .sort((a, b) => a.date.localeCompare(b.date))
+  const out: { since: string; amount: number }[] = []
+  for (const c of cargos) {
+    const prev = out[out.length - 1]
+    if (!prev || Math.abs(prev.amount - c.amount) > 0.5) out.push({ since: c.date, amount: c.amount })
+  }
+  if (!out.length) out.push({ since: tx.recurringStart ?? tx.date, amount: tx.amount })
+  else if (Math.abs(out[out.length - 1].amount - tx.amount) > 0.5) out.push({ since: tx.recurringNext ?? today(), amount: tx.amount })
+  return out
+}
+
+/*
+ * U5 · EL REPASO: «¿SIGUES USÁNDOLA?».
+ *
+ * De una en una, con lo que cuesta al año. Nada se cancela solo: al final
+ * queda la lista de las que puedes dejar y cuánto ahorrarías.
+ */
+function ReviewSheet({ txs, currency, onClose, onDone, onOpen }: {
+  txs: Transaction[]
+  currency: CurrencyCode
+  onClose: () => void
+  onDone: () => void
+  onOpen: (tx: Transaction) => void
+}) {
+  const t = useT()
+  const [i, setI] = useState(0)
+  const [drop, setDrop] = useState<string[]>([])
+  const fin = i >= txs.length
+  const actual = txs[i]
+  const ahorro = txs.filter(tx => drop.includes(tx.id)).reduce((s, tx) => s + monthlyEquivalent(tx) * 12, 0)
+  const answer = (dejar: boolean) => {
+    if (dejar && actual) setDrop(d => [...d, actual.id])
+    const next = i + 1
+    setI(next)
+    if (next >= txs.length) onDone()
+  }
+  return (
+    <NxSheet title={t('u28ReviewTitle')} sub={fin ? undefined : t('u28ReviewStep').replace('{n}', String(i + 1)).replace('{of}', String(txs.length))} onClose={onClose}>
+      {!fin && actual ? (
+        <div className="u28-rev">
+          <b className="u28-rev-name">{actual.note}</b>
+          <b className="u28-big">{fmt(monthlyEquivalent(actual) * 12, currency)}<em>{t('u28PerYear')}</em></b>
+          <small className="u28-sub">{fmt(actual.amount, currency)} {freqLabel(actual, t)}</small>
+          <div className="u28-ask-acts">
+            <button onClick={() => answer(true)}>{t('u28CanDrop')}</button>
+            <button className="pri" onClick={() => answer(false)}>{t('u28StillUse')}</button>
+          </div>
+        </div>
+      ) : (
+        <div className="u28-rev">
+          {drop.length ? (
+            <>
+              <b className="u28-rev-name">{t('u28ReviewSave').replace('{n}', String(drop.length)).replace('{amount}', fmt(ahorro, currency))}</b>
+              <small className="u28-sub">{t('u28ReviewSaveHint')}</small>
+              <div className="nx-list">
+                {txs.filter(tx => drop.includes(tx.id)).map(tx => (
+                  <button key={tx.id} className="an28-pick" onClick={() => onOpen(tx)}>
+                    <span className="an28-row-main"><b>{tx.note}</b><small>{fmt(monthlyEquivalent(tx) * 12, currency)} {t('u28PerYear')}</small></span>
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : (
+            <b className="u28-rev-name">{t('u28ReviewAllUsed')}</b>
+          )}
+        </div>
+      )}
+    </NxSheet>
   )
 }
 
@@ -483,17 +766,14 @@ function ResoldRow({ tx, services, currency, t, onPick }: {
       <label className="msub-resold-label" htmlFor="msub-resold-pick">
         {t('subResoldTitle')}
       </label>
-      <select
+      <SheetSelect
         id="msub-resold-pick"
         className="msub-resold-pick"
+        title={t('subResoldTitle')}
         value={tx.resoldAs ?? ''}
-        onChange={e => onPick(e.target.value)}
-      >
-        <option value="">{t('subResoldNone')}</option>
-        {services.map(v => (
-          <option key={v.id} value={v.id}>{v.name}</option>
-        ))}
-      </select>
+        onChange={onPick}
+        options={[{ value: '', label: t('subResoldNone') }, ...services.map(v => ({ value: v.id, label: v.name }))]}
+      />
       <small>{t('subResoldHint')}</small>
       {descuadra && (
         <p className="msub-resold-warn">
@@ -502,74 +782,6 @@ function ResoldRow({ tx, services, currency, t, onPick }: {
             .replace('{declared}', fmt(declarado, currency))
             .replace('{real}', fmt(real, currency))}
         </p>
-      )}
-    </div>
-  )
-}
-
-/**
- * Cuántas sugerencias se enseñan de golpe.
- *
- * Antes salían TODAS. Con ocho cargos recurrentes detectados, la pantalla se
- * convertía en un muro de «¿esto es una suscripción?» por encima de las
- * suscripciones de verdad — que es lo que el usuario venía a ver. Un muro de
- * preguntas se aprende a ignorar entero, así que la novena sugerencia, la
- * buena, tampoco se lee.
- *
- * De tres en tres: se responden, aparecen las siguientes.
- */
-const MAX_SUGGESTIONS_AT_ONCE = 3
-
-function DetectedSection({ items, categories, accounts, currency, t, onConvert, onDismiss, onDismissAll }: {
-  items: SubscriptionInsight[]
-  categories: Category[]
-  accounts: Account[]
-  currency: CurrencyCode
-  t: ReturnType<typeof useT>
-  onConvert: (insight: SubscriptionInsight) => void
-  onDismiss: (insight: SubscriptionInsight) => void
-  onDismissAll: () => void
-}) {
-  const shown = items.slice(0, MAX_SUGGESTIONS_AT_ONCE)
-  const hidden = items.length - shown.length
-  return (
-    <div className="msub-section">
-      <div className="msub-section-header">
-        <span>{t('detectedAutomaticallyLabel')}</span>
-        {/* Salida limpia para quien no quiere ninguna. Sin esto, la unica forma
-            de quitarlas era descartarlas de una en una. */}
-        <button className="msub-dismiss-all" onClick={onDismissAll}>{t('dismissAllLabel')}</button>
-      </div>
-      {shown.map(item => {
-        const cat = categories.find(c => c.id === item.categoryId)
-        const acct = accounts.find(a => a.id === item.accountId)
-        return (
-          <div key={insightKey(item)} className="msub-row msub-detected-row">
-            <RowTile fallbackColor={cat?.color ?? '#888'} fallbackIcon={cat?.icon ?? 'repeat'} />
-            <div className="msub-row-info">
-              <b>{titleCase(item.merchant)}</b>
-              <small>
-                {item.months} {t(item.months === 1 ? 'monthsSingular' : 'monthsPlural')} · {t('confidencePct').replace('{pct}', String(item.confidence))}
-                {acct && <> · <span style={{ color: acct.color }}>●</span> {acct.short}</>}
-              </small>
-            </div>
-            <div className="msub-row-right">
-              <strong className="text-expense">−{fmt(item.amount, currency)}</strong>
-              <div className="msub-detected-actions">
-                <button className="msub-convert-btn" onClick={() => onConvert(item)}>
-                  <Icon name="repeat" size={14} /> {t('convertLabel')}
-                </button>
-                <button className="msub-dismiss-btn" aria-label={t('ignoreSuggestionLabel')} onClick={() => onDismiss(item)}>
-                  <Icon name="close" size={14} />
-                </button>
-              </div>
-            </div>
-          </div>
-        )
-      })}
-      {/* Decir cuantas quedan evita que parezca que la app dejo de detectar. */}
-      {hidden > 0 && (
-        <p className="msub-more-hint">{t('moreSuggestionsHint').replace('{n}', String(hidden))}</p>
       )}
     </div>
   )
@@ -614,126 +826,6 @@ function ConvertSheet({ dialogRef, insight, categories, accounts, currency, lang
   )
 }
 
-function Section({ title, txs, categories, accounts, currency, locale, lang, t, onOpen }: {
-  title: string
-  txs: Transaction[]
-  categories: Category[]
-  accounts: Account[]
-  currency: CurrencyCode
-  locale: string
-  lang: 'en' | 'es'
-  t: ReturnType<typeof useT>
-  onOpen: (tx: Transaction) => void
-}) {
-  const sectionTotal = txs.reduce((s, tx) => s + tx.amount, 0)
-
-  return (
-    <div className="msub-section">
-      <div className="msub-section-header">
-        <span>{title}</span>
-        <span>{fmt(sectionTotal, currency)}</span>
-      </div>
-      {txs.map(tx => {
-        const cat  = categories.find(c => c.id === tx.categoryId)
-        const acct = accounts.find(a => a.id === tx.accountId)
-        const isPast = (tx.recurringNext ?? tx.date) < today()
-        const service = tx.serviceId ? SUBSCRIPTION_CATALOG.find(c => c.id === tx.serviceId) : undefined
-        const chipColor = service?.color ?? cat?.color ?? '#888'
-        const lowFunds = tx.type === 'expense' && !!acct && lacksFunds(acct, tx.amount)
-        return (
-          <button key={tx.id} className="msub-row" onClick={() => onOpen(tx)}>
-            <RowTile item={service} fallbackColor={chipColor} fallbackIcon={cat?.icon ?? 'repeat'} />
-            <div className="msub-row-info">
-              <b>{tx.note || (cat ? translateCategoryName(cat, lang) : '—')}</b>
-              <small>
-                {t('nextAbbrev')} {nextLabel(tx, locale)}
-                {isPast && <span className="msub-overdue"> · {t('overdueLabel')}</span>}
-                {lowFunds && <span className="msub-lowfunds"> · {t('lowFundsWarningShort')}</span>}
-                {acct && <> · <span style={{ color: acct.color }}>●</span> {acct.short}</>}
-              </small>
-            </div>
-            <div className="msub-row-right">
-              <strong className={tx.type === 'expense' ? 'text-expense' : 'text-income'}>
-                {tx.type === 'expense' ? '−' : '+'}{fmt(tx.amount, currency)}
-              </strong>
-              <small>{t('annualEquivalentLabel').replace('{amount}', fmt(monthlyEquivalent(tx) * 12, currency))}</small>
-            </div>
-          </button>
-        )
-      })}
-    </div>
-  )
-}
-
-/**
- * «Próximos cobros»: los siguientes cargos de todas las suscripciones activas,
- * ordenados por fecha. Antes había que abrir cada grupo y sumar de cabeza qué
- * venía primero; aquí se lee la secuencia real de un vistazo, con un contador
- * relativo («en 3 días», «hoy», «vencido») que es lo que de verdad importa.
- */
-function UpcomingChargesSection({ txs, categories, accounts, currency, locale, lang, t, onOpen }: {
-  txs: Transaction[]
-  categories: Category[]
-  accounts: Account[]
-  currency: CurrencyCode
-  locale: string
-  lang: 'en' | 'es'
-  t: ReturnType<typeof useT>
-  onOpen: (tx: Transaction) => void
-}) {
-  const todayISO = today()
-  const upcoming = useMemo(
-    () => [...txs]
-      .filter(tx => !tx.recurringEnd || nextDate(tx) <= tx.recurringEnd)
-      .sort((a, b) => nextDate(a).localeCompare(nextDate(b)))
-      .slice(0, 6),
-    [txs],
-  )
-  if (upcoming.length === 0) return null
-
-  const relLabel = (iso: string): string => {
-    const d = daysUntil(iso, todayISO)
-    if (d < 0) return t('overdueLabel')
-    if (d === 0) return t('todayLabel')
-    if (d === 1) return t('tomorrowLabel')
-    return t('inDaysLabel').replace('{n}', String(d))
-  }
-
-  return (
-    <div className="msub-section">
-      <div className="msub-section-header">
-        <span>{t('upcomingChargesTitle')}</span>
-      </div>
-      <div className="msub-timeline">
-        {upcoming.map(tx => {
-          const cat = categories.find(c => c.id === tx.categoryId)
-          const acct = accounts.find(a => a.id === tx.accountId)
-          const service = tx.serviceId ? SUBSCRIPTION_CATALOG.find(c => c.id === tx.serviceId) : undefined
-          const iso = nextDate(tx)
-          const overdue = daysUntil(iso, todayISO) < 0
-          const lowFunds = !!acct && lacksFunds(acct, tx.amount)
-          return (
-            <button key={tx.id} className="msub-timeline-row" onClick={() => onOpen(tx)}>
-              <span className={`msub-timeline-date${overdue ? ' overdue' : ''}`}>
-                <b>{new Date(`${iso}T00:00:00`).toLocaleDateString(locale, { day: 'numeric' })}</b>
-                <small>{new Date(`${iso}T00:00:00`).toLocaleDateString(locale, { month: 'short' }).replace('.', '')}</small>
-              </span>
-              <RowTile item={service} fallbackColor={service?.color ?? cat?.color ?? '#888'} fallbackIcon={cat?.icon ?? 'repeat'} size={38} glyph={18} />
-              <div className="msub-timeline-info">
-                <b>{tx.note || (cat ? translateCategoryName(cat, lang) : '—')}</b>
-                <small className={overdue ? 'msub-overdue' : lowFunds ? 'msub-lowfunds' : ''}>
-                  {relLabel(iso)}{lowFunds && !overdue && ` · ${t('lowFundsWarningShort')}`}
-                </small>
-              </div>
-              <strong className="text-expense">−{fmt(tx.amount, currency)}</strong>
-            </button>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
 function AddSubscriptionSheet({ dialogRef, categories, accounts, currency, lang, t, onClose, onConfirm }: {
   dialogRef: React.RefObject<HTMLDivElement>
   categories: Category[]
@@ -745,6 +837,8 @@ function AddSubscriptionSheet({ dialogRef, categories, accounts, currency, lang,
   onConfirm: (fields: SubscriptionFormFields) => void
 }) {
   const [picked, setPicked] = useState<{ item: SubscriptionCatalogItem | null } | null>(null)
+  const [q, setQ] = useState('')
+  const catalogo = q.trim() ? SUBSCRIPTION_CATALOG.filter(i => i.name.toLowerCase().includes(q.trim().toLowerCase())) : SUBSCRIPTION_CATALOG
 
   if (!picked) {
     return (
@@ -759,8 +853,12 @@ function AddSubscriptionSheet({ dialogRef, categories, accounts, currency, lang,
             <strong>{t('addSubscriptionLabel')}</strong>
             <p>{t('subscriptionsQuickDesc')}</p>
           </div>
+          <label className="u28-search">
+            <Icon name="search" size={16} />
+            <input value={q} onChange={e => setQ(e.target.value)} placeholder={t('u28SearchBrand')} aria-label={t('u28SearchBrand')} />
+          </label>
           <div className="msub-catalog-grid">
-            {SUBSCRIPTION_CATALOG.map(item => (
+            {catalogo.map(item => (
               <button key={item.id} className="msub-catalog-item" onClick={() => setPicked({ item })}>
                 <ServiceTile item={item} size={52} glyph={28} />
                 <span>{item.name}</span>
@@ -798,6 +896,15 @@ function AddSubscriptionForm({ dialogRef, item, categories, accounts, currency, 
   onConfirm: (fields: SubscriptionFormFields) => void
 }) {
   const expenseCategories = categories.filter(c => c.type === 'expense')
+  const transactions = useFinance(st => st.transactions)
+  // U4 · Si ya hay un cobro con ese nombre, su monto, su día y su cuenta se proponen.
+  const parecido = useMemo(() => {
+    if (!item) return null
+    const n = item.name.toLowerCase()
+    return [...transactions]
+      .filter(tx => tx.type === 'expense' && tx.note.toLowerCase().includes(n))
+      .sort((a, b) => b.date.localeCompare(a.date))[0] ?? null
+  }, [item, transactions])
 
   return (
     <RecurringTxForm
@@ -815,9 +922,11 @@ function AddSubscriptionForm({ dialogRef, item, categories, accounts, currency, 
       lang={lang}
       t={t}
       initialNote={item?.name ?? ''}
-      initialAmount={0}
-      initialCategoryId={item ? suggestedCategoryId(item.categoryHint, categories) : (expenseCategories[0]?.id ?? '')}
-      initialAccountId={accounts[0]?.id ?? ''}
+      initialAmount={parecido?.amount ?? 0}
+      initialMonthDay={parecido ? Number(parecido.date.slice(8, 10)) : null}
+      hint={parecido ? <p className="u28-sub" style={{ margin: '4px 2px 0' }}>{t('u28Suggested')}</p> : undefined}
+      initialCategoryId={parecido?.categoryId ?? (item ? suggestedCategoryId(item.categoryHint, categories) : (expenseCategories[0]?.id ?? ''))}
+      initialAccountId={parecido?.accountId ?? accounts[0]?.id ?? ''}
       initialFrequency="monthly"
       initialServiceId={item?.id}
       onClose={onClose}
@@ -827,11 +936,11 @@ function AddSubscriptionForm({ dialogRef, item, categories, accounts, currency, 
   )
 }
 
-type RecurringFormSub = 'amount' | 'name' | 'account' | 'category' | null
+type RecurringFormSub = 'amount' | 'name' | 'account' | 'category' | 'when' | null
 
 function RecurringTxForm({
   dialogRef, title, preview, hint, confirmLabel, categories, accounts, currency, lang, t,
-  initialNote, initialAmount, initialCategoryId, initialAccountId, initialFrequency, initialServiceId,
+  initialNote, initialAmount, initialCategoryId, initialAccountId, initialFrequency, initialServiceId, initialMonthDay,
   onClose, onBack, onConfirm,
 }: {
   dialogRef: React.RefObject<HTMLDivElement>
@@ -850,6 +959,7 @@ function RecurringTxForm({
   initialAccountId: string
   initialFrequency: RecurrenceFrequency
   initialServiceId?: string
+  initialMonthDay?: number | null
   onClose: () => void
   onBack?: () => void
   onConfirm: (fields: SubscriptionFormFields) => void
@@ -861,7 +971,7 @@ function RecurringTxForm({
   const [accountId, setAccountId] = useState(initialAccountId)
   const [frequency, setFrequency] = useState<RecurrenceFrequency>(initialFrequency)
   const [chargeWeekday, setChargeWeekday] = useState<number | null>(null)
-  const [chargeMonthDay, setChargeMonthDay] = useState<number | null>(null)
+  const [chargeMonthDay, setChargeMonthDay] = useState<number | null>(initialMonthDay ?? null)
   const [sub, setSub] = useState<RecurringFormSub>(null)
 
   useMobileBackDismiss(sub !== null, () => setSub(null))
@@ -932,24 +1042,40 @@ function RecurringTxForm({
                 {arrow}
               </button>
 
-              <div className="mpr-form-row">
+              <button className="mpr-form-row" onClick={() => setSub('when')}>
                 <Icon name="repeat" size={16} style={{ color: 'var(--m-muted)', flexShrink: 0 }} />
-                <span className="mpr-form-row-label">{t('frequencyLabel')}</span>
-                <div className="mpr-pill-row" style={{ flex: 1, justifyContent: 'flex-end' }}>
-                  {(['weekly', 'monthly'] as RecurrenceFrequency[]).map(f => (
-                    <button
-                      key={f}
-                      className={`mpr-pill${frequency === f ? ' on' : ''}`}
-                      style={frequency === f ? { borderColor: 'var(--m-text)', color: 'var(--m-text)' } : {}}
-                      onClick={() => setFrequency(f)}
-                    >
-                      {f === 'weekly' ? t('weekly') : t('monthly')}
-                    </button>
-                  ))}
-                </div>
-              </div>
+                <span className="mpr-form-row-label">{t('n28Every')}</span>
+                <span className="mpr-form-row-val">
+                  {frequency === 'weekly'
+                    ? `${t('weekly')}${chargeWeekday !== null ? ` · ${weekdayLabels[WEEKDAY_ORDER.indexOf(chargeWeekday)]}` : ''}`
+                    : `${t('monthly')}${chargeMonthDay !== null ? ` · ${t('bizDayShort').replace('{n}', String(chargeMonthDay))}` : ''}`}
+                </span>
+                {arrow}
+              </button>
             </div>
 
+            {hint}
+          </div>
+          <div className="msub-form-actions">
+            <button className="msub-form-cancel" onClick={onBack ?? onClose}>{onBack ? t('back') : t('cancel')}</button>
+            <button className="msub-form-save" disabled={!canSave}
+              onClick={() => onConfirm({ note: note.trim(), amount, categoryId, accountId, recurring: frequency, chargeWeekday, chargeMonthDay, serviceId: initialServiceId })}>
+              {confirmLabel}
+            </button>
+          </div>
+        </section>
+      </div>
+      </SheetPortal>
+
+      {sub === 'when' && (
+        <NxSheet title={t('chargeDayLabel')} onClose={() => setSub(null)} footer={<button className="nx-btn pri" onClick={() => setSub(null)}>{t('done')}</button>}>
+          <div className="mpr-pill-row" style={{ marginBottom: 12 }}>
+            {(['weekly', 'monthly'] as RecurrenceFrequency[]).map(f => (
+              <button key={f} className={`mpr-pill${frequency === f ? ' on' : ''}`} onClick={() => setFrequency(f)}>
+                {f === 'weekly' ? t('weekly') : t('monthly')}
+              </button>
+            ))}
+          </div>
             {frequency === 'weekly' && (
               <div className="msub-chargeday">
                 <span className="msub-chargeday-title">{t('chargeDayLabel')}</span>
@@ -998,18 +1124,8 @@ function RecurringTxForm({
               </div>
             )}
 
-            {hint}
-          </div>
-          <div className="msub-form-actions">
-            <button className="msub-form-cancel" onClick={onBack ?? onClose}>{onBack ? t('back') : t('cancel')}</button>
-            <button className="msub-form-save" disabled={!canSave}
-              onClick={() => onConfirm({ note: note.trim(), amount, categoryId, accountId, recurring: frequency, chargeWeekday, chargeMonthDay, serviceId: initialServiceId })}>
-              {confirmLabel}
-            </button>
-          </div>
-        </section>
-      </div>
-      </SheetPortal>
+        </NxSheet>
+      )}
 
       {sub === 'amount' && (
         <MobileAmountSheet

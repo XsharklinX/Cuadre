@@ -21,6 +21,12 @@ interface SettingsState {
   releaseChannel: 'stable' | 'beta'
   errorTelemetryEnabled: boolean
   displayName: string
+  /**
+   * Las plantillas de Negocio, si el usuario las cambió. Vacías = las de la
+   * app, en su idioma. Se escriben una vez y sirven para todos los clientes.
+   */
+  bizReminderTemplate: string
+  bizThanksTemplate: string
   /** Data URL (JPEG, ya recortada a cuadrado y reducida) de la foto de perfil; `null` = usar la inicial del nombre. */
   profilePhoto: string | null
   language: 'en' | 'es'
@@ -157,6 +163,7 @@ interface SettingsState {
   setReleaseChannel: (v: SettingsState['releaseChannel']) => void
   setErrorTelemetryEnabled: (v: boolean) => void
   setDisplayName: (v: string) => void
+  setBizTemplates: (fields: Partial<Pick<SettingsState, 'bizReminderTemplate' | 'bizThanksTemplate'>>) => void
   setProfilePhoto: (v: string | null) => void
   setLanguage: (v: 'en' | 'es') => void
   setLanguageAutoDetected: (v: boolean) => void
@@ -222,6 +229,8 @@ export const useSettings = create<SettingsState>()(
       releaseChannel: 'stable',
       errorTelemetryEnabled: false,
       displayName: '',
+      bizReminderTemplate: '',
+      bizThanksTemplate: '',
       profilePhoto: null,
       language: 'es',
       languageAutoDetected: false,
@@ -278,6 +287,7 @@ export const useSettings = create<SettingsState>()(
       setReleaseChannel: (releaseChannel) => set({ releaseChannel }),
       setErrorTelemetryEnabled: (errorTelemetryEnabled) => set({ errorTelemetryEnabled }),
       setDisplayName: (displayName) => set({ displayName }),
+      setBizTemplates: (fields) => set(fields),
       setProfilePhoto: (profilePhoto) => set({ profilePhoto }),
       setLanguage: (language) => set({ language }),
       setLanguageAutoDetected: (languageAutoDetected) => set({ languageAutoDetected }),

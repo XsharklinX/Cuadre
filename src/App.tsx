@@ -9,9 +9,11 @@ import { currentMonthKey, monthKeys } from '@/data/helpers'
 import { ToastHost } from '@/components/ui/Toast'
 import { deleteWithUndo } from '@/lib/undoDelete'
 import { installTapFeedback } from '@/lib/tapFeedback'
+import { installSheetMotion } from '@/lib/sheetMotion'
 import { pruneOrphanReceipts } from '@/lib/receiptStore'
 import { DialogProvider } from '@/components/ui/DialogProvider'
 import { useRecurring } from '@/hooks/useRecurring'
+import { useBusinessAutomation } from '@/hooks/useBusinessAutomation'
 import { useGoalAutoContributions } from '@/hooks/useGoalAutoContributions'
 import { useNotifications } from '@/hooks/useNotifications'
 import { useUpcomingPaymentAlerts } from '@/hooks/useUpcomingPaymentAlerts'
@@ -44,6 +46,7 @@ import { MobileWhatsNew } from '@/mobile/MobileWhatsNew'
 import { MobileWelcome2 } from '@/mobile/MobileWelcome2'
 import { useExitConfirm } from '@/mobile/useExitConfirm'
 import { useMobileBackDismiss } from '@/mobile/useMobileBackDismiss'
+import { guardedClose } from '@/mobile/closeGuard'
 import type { Sheet } from '@/mobile/settings/shared'
 import type { Transaction, ViewId, ViewProps } from '@/types'
 
@@ -107,6 +110,8 @@ export default function App() {
    * un único ajuste, porque `playTapHaptic` ya consulta `hapticsEnabled`.
    */
   useEffect(() => installTapFeedback(), [])
+  // Hojas que salen con animación y se bajan con el dedo; modo ligero; presión.
+  useEffect(() => installSheetMotion(), [])
 
   /*
    * FOTOS DE RECIBO SIN DUEÑO.
@@ -157,6 +162,7 @@ export default function App() {
   }, [hydrated])
 
   useRecurring()
+  useBusinessAutomation()
   useGoalAutoContributions()
   useExitConfirm()
   useNotifications()
@@ -208,7 +214,7 @@ export default function App() {
       setSettingsOpen(false)
       setSettingsInitialSheet(null)
     }
-    else if (txForm) setTxForm(null)
+    else if (txForm) return guardedClose(() => setTxForm(null))
   })
 
   const resolvedTheme = useResolvedTheme()

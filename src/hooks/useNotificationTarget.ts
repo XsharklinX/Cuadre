@@ -3,11 +3,11 @@ import { isTauri } from './useTauri'
 
 export type NotificationTargetType =
   | 'budget' | 'recurring' | 'lowfunds' | 'goal' | 'weekly' | 'fx' | 'anomaly' | 'activity'
-  | 'charge'
+  | 'charge' | 'caprice' | 'debt' | 'cashflow' | 'subscription'
 
 const NOTIFICATION_PREFIX = 'sharky://notification/'
 const TARGET_TYPES: NotificationTargetType[] =
-  ['budget', 'recurring', 'lowfunds', 'goal', 'weekly', 'fx', 'anomaly', 'activity', 'charge']
+  ['budget', 'recurring', 'lowfunds', 'goal', 'weekly', 'fx', 'anomaly', 'activity', 'charge', 'caprice', 'debt', 'cashflow', 'subscription']
 
 function isTargetType(id: string): id is NotificationTargetType {
   return (TARGET_TYPES as string[]).includes(id)

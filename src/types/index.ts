@@ -45,6 +45,8 @@ export type IconName =
   | 'banknote' | 'coins' | 'handCoins' | 'landmark' | 'receipt'
   // compartir / portapapeles
   | 'share' | 'clipboard'
+  // interfaz 2.5: ordenar, fijar, pausar, duplicar y el menú lateral
+  | 'grip' | 'pin' | 'pause' | 'copy' | 'menu'
 
 // ── Entidades financieras ─────────────────────────────────
 export interface Account {
@@ -294,6 +296,22 @@ export interface Transaction {
    * gasto concreto PAGÓ ese servicio, y son tres cosas distintas.
    */
   paidService?: string
+  /**
+   * CUÁL DE LAS CUENTAS de ese servicio pagó.
+   *
+   * Netflix con dos cuentas se paga dos veces al mes, a veces en días
+   * distintos. Sin esto, el pago automático no sabría si el gasto del día 12
+   * era de la cuenta 1 o de la 2, y podría registrar otra vez la que ya
+   * pagaste a mano.
+   */
+  paidAccount?: string
+  /**
+   * Lo registró la app sola, el día que tocaba (ver `useBusinessAutomation`).
+   *
+   * Para decirlo en la lista —«automático»— y para que deshacer el aviso de
+   * «registré Netflix» sepa qué borrar sin tocar lo que pusiste tú.
+   */
+  autoPaid?: boolean
   tags?:        string[]            // ej. ['trabajo', 'viaje']
   /**
    * FOTO DEL RECIBO: aquí va solo la MARCA de que existe, no la imagen.
@@ -397,6 +415,10 @@ export interface Goal {
   openingSaved?: number
   /** Aporte periódico automático hacia esta meta, generado como GoalContribution. */
   autoContribute?: GoalAutoContribute
+  /** El aporte automático está pausado: se conserva la configuración pero no corre. */
+  autoPaused?: boolean
+  /** Fecha (YYYY-MM-DD) en que se dio por lograda, llegara o no al 100 %. */
+  achievedAt?: string
 }
 
 export interface GoalContribution {
@@ -406,6 +428,8 @@ export interface GoalContribution {
   fromAccountId: string
   date: string
   note?: string
+  /** Sacar de la meta: el dinero vuelve a `fromAccountId`. `amount` sigue siendo positivo. */
+  withdraw?: boolean
 }
 
 export interface Currency {

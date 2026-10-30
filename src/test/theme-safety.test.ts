@@ -29,7 +29,7 @@ import { join } from 'node:path'
 const ESTILOS = join(__dirname, '..', 'styles')
 
 /** Las hojas que esta regla cubre. Las viejas quedan fuera a propósito. */
-const VIGILADAS = ['mobile-business.css', 'mobile-juice.css']
+const VIGILADAS = ['mobile-business.css', 'mobile-juice.css', 'mobile-tacto.css']
 
 /**
  * Colores que se permiten aunque sean literales.

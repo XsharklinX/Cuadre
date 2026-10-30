@@ -126,6 +126,46 @@ export interface Client {
   active: boolean
   createdAt: number
   notes?: string
+  /**
+   * BORRADO, PERO CON SU HISTORIAL.
+   *
+   * Al cargar, la app descarta los cobros cuyo cliente no existe. Así que
+   * «bórralo pero que lo que me pagó siga contando» no puede ser borrarlo de
+   * verdad: es esto. Sale de todas las listas y no genera cobros, y sus cobros
+   * pagados siguen sumando en Ganancia y en su servicio.
+   */
+  deletedAt?: number
+  /**
+   * LAS ESTRELLAS: cada una es alguien que te trajo.
+   *
+   * No es una nota de cariño: es lo que da el descuento (ver `referrals.ts`).
+   * Se guarda cuándo y a quién trajo porque las estrellas pueden caducar, y
+   * porque «me trajo a Juan» se puede comprobar; «le puse tres estrellas»,
+   * no.
+   */
+  stars?: ClientStar[]
+  /**
+   * Quién te lo recomendó. Al guardarlo, ese cliente gana una estrella sola:
+   * es lo que hace que el programa funcione sin tener que acordarse.
+   */
+  referredBy?: string
+  /**
+   * SE COBRA SOLO: paga por transferencia automática y nunca falla.
+   *
+   * Apagado por defecto. Un ingreso que aparece solo y no llegó es peor que
+   * uno que hay que marcar, así que esto es para quien de verdad paga sin
+   * fallar, y lo decide el usuario cliente por cliente.
+   */
+  autoCollect?: boolean
+}
+
+/** Una recomendación: cuándo, y a quién trajo si se sabe. */
+export interface ClientStar {
+  at: number
+  /** El cliente que trajo, si está en la app. */
+  referredId?: string
+  /** O lo que se quiera apuntar: «me trajo a su hermana». */
+  note?: string
 }
 
 /** Un cobro esperado. NO es dinero: es una expectativa con fecha. */
@@ -157,6 +197,14 @@ export interface Charge {
    * meterlas en la ficha convertiría su perfil en un diario.
    */
   note?: string
+  /**
+   * El descuento por estrellas que llevaba ESTE cobro al generarse, en %.
+   *
+   * Se guarda en el cobro y no se recalcula: si mañana caduca una estrella,
+   * lo que ya se le pidió no cambia. Y es lo que permite decirle «este mes
+   * pagas 315 en vez de 350 por recomendarnos».
+   */
+  discountPct?: number
 }
 
 export type ChargeState = 'paid' | 'partial' | 'late' | 'today' | 'upcoming' | 'waived'
